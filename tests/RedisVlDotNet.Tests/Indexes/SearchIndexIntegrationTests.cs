@@ -11,7 +11,7 @@ public sealed class SearchIndexIntegrationTests
     [RedisSearchIntegrationFact]
     public async Task CreatesInspectsAndDropsIndex()
     {
-        await using var connection = await ConnectionMultiplexer.ConnectAsync(RedisSearchTestEnvironment.ConnectionString!);
+        await using var connection = await RedisSearchTestEnvironment.ConnectAsync();
         var database = connection.GetDatabase();
 
         var token = Guid.NewGuid().ToString("N");
@@ -51,7 +51,7 @@ public sealed class SearchIndexIntegrationTests
     [RedisSearchIntegrationFact]
     public async Task ExecutesAsyncIndexAndTypedQueryFlowWithCancellationToken()
     {
-        await using var connection = await ConnectionMultiplexer.ConnectAsync(RedisSearchTestEnvironment.ConnectionString!);
+        await using var connection = await RedisSearchTestEnvironment.ConnectAsync();
         var database = connection.GetDatabase();
 
         var token = Guid.NewGuid().ToString("N");
@@ -74,8 +74,7 @@ public sealed class SearchIndexIntegrationTests
                     new HashMovieDocument("movie-2", "Arrival", 2016, "science-fiction")
                 ],
                 cancellationToken: cancellationTokenSource.Token);
-
-            await Task.Delay(TimeSpan.FromMilliseconds(250), cancellationTokenSource.Token);
+            await RedisSearchTestEnvironment.WaitForIndexDocumentCountAsync(index, 2, cancellationTokenSource.Token);
 
             var results = await index.SearchAsync<HashMovieDocument>(
                 new FilterQuery(
@@ -106,7 +105,7 @@ public sealed class SearchIndexIntegrationTests
     [RedisSearchIntegrationFact]
     public async Task LoadsFetchesAndDeletesJsonDocuments()
     {
-        await using var connection = await ConnectionMultiplexer.ConnectAsync(RedisSearchTestEnvironment.ConnectionString!);
+        await using var connection = await RedisSearchTestEnvironment.ConnectAsync();
         var database = connection.GetDatabase();
 
         var token = Guid.NewGuid().ToString("N");
@@ -164,7 +163,7 @@ public sealed class SearchIndexIntegrationTests
     [RedisSearchIntegrationFact]
     public async Task LoadsFetchesAndDeletesHashDocuments()
     {
-        await using var connection = await ConnectionMultiplexer.ConnectAsync(RedisSearchTestEnvironment.ConnectionString!);
+        await using var connection = await RedisSearchTestEnvironment.ConnectAsync();
         var database = connection.GetDatabase();
 
         var token = Guid.NewGuid().ToString("N");
@@ -222,7 +221,7 @@ public sealed class SearchIndexIntegrationTests
     [RedisSearchIntegrationFact]
     public async Task ExecutesFilterAndCountQueriesAcrossSupportedFieldTypes()
     {
-        await using var connection = await ConnectionMultiplexer.ConnectAsync(RedisSearchTestEnvironment.ConnectionString!);
+        await using var connection = await RedisSearchTestEnvironment.ConnectAsync();
         var database = connection.GetDatabase();
 
         var token = Guid.NewGuid().ToString("N");
@@ -239,33 +238,8 @@ public sealed class SearchIndexIntegrationTests
         try
         {
             await index.CreateAsync();
-
-            await database.HashSetAsync(
-                $"{schema.Index.Prefix}1",
-                [
-                    new HashEntry("title", "Heat"),
-                    new HashEntry("genre", "crime"),
-                    new HashEntry("year", 1995),
-                    new HashEntry("location", "-118.2437,34.0522")
-                ]);
-            await database.HashSetAsync(
-                $"{schema.Index.Prefix}2",
-                [
-                    new HashEntry("title", "Thief"),
-                    new HashEntry("genre", "crime"),
-                    new HashEntry("year", 1981),
-                    new HashEntry("location", "-87.6298,41.8781")
-                ]);
-            await database.HashSetAsync(
-                $"{schema.Index.Prefix}3",
-                [
-                    new HashEntry("title", "Arrival"),
-                    new HashEntry("genre", "science-fiction"),
-                    new HashEntry("year", 2016),
-                    new HashEntry("location", "-73.5673,45.5017")
-                ]);
-
-            await Task.Delay(TimeSpan.FromMilliseconds(250));
+            await SeedHashDocumentsAsync(database, schema, SearchIndexSeedData.FilterMovies);
+            await RedisSearchTestEnvironment.WaitForIndexDocumentCountAsync(index, SearchIndexSeedData.FilterMovies.Count);
 
             var tagResults = await index.SearchAsync(new FilterQuery(
                 Filter.Tag("genre").Eq("crime"),
@@ -311,7 +285,7 @@ public sealed class SearchIndexIntegrationTests
     [RedisSearchIntegrationFact]
     public async Task ExecutesVectorQueriesWithDeterministicRanking()
     {
-        await using var connection = await ConnectionMultiplexer.ConnectAsync(RedisSearchTestEnvironment.ConnectionString!);
+        await using var connection = await RedisSearchTestEnvironment.ConnectAsync();
         var database = connection.GetDatabase();
 
         var token = Guid.NewGuid().ToString("N");
@@ -333,30 +307,8 @@ public sealed class SearchIndexIntegrationTests
         try
         {
             await index.CreateAsync();
-
-            await database.HashSetAsync(
-                $"{schema.Index.Prefix}1",
-                [
-                    new HashEntry("title", "Heat"),
-                    new HashEntry("genre", "crime"),
-                    new HashEntry("embedding", EncodeFloat32([1f, 0f]))
-                ]);
-            await database.HashSetAsync(
-                $"{schema.Index.Prefix}2",
-                [
-                    new HashEntry("title", "Thief"),
-                    new HashEntry("genre", "crime"),
-                    new HashEntry("embedding", EncodeFloat32([0.8f, 0.2f]))
-                ]);
-            await database.HashSetAsync(
-                $"{schema.Index.Prefix}3",
-                [
-                    new HashEntry("title", "Arrival"),
-                    new HashEntry("genre", "science-fiction"),
-                    new HashEntry("embedding", EncodeFloat32([0f, 1f]))
-                ]);
-
-            await Task.Delay(TimeSpan.FromMilliseconds(250));
+            await SeedHashDocumentsAsync(database, schema, SearchIndexSeedData.VectorMovies);
+            await RedisSearchTestEnvironment.WaitForIndexDocumentCountAsync(index, SearchIndexSeedData.VectorMovies.Count);
 
             var query = VectorQuery.FromFloat32(
                 "embedding",
@@ -388,7 +340,7 @@ public sealed class SearchIndexIntegrationTests
     [RedisSearchIntegrationFact]
     public async Task ExecutesHybridQueriesWithDeterministicRanking()
     {
-        await using var connection = await ConnectionMultiplexer.ConnectAsync(RedisSearchTestEnvironment.ConnectionString!);
+        await using var connection = await RedisSearchTestEnvironment.ConnectAsync();
         var database = connection.GetDatabase();
 
         var token = Guid.NewGuid().ToString("N");
@@ -410,30 +362,8 @@ public sealed class SearchIndexIntegrationTests
         try
         {
             await index.CreateAsync();
-
-            await database.HashSetAsync(
-                $"{schema.Index.Prefix}1",
-                [
-                    new HashEntry("title", "Heat"),
-                    new HashEntry("genre", "crime"),
-                    new HashEntry("embedding", EncodeFloat32([1f, 0f]))
-                ]);
-            await database.HashSetAsync(
-                $"{schema.Index.Prefix}2",
-                [
-                    new HashEntry("title", "Heatwave"),
-                    new HashEntry("genre", "crime"),
-                    new HashEntry("embedding", EncodeFloat32([0.8f, 0.2f]))
-                ]);
-            await database.HashSetAsync(
-                $"{schema.Index.Prefix}3",
-                [
-                    new HashEntry("title", "Arrival"),
-                    new HashEntry("genre", "science-fiction"),
-                    new HashEntry("embedding", EncodeFloat32([0f, 1f]))
-                ]);
-
-            await Task.Delay(TimeSpan.FromMilliseconds(250));
+            await SeedHashDocumentsAsync(database, schema, SearchIndexSeedData.HybridMovies);
+            await RedisSearchTestEnvironment.WaitForIndexDocumentCountAsync(index, SearchIndexSeedData.HybridMovies.Count);
 
             var query = HybridQuery.FromFloat32(
                 Filter.Text("title").Prefix("He"),
@@ -466,7 +396,7 @@ public sealed class SearchIndexIntegrationTests
     [RedisSearchIntegrationFact]
     public async Task ExecutesVectorRangeQueriesWithThresholdOrdering()
     {
-        await using var connection = await ConnectionMultiplexer.ConnectAsync(RedisSearchTestEnvironment.ConnectionString!);
+        await using var connection = await RedisSearchTestEnvironment.ConnectAsync();
         var database = connection.GetDatabase();
 
         var token = Guid.NewGuid().ToString("N");
@@ -488,30 +418,8 @@ public sealed class SearchIndexIntegrationTests
         try
         {
             await index.CreateAsync();
-
-            await database.HashSetAsync(
-                $"{schema.Index.Prefix}1",
-                [
-                    new HashEntry("title", "Heat"),
-                    new HashEntry("genre", "crime"),
-                    new HashEntry("embedding", EncodeFloat32([1f, 0f]))
-                ]);
-            await database.HashSetAsync(
-                $"{schema.Index.Prefix}2",
-                [
-                    new HashEntry("title", "Thief"),
-                    new HashEntry("genre", "crime"),
-                    new HashEntry("embedding", EncodeFloat32([0.8f, 0.2f]))
-                ]);
-            await database.HashSetAsync(
-                $"{schema.Index.Prefix}3",
-                [
-                    new HashEntry("title", "Arrival"),
-                    new HashEntry("genre", "science-fiction"),
-                    new HashEntry("embedding", EncodeFloat32([0f, 1f]))
-                ]);
-
-            await Task.Delay(TimeSpan.FromMilliseconds(250));
+            await SeedHashDocumentsAsync(database, schema, SearchIndexSeedData.VectorMovies);
+            await RedisSearchTestEnvironment.WaitForIndexDocumentCountAsync(index, SearchIndexSeedData.VectorMovies.Count);
 
             var query = VectorRangeQuery.FromFloat32(
                 "embedding",
@@ -549,10 +457,18 @@ public sealed class SearchIndexIntegrationTests
 
     private sealed record HashMovieEnvelope(string ExternalId, string Title, int Year, string Genre);
 
-    private static byte[] EncodeFloat32(float[] vector)
+    private static async Task SeedHashDocumentsAsync(
+        IDatabase database,
+        SearchSchema schema,
+        IEnumerable<SearchIndexSeedData.HashSeedDocument> documents)
     {
-        var bytes = new byte[vector.Length * sizeof(float)];
-        Buffer.BlockCopy(vector, 0, bytes, 0, bytes.Length);
-        return bytes;
+        ArgumentNullException.ThrowIfNull(database);
+        ArgumentNullException.ThrowIfNull(schema);
+        ArgumentNullException.ThrowIfNull(documents);
+
+        foreach (var document in documents)
+        {
+            await database.HashSetAsync($"{schema.Index.Prefix}{document.Id}", document.Entries);
+        }
     }
 }

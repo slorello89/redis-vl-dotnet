@@ -10,7 +10,7 @@ public sealed class SemanticRouterIntegrationTests
     [RedisSearchIntegrationFact]
     public async Task CreatesRoutesAndMatchesNearestRoute()
     {
-        await using var connection = await ConnectionMultiplexer.ConnectAsync(RedisSearchTestEnvironment.ConnectionString!);
+        await using var connection = await RedisSearchTestEnvironment.ConnectAsync();
         var database = connection.GetDatabase();
 
         var token = Guid.NewGuid().ToString("N");
@@ -21,8 +21,12 @@ public sealed class SemanticRouterIntegrationTests
             await router.CreateAsync();
             await router.AddRouteAsync("billing", "refund status", [1f, 0f]);
             await router.AddRouteAsync("support", "technical troubleshooting", [0f, 1f]);
-
-            await Task.Delay(TimeSpan.FromMilliseconds(250));
+            await RedisSearchTestEnvironment.WaitForAsync(
+                async () =>
+                {
+                    var ready = await router.RouteAsync("refund status", [1f, 0f]);
+                    return ready is not null;
+                });
 
             var match = await router.RouteAsync("where is my refund?", [1.1f, 0f]);
 
@@ -43,7 +47,7 @@ public sealed class SemanticRouterIntegrationTests
     [RedisSearchIntegrationFact]
     public async Task ReturnsMissWhenNearestRouteFallsOutsideThreshold()
     {
-        await using var connection = await ConnectionMultiplexer.ConnectAsync(RedisSearchTestEnvironment.ConnectionString!);
+        await using var connection = await RedisSearchTestEnvironment.ConnectAsync();
         var database = connection.GetDatabase();
 
         var token = Guid.NewGuid().ToString("N");
@@ -53,8 +57,12 @@ public sealed class SemanticRouterIntegrationTests
         {
             await router.CreateAsync();
             await router.AddRouteAsync("billing", "refund status", [1f, 0f]);
-
-            await Task.Delay(TimeSpan.FromMilliseconds(250));
+            await RedisSearchTestEnvironment.WaitForAsync(
+                async () =>
+                {
+                    var ready = await router.RouteAsync("refund status", [1f, 0f]);
+                    return ready is not null;
+                });
 
             var miss = await router.RouteAsync("reset my password", [0f, 1f]);
 

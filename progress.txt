@@ -22,6 +22,7 @@ Started: Thu Apr  9 16:10:38 EDT 2026
 - For exact-match cache primitives, use a dedicated Redis keyspace with per-entry TTL, hash user input into bounded keys, and store the original input alongside the payload so collision checks preserve exact-match semantics.
 - For semantic cache primitives, back each cache with a dedicated RediSearch index over HASH documents, store vector payloads as raw bytes in hash fields, and hash prompts into stable Redis keys so semantic lookup and per-entry TTL can coexist cleanly.
 - For higher-level semantic workflows, layer on `SearchIndex` with dedicated HASH-backed workflow documents and write vector bytes directly into hash fields so provider-agnostic routing or cache APIs can reuse the query stack without depending on the generic POCO hash mapper.
+- For Redis-backed integration coverage, keep deterministic seed datasets in shared test fixtures and wait on index readiness with bounded polling helpers instead of fixed `Task.Delay(...)` sleeps.
 ---
 
 ## 2026-04-09 16:14 EDT - US-001
@@ -195,4 +196,14 @@ Started: Thu Apr  9 16:10:38 EDT 2026
   - Patterns discovered: higher-level semantic workflows can stay small and reusable if they own only workflow-specific document fields and delegate all vector search behavior to the existing `SearchIndex` and `VectorRangeQuery` stack.
   - Gotchas encountered: typed result mapping follows the web-default camel-case naming policy, so workflow field names should avoid snake_case defaults unless the DTOs opt into explicit `JsonPropertyName` annotations.
   - Useful context: there is no `AGENTS.md` file under this repository path today, so workflow-specific guidance currently lives in this progress log instead of an area-local agent note.
+---
+## 2026-04-09 17:29 EDT - US-017
+- Implemented a deterministic Redis-backed test harness by adding reusable readiness polling helpers, shared seeded HASH/vector datasets, and integration-test updates that now wait for indexed state instead of relying on fixed sleeps.
+- Added local and CI execution paths for Redis-backed tests with `docker-compose.integration.yml`, a GitHub Actions workflow that provisions `redis/redis-stack-server`, and testing documentation in `README.md` and `docs/testing.md`.
+- Files changed: `README.md`, `docs/testing.md`, `docker-compose.integration.yml`, `.github/workflows/ci.yml`, `tests/RedisVlDotNet.Tests/Indexes/RedisSearchTestEnvironment.cs`, `tests/RedisVlDotNet.Tests/Indexes/SearchIndexSeedData.cs`, `tests/RedisVlDotNet.Tests/Indexes/SearchIndexIntegrationTests.cs`, `tests/RedisVlDotNet.Tests/Caches/SemanticCacheIntegrationTests.cs`, `tests/RedisVlDotNet.Tests/Workflows/SemanticRouterIntegrationTests.cs`, `prd.json`, `progress.txt`
+- Quality checks run and result: `dotnet build redis-vl-dotnet.sln` passed; `dotnet test redis-vl-dotnet.sln` passed with Redis integration tests skipped because `REDIS_VL_REDIS_URL` was not set; `docker compose -f docker-compose.integration.yml up -d redis-stack` could not run because the local Docker daemon was unavailable in this environment; `redis-cli -p 6379 ping` failed because no local Redis instance was running.
+- Learnings for future iterations:
+  - Patterns discovered: centralize deterministic Redis seed data so vector, hybrid, and filter assertions reuse the same fixtures across tests and CI.
+  - Gotchas encountered: local Docker CLI availability is not enough for live integration validation, so record daemon availability explicitly and rely on CI service containers when the workspace cannot start Redis locally.
+  - Useful context: the new CI workflow sets `REDIS_VL_REDIS_URL=localhost:6379`, so the same opt-in integration tests used locally become mandatory on pushes and pull requests.
 ---

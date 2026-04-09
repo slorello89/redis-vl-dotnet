@@ -10,7 +10,7 @@ public sealed class SemanticCacheIntegrationTests
     [RedisSearchIntegrationFact]
     public async Task CreatesStoresAndChecksSemanticMatches()
     {
-        await using var connection = await ConnectionMultiplexer.ConnectAsync(RedisSearchTestEnvironment.ConnectionString!);
+        await using var connection = await RedisSearchTestEnvironment.ConnectAsync();
         var database = connection.GetDatabase();
 
         var token = Guid.NewGuid().ToString("N");
@@ -21,8 +21,8 @@ public sealed class SemanticCacheIntegrationTests
         {
             await cache.CreateAsync();
             await cache.StoreAsync("prompt-a", "cached-a", [1f, 0f]);
-
-            await Task.Delay(TimeSpan.FromMilliseconds(250));
+            await RedisSearchTestEnvironment.WaitForAsync(
+                async () => await cache.CheckAsync("prompt-a", [1f, 0f]) is not null);
 
             var hit = await cache.CheckAsync("prompt-b", [1.2f, 0f]);
 
@@ -43,7 +43,7 @@ public sealed class SemanticCacheIntegrationTests
     [RedisSearchIntegrationFact]
     public async Task ReturnsMissWhenNearestPromptFallsOutsideThreshold()
     {
-        await using var connection = await ConnectionMultiplexer.ConnectAsync(RedisSearchTestEnvironment.ConnectionString!);
+        await using var connection = await RedisSearchTestEnvironment.ConnectAsync();
         var database = connection.GetDatabase();
 
         var token = Guid.NewGuid().ToString("N");
@@ -53,8 +53,8 @@ public sealed class SemanticCacheIntegrationTests
         {
             await cache.CreateAsync();
             await cache.StoreAsync("prompt-a", "cached-a", [1f, 0f]);
-
-            await Task.Delay(TimeSpan.FromMilliseconds(250));
+            await RedisSearchTestEnvironment.WaitForAsync(
+                async () => await cache.CheckAsync("prompt-a", [1f, 0f]) is not null);
 
             var miss = await cache.CheckAsync("prompt-c", [0f, 1f]);
 
@@ -72,7 +72,7 @@ public sealed class SemanticCacheIntegrationTests
     [RedisSearchIntegrationFact]
     public async Task HonorsThresholdBoundaryAcrossCacheInstances()
     {
-        await using var connection = await ConnectionMultiplexer.ConnectAsync(RedisSearchTestEnvironment.ConnectionString!);
+        await using var connection = await RedisSearchTestEnvironment.ConnectAsync();
         var database = connection.GetDatabase();
 
         var token = Guid.NewGuid().ToString("N");
@@ -83,8 +83,8 @@ public sealed class SemanticCacheIntegrationTests
         {
             await permissiveCache.CreateAsync();
             await permissiveCache.StoreAsync("prompt-a", "cached-a", [1f, 0f]);
-
-            await Task.Delay(TimeSpan.FromMilliseconds(250));
+            await RedisSearchTestEnvironment.WaitForAsync(
+                async () => await permissiveCache.CheckAsync("prompt-a", [1f, 0f]) is not null);
 
             var permissiveHit = await permissiveCache.CheckAsync("prompt-b", [1.2f, 0f]);
             var strictMiss = await strictCache.CheckAsync("prompt-b", [1.2f, 0f]);
