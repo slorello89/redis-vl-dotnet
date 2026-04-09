@@ -249,6 +249,9 @@ public sealed class SearchIndex
     public SearchResults Search(VectorQuery query) =>
         SearchAsync(query).GetAwaiter().GetResult();
 
+    public SearchResults Search(FilterQuery query) =>
+        SearchAsync(query).GetAwaiter().GetResult();
+
     public async Task<SearchResults> SearchAsync(VectorQuery query, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(query);
@@ -259,6 +262,33 @@ public sealed class SearchIndex
             cancellationToken).ConfigureAwait(false);
 
         return SearchResultsParser.Parse(result);
+    }
+
+    public async Task<SearchResults> SearchAsync(FilterQuery query, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(query);
+
+        var result = await ExecuteAsync(
+            "FT.SEARCH",
+            SearchQueryCommandBuilder.BuildFilterSearchArguments(Schema, query),
+            cancellationToken).ConfigureAwait(false);
+
+        return SearchResultsParser.Parse(result);
+    }
+
+    public long Count(CountQuery query) =>
+        CountAsync(query).GetAwaiter().GetResult();
+
+    public async Task<long> CountAsync(CountQuery query, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(query);
+
+        var result = await ExecuteAsync(
+            "FT.SEARCH",
+            SearchQueryCommandBuilder.BuildCountArguments(Schema, query),
+            cancellationToken).ConfigureAwait(false);
+
+        return SearchResultsParser.Parse(result).TotalCount;
     }
 
     private async Task<RedisResult> ExecuteAsync(string command, object[] arguments, CancellationToken cancellationToken)

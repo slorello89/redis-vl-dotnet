@@ -15,6 +15,7 @@ Started: Thu Apr  9 16:10:38 EDT 2026
 - For `ON HASH` document lifecycle APIs, serialize POCOs with the shared web-default JSON naming policy so Redis hash fields stay camel-cased like schema field names, then rehydrate typed documents from `HashEntry[]` using the same property-name contract.
 - Keep RediSearch query DSL features as immutable expression objects that render query fragments directly, with `And`/`Or`/`Not` helpers and operator overloads as thin composition sugar rather than embedding string concatenation in later query APIs.
 - Keep RediSearch command shaping and raw response parsing in dedicated internal query builders and parsers so public query objects stay schema-focused and unit tests can validate command contracts without a live Redis connection.
+- For non-vector retrieval and count flows, keep using `FT.SEARCH` on the shared parser path; use `NOCONTENT LIMIT 0 0` for counts so filter, vector, and count abstractions all share one result-shaping pipeline.
 ---
 
 ## 2026-04-09 16:14 EDT - US-001
@@ -112,4 +113,15 @@ Started: Thu Apr  9 16:10:38 EDT 2026
   - Patterns discovered: let query abstractions validate target fields against `SearchSchema` and derive the actual RediSearch query field name from schema aliases so HASH and JSON storage modes share one query API.
   - Gotchas encountered: vector query payloads need byte-length validation against schema dimensions and datatype size before sending `FT.SEARCH`, otherwise Redis-side errors are much harder to diagnose.
   - Useful context: the current vector query result type is intentionally raw and projection-oriented, returning document ids plus projected `RedisValue` fields, which keeps `US-012` free to add typed materialization on top without reshaping the search execution contract.
+---
+## 2026-04-09 16:54 EDT - US-010
+- Implemented `FilterQuery` and `CountQuery` abstractions, added sync and async filter search plus count operations on `SearchIndex`, and extended the internal RediSearch command builder to emit filter-only and count `FT.SEARCH` calls.
+- Reused the shared raw search result contract by normalizing projection fields once and handling counts through `NOCONTENT LIMIT 0 0`, so filter and vector queries continue to return the same `SearchResults` shape.
+- Added unit tests for filter query projection and paging, count command generation, and total-only response parsing, plus an opt-in Redis integration test covering tag, numeric, text, geo, and count scenarios on seeded HASH documents.
+- Files changed: `src/RedisVlDotNet/Indexes/SearchIndex.cs`, `src/RedisVlDotNet/Indexes/SearchQueryCommandBuilder.cs`, `src/RedisVlDotNet/Queries/CountQuery.cs`, `src/RedisVlDotNet/Queries/FilterQuery.cs`, `src/RedisVlDotNet/Queries/QueryFieldNormalizer.cs`, `src/RedisVlDotNet/Queries/VectorQuery.cs`, `tests/RedisVlDotNet.Tests/Indexes/SearchIndexIntegrationTests.cs`, `tests/RedisVlDotNet.Tests/Indexes/SearchQueryCommandBuilderTests.cs`, `prd.json`, `progress.txt`
+- Quality checks run and result: `dotnet test redis-vl-dotnet.sln` passed with 5 Redis integration tests skipped because `REDIS_VL_REDIS_URL` was not set; `dotnet build redis-vl-dotnet.sln` passed.
+- Learnings for future iterations:
+  - Patterns discovered: keep return-field normalization shared across query types so projection semantics stay consistent as hybrid and typed-result abstractions are added.
+  - Gotchas encountered: this repo's known `dotnet` artifact lock still reproduces if `dotnet test` and `dotnet build` run concurrently, so final validation should stay strictly sequential.
+  - Useful context: the filter-only integration coverage is HASH-backed today, but the query APIs themselves remain storage-agnostic because they operate on RediSearch field names rather than document serialization details.
 ---

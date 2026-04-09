@@ -165,6 +165,95 @@ public sealed class SearchIndexIntegrationTests
     }
 
     [RedisSearchIntegrationFact]
+    public async Task ExecutesFilterAndCountQueriesAcrossSupportedFieldTypes()
+    {
+        await using var connection = await ConnectionMultiplexer.ConnectAsync(RedisSearchTestEnvironment.ConnectionString!);
+        var database = connection.GetDatabase();
+
+        var token = Guid.NewGuid().ToString("N");
+        var schema = new SearchSchema(
+            new IndexDefinition($"filter-idx-{token}", $"filter:{token}:", StorageType.Hash),
+            [
+                new TagFieldDefinition("genre"),
+                new NumericFieldDefinition("year"),
+                new TextFieldDefinition("title"),
+                new GeoFieldDefinition("location")
+            ]);
+        var index = new SearchIndex(database, schema);
+
+        try
+        {
+            await index.CreateAsync();
+
+            await database.HashSetAsync(
+                $"{schema.Index.Prefix}1",
+                [
+                    new HashEntry("title", "Heat"),
+                    new HashEntry("genre", "crime"),
+                    new HashEntry("year", 1995),
+                    new HashEntry("location", "-118.2437,34.0522")
+                ]);
+            await database.HashSetAsync(
+                $"{schema.Index.Prefix}2",
+                [
+                    new HashEntry("title", "Thief"),
+                    new HashEntry("genre", "crime"),
+                    new HashEntry("year", 1981),
+                    new HashEntry("location", "-87.6298,41.8781")
+                ]);
+            await database.HashSetAsync(
+                $"{schema.Index.Prefix}3",
+                [
+                    new HashEntry("title", "Arrival"),
+                    new HashEntry("genre", "science-fiction"),
+                    new HashEntry("year", 2016),
+                    new HashEntry("location", "-73.5673,45.5017")
+                ]);
+
+            await Task.Delay(TimeSpan.FromMilliseconds(250));
+
+            var tagResults = await index.SearchAsync(new FilterQuery(
+                Filter.Tag("genre").Eq("crime"),
+                ["title", "genre"],
+                limit: 10));
+            var numericResults = await index.SearchAsync(new FilterQuery(
+                Filter.Numeric("year").GreaterThan(1990),
+                ["title", "year"],
+                limit: 10));
+            var textResults = await index.SearchAsync(new FilterQuery(
+                Filter.Text("title").Prefix("Arr"),
+                ["title"],
+                limit: 10));
+            var geoResults = await index.SearchAsync(new FilterQuery(
+                Filter.Geo("location").WithinRadius(-118.2437, 34.0522, 50, RedisVlDotNet.Filters.GeoUnit.Miles),
+                ["title"],
+                limit: 10));
+            var crimeCount = await index.CountAsync(new CountQuery(Filter.Tag("genre").Eq("crime")));
+
+            Assert.Equal(2, tagResults.TotalCount);
+            Assert.Equal(
+                [$"{schema.Index.Prefix}1", $"{schema.Index.Prefix}2"],
+                tagResults.Documents.Select(static document => document.Id).ToArray());
+            Assert.Equal(2, numericResults.TotalCount);
+            Assert.Equal(
+                [$"{schema.Index.Prefix}1", $"{schema.Index.Prefix}3"],
+                numericResults.Documents.Select(static document => document.Id).ToArray());
+            Assert.Single(textResults.Documents);
+            Assert.Equal($"{schema.Index.Prefix}3", textResults.Documents[0].Id);
+            Assert.Single(geoResults.Documents);
+            Assert.Equal($"{schema.Index.Prefix}1", geoResults.Documents[0].Id);
+            Assert.Equal(2, crimeCount);
+        }
+        finally
+        {
+            if (await index.ExistsAsync())
+            {
+                await index.DropAsync(deleteDocuments: true);
+            }
+        }
+    }
+
+    [RedisSearchIntegrationFact]
     public async Task ExecutesVectorQueriesWithDeterministicRanking()
     {
         await using var connection = await ConnectionMultiplexer.ConnectAsync(RedisSearchTestEnvironment.ConnectionString!);

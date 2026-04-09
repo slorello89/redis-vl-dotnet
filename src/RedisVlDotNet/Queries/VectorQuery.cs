@@ -67,20 +67,8 @@ public sealed class VectorQuery
 
     private static IReadOnlyList<string> NormalizeReturnFields(IEnumerable<string>? returnFields, string scoreAlias)
     {
-        var normalized = new List<string>();
-        var seen = new HashSet<string>(StringComparer.Ordinal);
-
-        if (returnFields is not null)
-        {
-            foreach (var field in returnFields)
-            {
-                var normalizedField = FilterExpression.NormalizeFieldName(field);
-                if (seen.Add(normalizedField))
-                {
-                    normalized.Add(normalizedField);
-                }
-            }
-        }
+        var normalized = QueryFieldNormalizer.NormalizeReturnFields(returnFields).ToList();
+        var seen = new HashSet<string>(normalized, StringComparer.Ordinal);
 
         if (seen.Add(scoreAlias))
         {
