@@ -1,0 +1,20 @@
+# Ralph Progress Log
+Started: Thu Apr  9 16:10:38 EDT 2026
+
+## Codebase Patterns
+
+- Keep durable product and architecture contracts under `docs/`, and use the root `README.md` only as the short entry point into those deeper specs.
+- Even for documentation-first iterations, keep a valid `.NET` solution and at least one buildable project in place so `dotnet build` remains a meaningful repository quality gate.
+---
+
+## 2026-04-09 16:14 EDT - US-001
+- Implemented a v1 architecture contract in `docs/v1-architecture.md` with a parity matrix across schema, index lifecycle, document lifecycle, query types, caches, and higher-level workflow primitives.
+- Documented intentional .NET-native divergences from `redis-vl-java` and selected `redis-vl-python` workflows, including async-first APIs, typed mapping, YAML schema loading, and provider-agnostic AI extension boundaries.
+- Added a root `README.md`, a minimal solution scaffold, a starter class library project, and a `.gitignore` so the repository has an actionable contract and a real `dotnet build` target from the first iteration.
+- Files changed: `README.md`, `docs/v1-architecture.md`, `redis-vl-dotnet.sln`, `src/RedisVlDotNet/RedisVlDotNet.csproj`, `src/RedisVlDotNet/Class1.cs`, `.gitignore`, `prd.json`, `progress.txt`
+- Quality checks run and result: `dotnet build redis-vl-dotnet.sln` passed after adding the starter class library project.
+- Learnings for future iterations:
+  - Patterns discovered: keep cross-language parity decisions centralized in one document and have later stories implement against that contract rather than redefining scope in code.
+  - Gotchas encountered: the Ralph workspace started without an initialized git repository or buildable `.NET` project, so minimal repository scaffolding was required before branch and quality-gate steps were meaningful.
+  - Useful context: the v1 contract uses `redis-vl-java` as the primary parity baseline, selectively adopts `redis-vl-python` workflows, and explicitly excludes vendor-specific vectorizer dependencies from the core package.
+---

@@ -1,0 +1,6 @@
+.codex-iteration-prompt.md
+.codex-last-message.txt
+.last-branch
+
+bin/
+obj/
