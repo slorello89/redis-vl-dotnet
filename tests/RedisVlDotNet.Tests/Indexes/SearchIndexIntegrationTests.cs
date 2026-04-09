@@ -45,4 +45,66 @@ public sealed class SearchIndexIntegrationTests
 
         Assert.False(await index.ExistsAsync());
     }
+
+    [RedisSearchIntegrationFact]
+    public async Task LoadsFetchesAndDeletesJsonDocuments()
+    {
+        await using var connection = await ConnectionMultiplexer.ConnectAsync(RedisSearchTestEnvironment.ConnectionString!);
+        var database = connection.GetDatabase();
+
+        var token = Guid.NewGuid().ToString("N");
+        var schema = new SearchSchema(
+            new IndexDefinition($"json-docs-idx-{token}", $"jsondoc:{token}:", StorageType.Json),
+            [
+                new TextFieldDefinition("title"),
+                new NumericFieldDefinition("year"),
+                new TagFieldDefinition("genre")
+            ]);
+        var index = new SearchIndex(database, schema);
+
+        try
+        {
+            await index.CreateAsync();
+
+            var loadedKey = await index.LoadJsonAsync(new JsonMovieDocument("movie-1", "Heat", 1995, "crime"));
+            var batchKeys = await index.LoadJsonAsync(
+                [
+                    new JsonMovieEnvelope("movie-2", "Alien", 1979, "sci-fi"),
+                    new JsonMovieEnvelope("movie-3", "Arrival", 2016, "sci-fi")
+                ],
+                idSelector: static document => document.ExternalId);
+            var customKey = await index.LoadJsonAsync(
+                new JsonMovieEnvelope("unused", "Thief", 1981, "crime"),
+                key: $"{schema.Index.Prefix}custom");
+
+            var fetchedById = await index.FetchJsonByIdAsync<JsonMovieDocument>("movie-1");
+            var fetchedByKey = await index.FetchJsonByKeyAsync<JsonMovieEnvelope>(batchKeys[0]);
+            var fetchedCustom = await index.FetchJsonByKeyAsync<JsonMovieEnvelope>(customKey);
+            var deletedById = await index.DeleteJsonByIdAsync("movie-1");
+            var deletedByKey = await index.DeleteJsonByKeyAsync(customKey);
+            var missingAfterDelete = await index.FetchJsonByIdAsync<JsonMovieDocument>("movie-1");
+
+            Assert.Equal($"{schema.Index.Prefix}movie-1", loadedKey);
+            Assert.Equal(
+                [$"{schema.Index.Prefix}movie-2", $"{schema.Index.Prefix}movie-3"],
+                batchKeys);
+            Assert.Equal("Heat", fetchedById!.Title);
+            Assert.Equal("Alien", fetchedByKey!.Title);
+            Assert.Equal("Thief", fetchedCustom!.Title);
+            Assert.True(deletedById);
+            Assert.True(deletedByKey);
+            Assert.Null(missingAfterDelete);
+        }
+        finally
+        {
+            if (await index.ExistsAsync())
+            {
+                await index.DropAsync(deleteDocuments: true);
+            }
+        }
+    }
+
+    private sealed record JsonMovieDocument(string Id, string Title, int Year, string Genre);
+
+    private sealed record JsonMovieEnvelope(string ExternalId, string Title, int Year, string Genre);
 }
