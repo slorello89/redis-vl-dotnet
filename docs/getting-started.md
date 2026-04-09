@@ -140,3 +140,4 @@ The query APIs stay the same for JSON and HASH indexes because storage mode is a
 
 - [v1 architecture and parity matrix](/Users/steve.lorello/projects/redis/redis-vl-dotnet/docs/v1-architecture.md)
 - [testing and local Redis setup](/Users/steve.lorello/projects/redis/redis-vl-dotnet/docs/testing.md)
+- [runnable JSON storage example](/Users/steve.lorello/projects/redis/redis-vl-dotnet/examples/JsonStorageExample/README.md)

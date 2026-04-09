@@ -24,6 +24,7 @@ Started: Thu Apr  9 16:10:38 EDT 2026
 - For higher-level semantic workflows, layer on `SearchIndex` with dedicated HASH-backed workflow documents and write vector bytes directly into hash fields so provider-agnostic routing or cache APIs can reuse the query stack without depending on the generic POCO hash mapper.
 - For Redis-backed integration coverage, keep deterministic seed datasets in shared test fixtures and wait on index readiness with bounded polling helpers instead of fixed `Task.Delay(...)` sleeps.
 - Keep end-to-end onboarding docs in `docs/` with copy-pasteable commands and API-accurate snippets, and use the root `README.md` as a short navigator into those longer guides.
+- Keep runnable samples as checked-in console apps under `examples/` with direct project references to `src/RedisVlDotNet`, and include them in the solution so `dotnet build` validates example drift alongside the library.
 ---
 
 ## 2026-04-09 16:14 EDT - US-001
@@ -217,4 +218,14 @@ Started: Thu Apr  9 16:10:38 EDT 2026
   - Patterns discovered: keep onboarding guides copy-pasteable and honest about repository state, such as using a project reference until package publishing exists.
   - Gotchas encountered: the story asked for package installation guidance, but this repository does not publish a NuGet package yet, so the guide needs to distinguish current local consumption from a future published-package flow instead of pretending the package already exists.
   - Useful context: the guide uses the JSON storage path because it is the shortest end-to-end walkthrough, and it explicitly points HASH users to the parallel `LoadHash*`, `FetchHash*`, and `DeleteHash*` APIs.
+---
+## 2026-04-09 17:35 EDT - US-019
+- Implemented a checked-in `examples/JsonStorageExample` .NET 9 console app that defines a JSON schema, creates an index, loads sample documents, fetches by id, runs a filter query, counts matches, and drops the index on exit.
+- Documented how to run the example in `examples/JsonStorageExample/README.md`, linked it from the root `README.md`, and added it to the solution so repository builds now validate the example project.
+- Files changed: `examples/JsonStorageExample/JsonStorageExample.csproj`, `examples/JsonStorageExample/Program.cs`, `examples/JsonStorageExample/README.md`, `README.md`, `docs/getting-started.md`, `redis-vl-dotnet.sln`, `prd.json`, `progress.txt`
+- Quality checks run and result: `dotnet restore redis-vl-dotnet.sln` passed; `dotnet test redis-vl-dotnet.sln --no-restore` passed with 14 Redis integration tests skipped because `REDIS_VL_REDIS_URL` was not set; `dotnet build redis-vl-dotnet.sln --no-restore` passed; runtime execution of the example was not performed because no local Redis server was reachable on `localhost:6379`.
+- Learnings for future iterations:
+  - Patterns discovered: keep runnable examples as real console projects in the solution rather than doc-only snippets so compile drift is caught by normal repository builds.
+  - Gotchas encountered: adding a new example project requires a fresh `dotnet restore` before `--no-restore` build checks will pass, and this repo still benefits from running `dotnet test` and `dotnet build` sequentially.
+  - Useful context: the example reads `REDIS_VL_REDIS_URL` first and otherwise defaults to `localhost:6379`, matching the existing integration-test and local Redis documentation conventions.
 ---
