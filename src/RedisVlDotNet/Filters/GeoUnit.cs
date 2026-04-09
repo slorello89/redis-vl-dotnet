@@ -1,0 +1,9 @@
+namespace RedisVlDotNet.Filters;
+
+public enum GeoUnit
+{
+    Meters,
+    Kilometers,
+    Miles,
+    Feet
+}

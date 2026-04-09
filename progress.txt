@@ -13,6 +13,7 @@ Started: Thu Apr  9 16:10:38 EDT 2026
 - For `ON JSON` index creation, translate schema field names into JSONPath identifiers and default the RediSearch alias to the logical field name so the public schema model does not force callers to write raw JSONPath everywhere.
 - For JSON document lifecycle APIs, resolve Redis keys from an explicit key first, then an explicit or selected id, and finally a conventional public `Id` property so single-document and batch loads stay on one predictable key contract.
 - For `ON HASH` document lifecycle APIs, serialize POCOs with the shared web-default JSON naming policy so Redis hash fields stay camel-cased like schema field names, then rehydrate typed documents from `HashEntry[]` using the same property-name contract.
+- Keep RediSearch query DSL features as immutable expression objects that render query fragments directly, with `And`/`Or`/`Not` helpers and operator overloads as thin composition sugar rather than embedding string concatenation in later query APIs.
 ---
 
 ## 2026-04-09 16:14 EDT - US-001
@@ -88,4 +89,15 @@ Started: Thu Apr  9 16:10:38 EDT 2026
   - Patterns discovered: keep JSON and HASH document lifecycles on the same key-resolution contract so higher-level APIs do not vary by storage mode.
   - Gotchas encountered: HASH fetches need type-aware value reconstruction, otherwise numeric fields come back as strings and record deserialization breaks for typed properties.
   - Useful context: the current HASH mapper is aimed at scalar search fields and uses raw JSON text only as a fallback for more complex property types.
+---
+## 2026-04-09 16:44 EDT - US-008
+- Implemented a public `RedisVlDotNet.Filters` DSL with immutable filter expressions for tag, numeric, text, and geo predicates, plus `And`/`Or`/`Not` composition helpers and `&`, `|`, `!` operator support.
+- Added RediSearch query-string rendering with escaping for tag and text values, numeric range and infinity handling, and geo radius unit mapping so later query abstractions can reuse one filter surface.
+- Added unit coverage for individual filter rendering, composed expressions, and invalid input edge cases.
+- Files changed: `src/RedisVlDotNet/Filters/FilterExpression.cs`, `src/RedisVlDotNet/Filters/Filter.cs`, `src/RedisVlDotNet/Filters/TagFilterField.cs`, `src/RedisVlDotNet/Filters/NumericFilterField.cs`, `src/RedisVlDotNet/Filters/TextFilterField.cs`, `src/RedisVlDotNet/Filters/GeoFilterField.cs`, `src/RedisVlDotNet/Filters/GeoUnit.cs`, `tests/RedisVlDotNet.Tests/Filters/FilterExpressionTests.cs`, `prd.json`, `progress.txt`
+- Quality checks run and result: `dotnet test redis-vl-dotnet.sln` passed with the Redis integration tests skipped because `REDIS_VL_REDIS_URL` was not set; `dotnet build redis-vl-dotnet.sln` passed.
+- Learnings for future iterations:
+  - Patterns discovered: model RediSearch filters as standalone expression objects that own their escaping and rendering rules so vector, filter-only, and hybrid queries can share the same syntax contract.
+  - Gotchas encountered: this repo can hit transient test-assembly file locks if `dotnet test` and `dotnet build` overlap, so keep those checks sequential when recording final validation.
+  - Useful context: logical composition currently flattens nested `And` and `Or` expressions while preserving explicit parentheses around `Or` groups inside larger filters.
 ---
