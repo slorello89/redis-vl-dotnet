@@ -9,6 +9,8 @@ Started: Thu Apr  9 16:10:38 EDT 2026
 - Put schema guard clauses in the schema model constructors themselves so invalid configurations fail at object creation time and later Redis command builders can assume validated inputs.
 - For file-based schema loading, deserialize into a small DTO layer that matches upstream YAML keys, then map into the validated public schema model so code-first and file-first flows share the same invariants.
 - Run `dotnet test` and `dotnet build` sequentially in this repo; running them concurrently can contend on `tests/.../bin/Debug/net9.0/*.deps.json`.
+- Keep Redis-backed integration tests opt-in via `REDIS_VL_REDIS_URL` and a custom xUnit `Fact` attribute so the default test run stays green on machines without Redis Stack.
+- For `ON JSON` index creation, translate schema field names into JSONPath identifiers and default the RediSearch alias to the logical field name so the public schema model does not force callers to write raw JSONPath everywhere.
 ---
 
 ## 2026-04-09 16:14 EDT - US-001
@@ -51,4 +53,15 @@ Started: Thu Apr  9 16:10:38 EDT 2026
   - Patterns discovered: keep file-format-specific concerns in private DTOs annotated for exact YAML key aliases, then construct the public schema model so constructor validation remains the single source of truth.
   - Gotchas encountered: YAML values like Redis key prefixes ending in `:` must be quoted in fixtures, and parallel `dotnet build` plus `dotnet test` can fail on shared deps-file writes.
   - Useful context: the supported v1 YAML shape expects `index.name`, `index.prefix`, `index.storage_type`, and field entries with `type`, optional aliases and flags, plus vector `attrs` keys such as `algorithm`, `datatype`, `dims`, and `distance_metric`.
+---
+## 2026-04-09 16:31 EDT - US-005
+- Implemented a `SearchIndex` abstraction with create, exists, info, and drop operations, plus `CreateIndexOptions` for safe-create and overwrite behavior against RediSearch indexes.
+- Added command-building support for HASH and JSON indexes, including JSONPath alias normalization, vector field argument emission, and `SearchIndexInfo` parsing for `FT.INFO` responses.
+- Added unit tests for command shaping and index info parsing, plus opt-in integration coverage for create, skip-if-exists, overwrite, inspection, and cleanup flows when `REDIS_VL_REDIS_URL` is configured.
+- Files changed: `src/RedisVlDotNet/RedisVlDotNet.csproj`, `src/RedisVlDotNet/Indexes/CreateIndexOptions.cs`, `src/RedisVlDotNet/Indexes/SearchIndex.cs`, `src/RedisVlDotNet/Indexes/SearchIndexCommandBuilder.cs`, `src/RedisVlDotNet/Indexes/SearchIndexInfo.cs`, `src/RedisVlDotNet/Properties/AssemblyInfo.cs`, `tests/RedisVlDotNet.Tests/Indexes/SearchIndexCommandBuilderTests.cs`, `tests/RedisVlDotNet.Tests/Indexes/SearchIndexIntegrationTests.cs`, `tests/RedisVlDotNet.Tests/Indexes/RedisSearchIntegrationFactAttribute.cs`, `tests/RedisVlDotNet.Tests/Indexes/RedisSearchTestEnvironment.cs`, `prd.json`, `progress.txt`
+- Quality checks run and result: `dotnet test redis-vl-dotnet.sln` passed with the Redis integration test skipped because `REDIS_VL_REDIS_URL` was not set; `dotnet build redis-vl-dotnet.sln` passed.
+- Learnings for future iterations:
+  - Patterns discovered: keep RediSearch command shaping in an internal builder so unit tests can validate argument emission without needing to mock `IDatabase`.
+  - Gotchas encountered: `FT.INFO` existence checks should treat the RediSearch "unknown index" server error as a false result, and StackExchange.Redis test fixtures need `RedisResult.Create(...)` for synthetic raw responses.
+  - Useful context: the current index lifecycle API already exposes both sync and async forms, so later document and query stories can follow the same constructor-plus-async-overloads pattern around a shared `IDatabase`.
 ---
