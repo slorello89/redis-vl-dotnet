@@ -19,6 +19,7 @@ Started: Thu Apr  9 16:10:38 EDT 2026
 - Keep vector-derived query types responsible for normalizing their distance alias into `RETURN` fields, and enforce hybrid-query lexical intent by requiring at least one text predicate while still composing extra metadata filters through the shared filter DSL.
 - Layer typed search materialization on top of raw `SearchResults` with the shared web-default JSON serializer, and treat the Redis document id as a synthetic `id` field so projections can map into DTOs without a second query pipeline.
 - For async Redis-backed APIs, throw on cancellation before issuing direct `IDatabase` calls or doing expensive serialization/mapping work, and cover that behavior with unit tests that use a `DispatchProxy` `IDatabase` recorder instead of a live server.
+- For exact-match cache primitives, use a dedicated Redis keyspace with per-entry TTL, hash user input into bounded keys, and store the original input alongside the payload so collision checks preserve exact-match semantics.
 ---
 
 ## 2026-04-09 16:14 EDT - US-001
@@ -159,4 +160,15 @@ Started: Thu Apr  9 16:10:38 EDT 2026
   - Patterns discovered: async API tests can assert cancellation semantics cheaply by recording `IDatabase` invocations through `DispatchProxy` and verifying no Redis command starts when the token is already canceled.
   - Gotchas encountered: `WaitAsync(cancellationToken)` alone does not prevent direct `IDatabase` operations from being initiated, so explicit `ThrowIfCancellationRequested()` checks are still needed before direct Redis calls and local serialization or mapping work.
   - Useful context: the new async integration flow is guarded by the existing `RedisSearchIntegrationFact` gate, so it documents the intended task-based API contract without making default local test runs require Redis Stack.
+---
+## 2026-04-09 17:13 EDT - US-014
+- Implemented a standalone `EmbeddingsCache` abstraction with configurable cache name, optional namespace, optional per-entry TTL, and sync/async store plus lookup APIs over plain Redis string keys.
+- Used SHA-256-derived cache keys plus payload-level input verification so entries stay in a bounded keyspace without weakening exact-match semantics, and encoded embeddings as binary `float[]` payloads without introducing any provider-specific vectorizer dependency.
+- Added unit tests for hit, miss-on-input-mismatch, and cancellation behavior plus an opt-in Redis integration test that covers cache miss, hit, overwrite, and expiration flows.
+- Files changed: `src/RedisVlDotNet/Caches/EmbeddingsCache.cs`, `src/RedisVlDotNet/Caches/EmbeddingsCacheOptions.cs`, `tests/RedisVlDotNet.Tests/Caches/EmbeddingsCacheTests.cs`, `tests/RedisVlDotNet.Tests/Caches/EmbeddingsCacheIntegrationTests.cs`, `prd.json`, `progress.txt`
+- Quality checks run and result: `dotnet test redis-vl-dotnet.sln` passed with 9 Redis integration tests skipped because `REDIS_VL_REDIS_URL` was not set; `dotnet build redis-vl-dotnet.sln` passed.
+- Learnings for future iterations:
+  - Patterns discovered: exact-match cache entries work cleanly as standalone Redis string values because overwrite and TTL semantics stay per entry instead of being shared across a larger hash.
+  - Gotchas encountered: `StackExchange.Redis` string-set overload resolution is stricter than some other database calls in this repo, so pass TTL and `When` positionally to avoid binding to the lower-level `Expiration` overload.
+  - Useful context: the cache trims names and namespaces for stable key prefixes, but preserves embedding inputs verbatim so cache lookups remain truly exact-match for deterministic vectorization work.
 ---
