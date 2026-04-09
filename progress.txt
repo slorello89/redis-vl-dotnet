@@ -20,6 +20,7 @@ Started: Thu Apr  9 16:10:38 EDT 2026
 - Layer typed search materialization on top of raw `SearchResults` with the shared web-default JSON serializer, and treat the Redis document id as a synthetic `id` field so projections can map into DTOs without a second query pipeline.
 - For async Redis-backed APIs, throw on cancellation before issuing direct `IDatabase` calls or doing expensive serialization/mapping work, and cover that behavior with unit tests that use a `DispatchProxy` `IDatabase` recorder instead of a live server.
 - For exact-match cache primitives, use a dedicated Redis keyspace with per-entry TTL, hash user input into bounded keys, and store the original input alongside the payload so collision checks preserve exact-match semantics.
+- For semantic cache primitives, back each cache with a dedicated RediSearch index over HASH documents, store vector payloads as raw bytes in hash fields, and hash prompts into stable Redis keys so semantic lookup and per-entry TTL can coexist cleanly.
 ---
 
 ## 2026-04-09 16:14 EDT - US-001
@@ -171,4 +172,15 @@ Started: Thu Apr  9 16:10:38 EDT 2026
   - Patterns discovered: exact-match cache entries work cleanly as standalone Redis string values because overwrite and TTL semantics stay per entry instead of being shared across a larger hash.
   - Gotchas encountered: `StackExchange.Redis` string-set overload resolution is stricter than some other database calls in this repo, so pass TTL and `When` positionally to avoid binding to the lower-level `Expiration` overload.
   - Useful context: the cache trims names and namespaces for stable key prefixes, but preserves embedding inputs verbatim so cache lookups remain truly exact-match for deterministic vectorization work.
+---
+## 2026-04-09 17:18 EDT - US-015
+- Implemented a RediSearch-backed `SemanticCache` with create, exists, drop, check, and store operations, plus `SemanticCacheOptions`, `SemanticCacheHit`, and an async provider-agnostic `ITextEmbeddingGenerator` interface for caller-supplied embedding generation.
+- Backed semantic cache entries with HASH documents that store prompt text, cached response text, and raw float32 embedding bytes under a dedicated per-cache index, while keeping per-entry TTL by hashing prompts into stable Redis keys.
+- Added unit coverage for provider-based lookup, TTL-backed writes, and cancellation behavior, plus opt-in Redis integration tests for semantic match, semantic miss, and threshold-boundary behavior.
+- Files changed: `src/RedisVlDotNet/Caches/ITextEmbeddingGenerator.cs`, `src/RedisVlDotNet/Caches/SemanticCache.cs`, `src/RedisVlDotNet/Caches/SemanticCacheOptions.cs`, `tests/RedisVlDotNet.Tests/Caches/SemanticCacheTests.cs`, `tests/RedisVlDotNet.Tests/Caches/SemanticCacheIntegrationTests.cs`, `prd.json`, `progress.txt`
+- Quality checks run and result: `dotnet test redis-vl-dotnet.sln` passed with 12 Redis integration tests skipped because `REDIS_VL_REDIS_URL` was not set; `dotnet build redis-vl-dotnet.sln` passed.
+- Learnings for future iterations:
+  - Patterns discovered: semantic cache lookup layers cleanly on the existing `SearchIndex` and `VectorRangeQuery` abstractions if cache-specific storage writes handle raw embedding bytes directly.
+  - Gotchas encountered: HASH document helpers in this repo serialize arrays as JSON text, so vector cache entries that need RediSearch vector indexing should write byte payloads directly rather than routing through the generic hash POCO mapper.
+  - Useful context: semantic cache thresholds live on the cache options, so different cache instances can share the same underlying index and still enforce different hit cutoffs when needed.
 ---
