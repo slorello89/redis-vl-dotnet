@@ -23,6 +23,7 @@ Started: Thu Apr  9 16:10:38 EDT 2026
 - For semantic cache primitives, back each cache with a dedicated RediSearch index over HASH documents, store vector payloads as raw bytes in hash fields, and hash prompts into stable Redis keys so semantic lookup and per-entry TTL can coexist cleanly.
 - For higher-level semantic workflows, layer on `SearchIndex` with dedicated HASH-backed workflow documents and write vector bytes directly into hash fields so provider-agnostic routing or cache APIs can reuse the query stack without depending on the generic POCO hash mapper.
 - For Redis-backed integration coverage, keep deterministic seed datasets in shared test fixtures and wait on index readiness with bounded polling helpers instead of fixed `Task.Delay(...)` sleeps.
+- Keep end-to-end onboarding docs in `docs/` with copy-pasteable commands and API-accurate snippets, and use the root `README.md` as a short navigator into those longer guides.
 ---
 
 ## 2026-04-09 16:14 EDT - US-001
@@ -206,4 +207,14 @@ Started: Thu Apr  9 16:10:38 EDT 2026
   - Patterns discovered: centralize deterministic Redis seed data so vector, hybrid, and filter assertions reuse the same fixtures across tests and CI.
   - Gotchas encountered: local Docker CLI availability is not enough for live integration validation, so record daemon availability explicitly and rely on CI service containers when the workspace cannot start Redis locally.
   - Useful context: the new CI workflow sets `REDIS_VL_REDIS_URL=localhost:6379`, so the same opt-in integration tests used locally become mandatory on pushes and pull requests.
+---
+## 2026-04-09 17:32 EDT - US-018
+- Implemented a new `docs/getting-started.md` guide that covers local installation, Redis prerequisites, connection setup, schema definition, index creation, JSON document load, fetch, basic filter query execution, and count queries using the current v1 public APIs.
+- Updated `README.md` to surface the getting started guide as the primary onboarding entry point while keeping the root readme short and navigational.
+- Files changed: `README.md`, `docs/getting-started.md`, `prd.json`, `progress.txt`
+- Quality checks run and result: `dotnet build redis-vl-dotnet.sln` passed.
+- Learnings for future iterations:
+  - Patterns discovered: keep onboarding guides copy-pasteable and honest about repository state, such as using a project reference until package publishing exists.
+  - Gotchas encountered: the story asked for package installation guidance, but this repository does not publish a NuGet package yet, so the guide needs to distinguish current local consumption from a future published-package flow instead of pretending the package already exists.
+  - Useful context: the guide uses the JSON storage path because it is the shortest end-to-end walkthrough, and it explicitly points HASH users to the parallel `LoadHash*`, `FetchHash*`, and `DeleteHash*` APIs.
 ---
