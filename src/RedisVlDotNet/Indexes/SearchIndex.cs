@@ -89,7 +89,7 @@ public sealed class SearchIndex
     {
         EnsureJsonStorage();
 
-        var resolvedKey = JsonDocumentKeyResolver.ResolveKey(Schema, document, key, id);
+        var resolvedKey = DocumentKeyResolver.ResolveKey(Schema, document, key, id);
         await SetJsonDocumentAsync(resolvedKey, document, cancellationToken).ConfigureAwait(false);
         return resolvedKey;
     }
@@ -114,7 +114,7 @@ public sealed class SearchIndex
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            var resolvedKey = JsonDocumentKeyResolver.ResolveKeyForSelectors(Schema, document, keySelector, idSelector);
+            var resolvedKey = DocumentKeyResolver.ResolveKeyForSelectors(Schema, document, keySelector, idSelector);
             await SetJsonDocumentAsync(resolvedKey, document, cancellationToken).ConfigureAwait(false);
             loadedKeys.Add(resolvedKey);
         }
@@ -143,7 +143,7 @@ public sealed class SearchIndex
         FetchJsonByIdAsync<TDocument>(id).GetAwaiter().GetResult();
 
     public Task<TDocument?> FetchJsonByIdAsync<TDocument>(string id, CancellationToken cancellationToken = default) =>
-        FetchJsonByKeyAsync<TDocument>(JsonDocumentKeyResolver.ResolveKeyFromId(Schema, id), cancellationToken);
+        FetchJsonByKeyAsync<TDocument>(DocumentKeyResolver.ResolveKeyFromId(Schema, id), cancellationToken);
 
     public bool DeleteJsonByKey(string key) =>
         DeleteJsonByKeyAsync(key).GetAwaiter().GetResult();
@@ -161,7 +161,89 @@ public sealed class SearchIndex
         DeleteJsonByIdAsync(id).GetAwaiter().GetResult();
 
     public Task<bool> DeleteJsonByIdAsync(string id, CancellationToken cancellationToken = default) =>
-        DeleteJsonByKeyAsync(JsonDocumentKeyResolver.ResolveKeyFromId(Schema, id), cancellationToken);
+        DeleteJsonByKeyAsync(DocumentKeyResolver.ResolveKeyFromId(Schema, id), cancellationToken);
+
+    public string LoadHash<TDocument>(TDocument document, string? key = null, string? id = null) =>
+        LoadHashAsync(document, key, id).GetAwaiter().GetResult();
+
+    public async Task<string> LoadHashAsync<TDocument>(
+        TDocument document,
+        string? key = null,
+        string? id = null,
+        CancellationToken cancellationToken = default)
+    {
+        EnsureHashStorage();
+
+        var resolvedKey = DocumentKeyResolver.ResolveKey(Schema, document, key, id);
+        await SetHashDocumentAsync(resolvedKey, document, cancellationToken).ConfigureAwait(false);
+        return resolvedKey;
+    }
+
+    public IReadOnlyList<string> LoadHash<TDocument>(
+        IEnumerable<TDocument> documents,
+        Func<TDocument, string>? keySelector = null,
+        Func<TDocument, string>? idSelector = null) =>
+        LoadHashAsync(documents, keySelector, idSelector).GetAwaiter().GetResult();
+
+    public async Task<IReadOnlyList<string>> LoadHashAsync<TDocument>(
+        IEnumerable<TDocument> documents,
+        Func<TDocument, string>? keySelector = null,
+        Func<TDocument, string>? idSelector = null,
+        CancellationToken cancellationToken = default)
+    {
+        EnsureHashStorage();
+        ArgumentNullException.ThrowIfNull(documents);
+
+        var loadedKeys = new List<string>();
+        foreach (var document in documents)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var resolvedKey = DocumentKeyResolver.ResolveKeyForSelectors(Schema, document, keySelector, idSelector);
+            await SetHashDocumentAsync(resolvedKey, document, cancellationToken).ConfigureAwait(false);
+            loadedKeys.Add(resolvedKey);
+        }
+
+        return loadedKeys;
+    }
+
+    public TDocument? FetchHashByKey<TDocument>(string key) =>
+        FetchHashByKeyAsync<TDocument>(key).GetAwaiter().GetResult();
+
+    public async Task<TDocument?> FetchHashByKeyAsync<TDocument>(string key, CancellationToken cancellationToken = default)
+    {
+        EnsureHashStorage();
+        ArgumentException.ThrowIfNullOrWhiteSpace(key);
+
+        var entries = await _database.HashGetAllAsync(key.Trim()).WaitAsync(cancellationToken).ConfigureAwait(false);
+        return entries.Length == 0
+            ? default
+            : HashDocumentMapper.FromHashEntries<TDocument>(entries, _serializerOptions);
+    }
+
+    public TDocument? FetchHashById<TDocument>(string id) =>
+        FetchHashByIdAsync<TDocument>(id).GetAwaiter().GetResult();
+
+    public Task<TDocument?> FetchHashByIdAsync<TDocument>(string id, CancellationToken cancellationToken = default) =>
+        FetchHashByKeyAsync<TDocument>(DocumentKeyResolver.ResolveKeyFromId(Schema, id), cancellationToken);
+
+    public bool DeleteHashByKey(string key) =>
+        DeleteHashByKeyAsync(key).GetAwaiter().GetResult();
+
+    public async Task<bool> DeleteHashByKeyAsync(string key, CancellationToken cancellationToken = default)
+    {
+        EnsureHashStorage();
+        ArgumentException.ThrowIfNullOrWhiteSpace(key);
+
+        var deleted = await _database.KeyDeleteAsync(key.Trim()).WaitAsync(cancellationToken).ConfigureAwait(false);
+        return deleted;
+    }
+
+    public bool DeleteHashById(string id) =>
+        DeleteHashByIdAsync(id).GetAwaiter().GetResult();
+
+    public Task<bool> DeleteHashByIdAsync(string id, CancellationToken cancellationToken = default) =>
+        DeleteHashByKeyAsync(DocumentKeyResolver.ResolveKeyFromId(Schema, id), cancellationToken);
 
     private async Task<RedisResult> ExecuteAsync(string command, object[] arguments, CancellationToken cancellationToken)
     {
@@ -177,10 +259,24 @@ public sealed class SearchIndex
         }
     }
 
+    private void EnsureHashStorage()
+    {
+        if (Schema.Index.StorageType != StorageType.Hash)
+        {
+            throw new InvalidOperationException("Hash document operations require a schema configured with HASH storage.");
+        }
+    }
+
     private async Task SetJsonDocumentAsync<TDocument>(string key, TDocument document, CancellationToken cancellationToken)
     {
         var payload = JsonSerializer.Serialize(document, _serializerOptions);
         await ExecuteAsync("JSON.SET", [key, "$", payload], cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task SetHashDocumentAsync<TDocument>(string key, TDocument document, CancellationToken cancellationToken)
+    {
+        var entries = HashDocumentMapper.ToHashEntries(document, _serializerOptions);
+        await _database.HashSetAsync(key, entries).WaitAsync(cancellationToken).ConfigureAwait(false);
     }
 
     private static bool IsUnknownIndexException(RedisServerException exception) =>

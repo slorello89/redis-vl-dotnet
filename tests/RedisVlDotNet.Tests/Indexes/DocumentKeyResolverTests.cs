@@ -3,7 +3,7 @@ using RedisVlDotNet.Schema;
 
 namespace RedisVlDotNet.Tests.Indexes;
 
-public sealed class JsonDocumentKeyResolverTests
+public sealed class DocumentKeyResolverTests
 {
     private static readonly SearchSchema JsonSchema = new(
         new IndexDefinition("docs-idx", "doc:", StorageType.Json),
@@ -12,7 +12,7 @@ public sealed class JsonDocumentKeyResolverTests
     [Fact]
     public void ResolvesKeyFromDocumentIdPropertyByDefault()
     {
-        var key = JsonDocumentKeyResolver.ResolveKey(JsonSchema, new MovieDocument("movie-1", "Heat"));
+        var key = DocumentKeyResolver.ResolveKey(JsonSchema, new MovieDocument("movie-1", "Heat"));
 
         Assert.Equal("doc:movie-1", key);
     }
@@ -20,7 +20,7 @@ public sealed class JsonDocumentKeyResolverTests
     [Fact]
     public void ResolvesKeyFromExplicitIdSelectorForBatchLoads()
     {
-        var key = JsonDocumentKeyResolver.ResolveKeyForSelectors(
+        var key = DocumentKeyResolver.ResolveKeyForSelectors(
             JsonSchema,
             new AlternateMovieDocument("movie-2", "Alien"),
             idSelector: static document => document.ExternalId);
@@ -31,7 +31,7 @@ public sealed class JsonDocumentKeyResolverTests
     [Fact]
     public void ResolvesKeyFromExplicitKeyWhenProvided()
     {
-        var key = JsonDocumentKeyResolver.ResolveKey(JsonSchema, new MovieDocument("movie-1", "Heat"), key: "custom:key");
+        var key = DocumentKeyResolver.ResolveKey(JsonSchema, new MovieDocument("movie-1", "Heat"), key: "custom:key");
 
         Assert.Equal("custom:key", key);
     }
@@ -40,7 +40,7 @@ public sealed class JsonDocumentKeyResolverTests
     public void RejectsConflictingExplicitKeyAndId()
     {
         var exception = Assert.Throws<ArgumentException>(() =>
-            JsonDocumentKeyResolver.ResolveKey(JsonSchema, new MovieDocument("movie-1", "Heat"), key: "custom:key", id: "movie-1"));
+            DocumentKeyResolver.ResolveKey(JsonSchema, new MovieDocument("movie-1", "Heat"), key: "custom:key", id: "movie-1"));
 
         Assert.Contains("Only one of key or id", exception.Message, StringComparison.OrdinalIgnoreCase);
     }
@@ -49,7 +49,7 @@ public sealed class JsonDocumentKeyResolverTests
     public void RejectsDocumentWithoutResolvableKey()
     {
         var exception = Assert.Throws<ArgumentException>(() =>
-            JsonDocumentKeyResolver.ResolveKey(JsonSchema, new TitleOnlyDocument("Heat")));
+            DocumentKeyResolver.ResolveKey(JsonSchema, new TitleOnlyDocument("Heat")));
 
         Assert.Contains("could not be resolved", exception.Message, StringComparison.OrdinalIgnoreCase);
     }

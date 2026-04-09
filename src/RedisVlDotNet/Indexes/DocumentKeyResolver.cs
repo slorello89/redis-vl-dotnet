@@ -3,7 +3,7 @@ using RedisVlDotNet.Schema;
 
 namespace RedisVlDotNet.Indexes;
 
-internal static class JsonDocumentKeyResolver
+internal static class DocumentKeyResolver
 {
     public static string ResolveKey<TDocument>(SearchSchema schema, TDocument document, string? key = null, string? id = null)
     {

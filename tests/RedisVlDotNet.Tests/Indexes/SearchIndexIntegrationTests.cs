@@ -104,7 +104,69 @@ public sealed class SearchIndexIntegrationTests
         }
     }
 
+    [RedisSearchIntegrationFact]
+    public async Task LoadsFetchesAndDeletesHashDocuments()
+    {
+        await using var connection = await ConnectionMultiplexer.ConnectAsync(RedisSearchTestEnvironment.ConnectionString!);
+        var database = connection.GetDatabase();
+
+        var token = Guid.NewGuid().ToString("N");
+        var schema = new SearchSchema(
+            new IndexDefinition($"hash-docs-idx-{token}", $"hashdoc:{token}:", StorageType.Hash),
+            [
+                new TextFieldDefinition("title"),
+                new NumericFieldDefinition("year"),
+                new TagFieldDefinition("genre")
+            ]);
+        var index = new SearchIndex(database, schema);
+
+        try
+        {
+            await index.CreateAsync();
+
+            var loadedKey = await index.LoadHashAsync(new HashMovieDocument("movie-1", "Heat", 1995, "crime"));
+            var batchKeys = await index.LoadHashAsync(
+                [
+                    new HashMovieEnvelope("movie-2", "Alien", 1979, "sci-fi"),
+                    new HashMovieEnvelope("movie-3", "Arrival", 2016, "sci-fi")
+                ],
+                idSelector: static document => document.ExternalId);
+            var customKey = await index.LoadHashAsync(
+                new HashMovieEnvelope("unused", "Thief", 1981, "crime"),
+                key: $"{schema.Index.Prefix}custom");
+
+            var fetchedById = await index.FetchHashByIdAsync<HashMovieDocument>("movie-1");
+            var fetchedByKey = await index.FetchHashByKeyAsync<HashMovieEnvelope>(batchKeys[0]);
+            var fetchedCustom = await index.FetchHashByKeyAsync<HashMovieEnvelope>(customKey);
+            var deletedById = await index.DeleteHashByIdAsync("movie-1");
+            var deletedByKey = await index.DeleteHashByKeyAsync(customKey);
+            var missingAfterDelete = await index.FetchHashByIdAsync<HashMovieDocument>("movie-1");
+
+            Assert.Equal($"{schema.Index.Prefix}movie-1", loadedKey);
+            Assert.Equal(
+                [$"{schema.Index.Prefix}movie-2", $"{schema.Index.Prefix}movie-3"],
+                batchKeys);
+            Assert.Equal("Heat", fetchedById!.Title);
+            Assert.Equal("Alien", fetchedByKey!.Title);
+            Assert.Equal("Thief", fetchedCustom!.Title);
+            Assert.True(deletedById);
+            Assert.True(deletedByKey);
+            Assert.Null(missingAfterDelete);
+        }
+        finally
+        {
+            if (await index.ExistsAsync())
+            {
+                await index.DropAsync(deleteDocuments: true);
+            }
+        }
+    }
+
     private sealed record JsonMovieDocument(string Id, string Title, int Year, string Genre);
 
     private sealed record JsonMovieEnvelope(string ExternalId, string Title, int Year, string Genre);
+
+    private sealed record HashMovieDocument(string Id, string Title, int Year, string Genre);
+
+    private sealed record HashMovieEnvelope(string ExternalId, string Title, int Year, string Genre);
 }

@@ -12,6 +12,7 @@ Started: Thu Apr  9 16:10:38 EDT 2026
 - Keep Redis-backed integration tests opt-in via `REDIS_VL_REDIS_URL` and a custom xUnit `Fact` attribute so the default test run stays green on machines without Redis Stack.
 - For `ON JSON` index creation, translate schema field names into JSONPath identifiers and default the RediSearch alias to the logical field name so the public schema model does not force callers to write raw JSONPath everywhere.
 - For JSON document lifecycle APIs, resolve Redis keys from an explicit key first, then an explicit or selected id, and finally a conventional public `Id` property so single-document and batch loads stay on one predictable key contract.
+- For `ON HASH` document lifecycle APIs, serialize POCOs with the shared web-default JSON naming policy so Redis hash fields stay camel-cased like schema field names, then rehydrate typed documents from `HashEntry[]` using the same property-name contract.
 ---
 
 ## 2026-04-09 16:14 EDT - US-001
@@ -76,4 +77,15 @@ Started: Thu Apr  9 16:10:38 EDT 2026
   - Patterns discovered: keep document key resolution in a dedicated helper so JSON and later HASH document APIs can share the same explicit-key, explicit-id, and `Id`-property fallback behavior.
   - Gotchas encountered: RedisJSON `JSON.GET` should fetch the root document without an explicit `"$"` path when the caller expects a single POCO payload rather than a path-result array wrapper.
   - Useful context: the JSON document APIs are intentionally guarded to `StorageType.Json`, and they use `System.Text.Json` web defaults for payload serialization and deserialization.
+---
+## 2026-04-09 16:40 EDT - US-007
+- Implemented HASH document lifecycle support on `SearchIndex`, including single and batch loads, fetch by key or id, and delete by key or id for `StorageType.Hash` schemas while keeping the API shape parallel with the existing JSON methods.
+- Replaced the JSON-only key helper with a shared document key resolver and added a hash document mapper that writes camel-cased Redis hash fields from POCOs and rehydrates typed records from `HashEntry[]`.
+- Added unit coverage for shared key resolution and hash mapping, plus opt-in Redis integration coverage for HASH round-trip persistence, fetch, and delete flows.
+- Files changed: `src/RedisVlDotNet/Indexes/SearchIndex.cs`, `src/RedisVlDotNet/Indexes/DocumentKeyResolver.cs`, `src/RedisVlDotNet/Indexes/HashDocumentMapper.cs`, `tests/RedisVlDotNet.Tests/Indexes/DocumentKeyResolverTests.cs`, `tests/RedisVlDotNet.Tests/Indexes/HashDocumentMapperTests.cs`, `tests/RedisVlDotNet.Tests/Indexes/SearchIndexIntegrationTests.cs`, `prd.json`, `progress.txt`
+- Quality checks run and result: `dotnet test redis-vl-dotnet.sln` passed with the Redis integration tests skipped because `REDIS_VL_REDIS_URL` was not set; `dotnet build redis-vl-dotnet.sln` passed.
+- Learnings for future iterations:
+  - Patterns discovered: keep JSON and HASH document lifecycles on the same key-resolution contract so higher-level APIs do not vary by storage mode.
+  - Gotchas encountered: HASH fetches need type-aware value reconstruction, otherwise numeric fields come back as strings and record deserialization breaks for typed properties.
+  - Useful context: the current HASH mapper is aimed at scalar search fields and uses raw JSON text only as a fallback for more complex property types.
 ---
