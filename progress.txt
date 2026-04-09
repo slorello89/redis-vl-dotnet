@@ -21,6 +21,7 @@ Started: Thu Apr  9 16:10:38 EDT 2026
 - For async Redis-backed APIs, throw on cancellation before issuing direct `IDatabase` calls or doing expensive serialization/mapping work, and cover that behavior with unit tests that use a `DispatchProxy` `IDatabase` recorder instead of a live server.
 - For exact-match cache primitives, use a dedicated Redis keyspace with per-entry TTL, hash user input into bounded keys, and store the original input alongside the payload so collision checks preserve exact-match semantics.
 - For semantic cache primitives, back each cache with a dedicated RediSearch index over HASH documents, store vector payloads as raw bytes in hash fields, and hash prompts into stable Redis keys so semantic lookup and per-entry TTL can coexist cleanly.
+- For higher-level semantic workflows, layer on `SearchIndex` with dedicated HASH-backed workflow documents and write vector bytes directly into hash fields so provider-agnostic routing or cache APIs can reuse the query stack without depending on the generic POCO hash mapper.
 ---
 
 ## 2026-04-09 16:14 EDT - US-001
@@ -183,4 +184,15 @@ Started: Thu Apr  9 16:10:38 EDT 2026
   - Patterns discovered: semantic cache lookup layers cleanly on the existing `SearchIndex` and `VectorRangeQuery` abstractions if cache-specific storage writes handle raw embedding bytes directly.
   - Gotchas encountered: HASH document helpers in this repo serialize arrays as JSON text, so vector cache entries that need RediSearch vector indexing should write byte payloads directly rather than routing through the generic hash POCO mapper.
   - Useful context: semantic cache thresholds live on the cache options, so different cache instances can share the same underlying index and still enforce different hit cutoffs when needed.
+---
+## 2026-04-09 17:23 EDT - US-016
+- Implemented a provider-agnostic `SemanticRouter` workflow primitive with create, exists, drop, route registration, and nearest-route lookup APIs, plus `SemanticRouterOptions` and `SemanticRouteMatch` for caller-supplied or generator-supplied embeddings.
+- Updated the v1 architecture contract to select semantic routing as the only higher-level workflow primitive included in v1 and keep message-history workflows deferred.
+- Added unit tests for generator-backed route registration, generator-backed route lookup, and cancellation behavior, plus opt-in Redis integration tests for nearest-route matches and threshold-based misses.
+- Files changed: `docs/v1-architecture.md`, `src/RedisVlDotNet/Workflows/SemanticRouter.cs`, `src/RedisVlDotNet/Workflows/SemanticRouterOptions.cs`, `tests/RedisVlDotNet.Tests/Workflows/SemanticRouterTests.cs`, `tests/RedisVlDotNet.Tests/Workflows/SemanticRouterIntegrationTests.cs`, `prd.json`, `progress.txt`
+- Quality checks run and result: `dotnet test tests/RedisVlDotNet.Tests/RedisVlDotNet.Tests.csproj --filter SemanticRouter` passed with 2 Redis integration tests skipped because `REDIS_VL_REDIS_URL` was not set; `dotnet test redis-vl-dotnet.sln` passed with 14 Redis integration tests skipped because `REDIS_VL_REDIS_URL` was not set; `dotnet build redis-vl-dotnet.sln` passed.
+- Learnings for future iterations:
+  - Patterns discovered: higher-level semantic workflows can stay small and reusable if they own only workflow-specific document fields and delegate all vector search behavior to the existing `SearchIndex` and `VectorRangeQuery` stack.
+  - Gotchas encountered: typed result mapping follows the web-default camel-case naming policy, so workflow field names should avoid snake_case defaults unless the DTOs opt into explicit `JsonPropertyName` annotations.
+  - Useful context: there is no `AGENTS.md` file under this repository path today, so workflow-specific guidance currently lives in this progress log instead of an area-local agent note.
 ---

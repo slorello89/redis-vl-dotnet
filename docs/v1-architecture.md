@@ -115,7 +115,7 @@ Rationale: .NET consumers generally expect serializer-driven materialization rat
 | Caches | Embeddings cache | Yes | Yes | Required | Provider-agnostic embedding reuse |
 | Caches | Semantic cache | Yes | Yes | Required | Caller-supplied embeddings or interface |
 | Caches | Cache models and advanced cache helpers | Yes | Yes | Deferred | Minimal usable cache API first |
-| Higher-level workflows | Semantic routing | Yes | Yes | Deferred | Candidate v1 extension if lower layers land early |
+| Higher-level workflows | Semantic routing | Yes | Yes | Required | Selected v1 workflow primitive for provider-agnostic intent routing |
 | Higher-level workflows | Message history or semantic message history | Yes | Yes | Deferred | Useful, but not necessary for base library release |
 | Higher-level workflows | Rerankers and vectorizer integrations | Yes | Yes | Out of scope | Keep core package provider-agnostic |
 | Tooling | CLI for index management | Partial | Yes | Out of scope | Prefer library-first delivery before tooling |
@@ -143,6 +143,7 @@ Rationale: .NET consumers generally expect serializer-driven materialization rat
 - No CLI in the first release.
 - No built-in reranker or hosted vectorizer implementations in the core package.
 - Higher-level workflows are additive only after schema, lifecycle, query, and cache primitives are stable.
+- V1 includes semantic routing only; message-history workflows remain deferred until the base storage and retrieval surface sees broader usage.
 
 ## Delivery Sequence
 
