@@ -5,6 +5,7 @@ Started: Thu Apr  9 16:10:38 EDT 2026
 
 - Keep durable product and architecture contracts under `docs/`, and use the root `README.md` only as the short entry point into those deeper specs.
 - Even for documentation-first iterations, keep a valid `.NET` solution and at least one buildable project in place so `dotnet build` remains a meaningful repository quality gate.
+- Keep production code under `src/` and mirror public API coverage under `tests/`, with schema and other contract tests grouped by feature namespace so `dotnet test` validates repository progress as the surface area grows.
 ---
 
 ## 2026-04-09 16:14 EDT - US-001
@@ -17,4 +18,14 @@ Started: Thu Apr  9 16:10:38 EDT 2026
   - Patterns discovered: keep cross-language parity decisions centralized in one document and have later stories implement against that contract rather than redefining scope in code.
   - Gotchas encountered: the Ralph workspace started without an initialized git repository or buildable `.NET` project, so minimal repository scaffolding was required before branch and quality-gate steps were meaningful.
   - Useful context: the v1 contract uses `redis-vl-java` as the primary parity baseline, selectively adopts `redis-vl-python` workflows, and explicitly excludes vendor-specific vectorizer dependencies from the core package.
+---
+## 2026-04-09 16:17 EDT - US-002
+- Implemented a strongly typed schema model with index metadata, storage mode, field definitions for text, tag, numeric, geo, and vector fields, plus typed vector configuration enums and option records.
+- Added repository tests that exercise index metadata, field preservation, and basic guard clauses so schema work now has a real `dotnet test` contract.
+- Files changed: `redis-vl-dotnet.sln`, `src/RedisVlDotNet/Schema/StorageType.cs`, `src/RedisVlDotNet/Schema/VectorAlgorithm.cs`, `src/RedisVlDotNet/Schema/VectorDataType.cs`, `src/RedisVlDotNet/Schema/VectorDistanceMetric.cs`, `src/RedisVlDotNet/Schema/IndexDefinition.cs`, `src/RedisVlDotNet/Schema/FieldDefinition.cs`, `src/RedisVlDotNet/Schema/TextFieldDefinition.cs`, `src/RedisVlDotNet/Schema/TagFieldDefinition.cs`, `src/RedisVlDotNet/Schema/NumericFieldDefinition.cs`, `src/RedisVlDotNet/Schema/GeoFieldDefinition.cs`, `src/RedisVlDotNet/Schema/VectorFieldAttributes.cs`, `src/RedisVlDotNet/Schema/VectorFieldDefinition.cs`, `src/RedisVlDotNet/Schema/SearchSchema.cs`, `tests/RedisVlDotNet.Tests/RedisVlDotNet.Tests.csproj`, `tests/RedisVlDotNet.Tests/Schema/SearchSchemaTests.cs`, `prd.json`, `progress.txt`
+- Quality checks run and result: `dotnet test redis-vl-dotnet.sln` passed; `dotnet build redis-vl-dotnet.sln` passed.
+- Learnings for future iterations:
+  - Patterns discovered: use enums and focused option records for Redis schema flags instead of raw strings so later command builders and parsers can share one typed contract.
+  - Gotchas encountered: positional record constructor parameter names do not align well with the lower-case named-argument style used elsewhere in the API, so explicit constructors are clearer for public schema types.
+  - Useful context: vector schema support now includes typed placeholders for algorithm, datatype, and distance metric, while deeper compatibility validation is still reserved for `US-003`.
 ---
