@@ -119,6 +119,89 @@ public sealed class SearchQueryCommandBuilderTests
     }
 
     [Fact]
+    public void BuildsHybridSearchArgumentsWithTextAndMetadataFilters()
+    {
+        var schema = new SearchSchema(
+            new IndexDefinition("movies-idx", "movie:", StorageType.Hash),
+            [
+                new TextFieldDefinition("title"),
+                new TagFieldDefinition("genre"),
+                new VectorFieldDefinition(
+                    "embedding",
+                    new VectorFieldAttributes(
+                        VectorAlgorithm.Flat,
+                        VectorDataType.Float32,
+                        VectorDistanceMetric.Cosine,
+                        2))
+            ]);
+        var query = HybridQuery.FromFloat32(
+            Filter.Text("title").Prefix("He"),
+            "embedding",
+            [1f, 0f],
+            2,
+            Filter.Tag("genre").Eq("crime"),
+            ["title"],
+            scoreAlias: "distance");
+
+        var arguments = SearchQueryCommandBuilder.BuildHybridSearchArguments(schema, query);
+        var rendered = arguments.Select(RenderArgument).ToArray();
+
+        Assert.Equal("movies-idx", rendered[0]);
+        Assert.Equal("(@title:He* @genre:{crime})=>[KNN 2 @embedding $vector AS distance]", rendered[1]);
+        Assert.Equal(
+            [
+                "PARAMS", "2", "vector", "<binary>",
+                "SORTBY", "distance", "ASC",
+                "RETURN", "2", "title", "distance",
+                "LIMIT", "0", "2",
+                "DIALECT", "2"
+            ],
+            rendered[2..]);
+    }
+
+    [Fact]
+    public void BuildsVectorRangeArgumentsWithSortingProjectionAndPaging()
+    {
+        var schema = new SearchSchema(
+            new IndexDefinition("movies-idx", "movie:", StorageType.Hash),
+            [
+                new TagFieldDefinition("genre"),
+                new TextFieldDefinition("title"),
+                new VectorFieldDefinition(
+                    "embedding",
+                    new VectorFieldAttributes(
+                        VectorAlgorithm.Flat,
+                        VectorDataType.Float32,
+                        VectorDistanceMetric.Cosine,
+                        2))
+            ]);
+        var query = VectorRangeQuery.FromFloat32(
+            "embedding",
+            [1f, 0f],
+            0.3,
+            Filter.Tag("genre").Eq("crime"),
+            ["title"],
+            scoreAlias: "distance",
+            offset: 1,
+            limit: 5);
+
+        var arguments = SearchQueryCommandBuilder.BuildVectorRangeArguments(schema, query);
+        var rendered = arguments.Select(RenderArgument).ToArray();
+
+        Assert.Equal("movies-idx", rendered[0]);
+        Assert.Equal("@genre:{crime} @embedding:[VECTOR_RANGE 0.3 $vector]=>{$YIELD_DISTANCE_AS: distance}", rendered[1]);
+        Assert.Equal(
+            [
+                "PARAMS", "2", "vector", "<binary>",
+                "SORTBY", "distance", "ASC",
+                "RETURN", "2", "title", "distance",
+                "LIMIT", "1", "5",
+                "DIALECT", "2"
+            ],
+            rendered[2..]);
+    }
+
+    [Fact]
     public void RejectsUnknownVectorField()
     {
         var schema = new SearchSchema(
@@ -224,6 +307,34 @@ public sealed class SearchQueryCommandBuilderTests
     }
 
     [Fact]
+    public void HybridQueryRequiresATextPredicate()
+    {
+        var exception = Assert.Throws<ArgumentException>(() => HybridQuery.FromFloat32(
+            Filter.Tag("genre").Eq("crime"),
+            "embedding",
+            [1f, 2f],
+            1));
+
+        Assert.Contains("text predicate", exception.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void HybridQueryNormalizesReturnFieldsAndScoreAlias()
+    {
+        var query = HybridQuery.FromFloat32(
+            Filter.Text("title").Prefix("He"),
+            "@embedding",
+            [1f, 2f],
+            2,
+            returnFields: ["@title", "title", "distance"],
+            scoreAlias: "@distance");
+
+        Assert.Equal("embedding", query.VectorFieldName);
+        Assert.Equal("distance", query.ScoreAlias);
+        Assert.Equal(["title", "distance"], query.ReturnFields);
+    }
+
+    [Fact]
     public void FilterQueryNormalizesReturnFieldsAndPaging()
     {
         var query = new FilterQuery(
@@ -232,6 +343,25 @@ public sealed class SearchQueryCommandBuilderTests
             limit: 5);
 
         Assert.Equal(["title", "year"], query.ReturnFields);
+        Assert.Equal(2, query.Offset);
+        Assert.Equal(5, query.Limit);
+    }
+
+    [Fact]
+    public void VectorRangeQueryNormalizesReturnFieldsAndPaging()
+    {
+        var query = VectorRangeQuery.FromFloat32(
+            "@embedding",
+            [1f, 2f],
+            0.5,
+            returnFields: ["@title", "title", "distance"],
+            scoreAlias: "@distance",
+            offset: 2,
+            limit: 5);
+
+        Assert.Equal("embedding", query.FieldName);
+        Assert.Equal("distance", query.ScoreAlias);
+        Assert.Equal(["title", "distance"], query.ReturnFields);
         Assert.Equal(2, query.Offset);
         Assert.Equal(5, query.Limit);
     }

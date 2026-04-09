@@ -16,6 +16,7 @@ Started: Thu Apr  9 16:10:38 EDT 2026
 - Keep RediSearch query DSL features as immutable expression objects that render query fragments directly, with `And`/`Or`/`Not` helpers and operator overloads as thin composition sugar rather than embedding string concatenation in later query APIs.
 - Keep RediSearch command shaping and raw response parsing in dedicated internal query builders and parsers so public query objects stay schema-focused and unit tests can validate command contracts without a live Redis connection.
 - For non-vector retrieval and count flows, keep using `FT.SEARCH` on the shared parser path; use `NOCONTENT LIMIT 0 0` for counts so filter, vector, and count abstractions all share one result-shaping pipeline.
+- Keep vector-derived query types responsible for normalizing their distance alias into `RETURN` fields, and enforce hybrid-query lexical intent by requiring at least one text predicate while still composing extra metadata filters through the shared filter DSL.
 ---
 
 ## 2026-04-09 16:14 EDT - US-001
@@ -124,4 +125,15 @@ Started: Thu Apr  9 16:10:38 EDT 2026
   - Patterns discovered: keep return-field normalization shared across query types so projection semantics stay consistent as hybrid and typed-result abstractions are added.
   - Gotchas encountered: this repo's known `dotnet` artifact lock still reproduces if `dotnet test` and `dotnet build` run concurrently, so final validation should stay strictly sequential.
   - Useful context: the filter-only integration coverage is HASH-backed today, but the query APIs themselves remain storage-agnostic because they operate on RediSearch field names rather than document serialization details.
+---
+## 2026-04-09 16:59 EDT - US-011
+- Implemented `HybridQuery` and `VectorRangeQuery` abstractions, added sync and async execution overloads on `SearchIndex`, and extended the shared query command builder to emit deterministic distance-sorted `FT.SEARCH` calls for both query types.
+- Added reusable query helpers for score-alias projection normalization and hybrid text-predicate validation so vector-style queries keep a stable distance-field contract while hybrid queries remain meaningfully lexical.
+- Added unit coverage for hybrid and vector-range command rendering, query normalization, and hybrid guard clauses, plus opt-in Redis integration coverage for seeded hybrid ranking and vector-range threshold ordering.
+- Files changed: `src/RedisVlDotNet/Filters/FilterExpression.cs`, `src/RedisVlDotNet/Indexes/SearchIndex.cs`, `src/RedisVlDotNet/Indexes/SearchQueryCommandBuilder.cs`, `src/RedisVlDotNet/Queries/HybridQuery.cs`, `src/RedisVlDotNet/Queries/QueryFilterInspector.cs`, `src/RedisVlDotNet/Queries/QueryReturnFieldHelper.cs`, `src/RedisVlDotNet/Queries/VectorQuery.cs`, `src/RedisVlDotNet/Queries/VectorRangeQuery.cs`, `tests/RedisVlDotNet.Tests/Indexes/SearchIndexIntegrationTests.cs`, `tests/RedisVlDotNet.Tests/Indexes/SearchQueryCommandBuilderTests.cs`, `prd.json`, `progress.txt`
+- Quality checks run and result: `dotnet test redis-vl-dotnet.sln` passed with 7 Redis integration tests skipped because `REDIS_VL_REDIS_URL` was not set; `dotnet build redis-vl-dotnet.sln` passed.
+- Learnings for future iterations:
+  - Patterns discovered: keep new RediSearch query families on the existing `SearchResultsParser` path so additional query abstractions only need schema validation and command shaping, not new response models.
+  - Gotchas encountered: hybrid queries need an explicit lexical guard or they collapse into a renamed vector query, so requiring at least one text predicate keeps the public abstraction honest.
+  - Useful context: vector-range queries can keep deterministic ordering by always yielding a distance alias and sorting ascending on that alias, even when a metadata filter is also present.
 ---

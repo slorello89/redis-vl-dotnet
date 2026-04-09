@@ -252,6 +252,12 @@ public sealed class SearchIndex
     public SearchResults Search(FilterQuery query) =>
         SearchAsync(query).GetAwaiter().GetResult();
 
+    public SearchResults Search(HybridQuery query) =>
+        SearchAsync(query).GetAwaiter().GetResult();
+
+    public SearchResults Search(VectorRangeQuery query) =>
+        SearchAsync(query).GetAwaiter().GetResult();
+
     public async Task<SearchResults> SearchAsync(VectorQuery query, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(query);
@@ -259,6 +265,30 @@ public sealed class SearchIndex
         var result = await ExecuteAsync(
             "FT.SEARCH",
             SearchQueryCommandBuilder.BuildVectorSearchArguments(Schema, query),
+            cancellationToken).ConfigureAwait(false);
+
+        return SearchResultsParser.Parse(result);
+    }
+
+    public async Task<SearchResults> SearchAsync(HybridQuery query, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(query);
+
+        var result = await ExecuteAsync(
+            "FT.SEARCH",
+            SearchQueryCommandBuilder.BuildHybridSearchArguments(Schema, query),
+            cancellationToken).ConfigureAwait(false);
+
+        return SearchResultsParser.Parse(result);
+    }
+
+    public async Task<SearchResults> SearchAsync(VectorRangeQuery query, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(query);
+
+        var result = await ExecuteAsync(
+            "FT.SEARCH",
+            SearchQueryCommandBuilder.BuildVectorRangeArguments(Schema, query),
             cancellationToken).ConfigureAwait(false);
 
         return SearchResultsParser.Parse(result);

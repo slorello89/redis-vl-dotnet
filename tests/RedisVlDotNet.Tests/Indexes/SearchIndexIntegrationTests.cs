@@ -330,6 +330,162 @@ public sealed class SearchIndexIntegrationTests
         }
     }
 
+    [RedisSearchIntegrationFact]
+    public async Task ExecutesHybridQueriesWithDeterministicRanking()
+    {
+        await using var connection = await ConnectionMultiplexer.ConnectAsync(RedisSearchTestEnvironment.ConnectionString!);
+        var database = connection.GetDatabase();
+
+        var token = Guid.NewGuid().ToString("N");
+        var schema = new SearchSchema(
+            new IndexDefinition($"hybrid-idx-{token}", $"hybrid:{token}:", StorageType.Hash),
+            [
+                new TagFieldDefinition("genre"),
+                new TextFieldDefinition("title"),
+                new VectorFieldDefinition(
+                    "embedding",
+                    new VectorFieldAttributes(
+                        VectorAlgorithm.Flat,
+                        VectorDataType.Float32,
+                        VectorDistanceMetric.Cosine,
+                        2))
+            ]);
+        var index = new SearchIndex(database, schema);
+
+        try
+        {
+            await index.CreateAsync();
+
+            await database.HashSetAsync(
+                $"{schema.Index.Prefix}1",
+                [
+                    new HashEntry("title", "Heat"),
+                    new HashEntry("genre", "crime"),
+                    new HashEntry("embedding", EncodeFloat32([1f, 0f]))
+                ]);
+            await database.HashSetAsync(
+                $"{schema.Index.Prefix}2",
+                [
+                    new HashEntry("title", "Heatwave"),
+                    new HashEntry("genre", "crime"),
+                    new HashEntry("embedding", EncodeFloat32([0.8f, 0.2f]))
+                ]);
+            await database.HashSetAsync(
+                $"{schema.Index.Prefix}3",
+                [
+                    new HashEntry("title", "Arrival"),
+                    new HashEntry("genre", "science-fiction"),
+                    new HashEntry("embedding", EncodeFloat32([0f, 1f]))
+                ]);
+
+            await Task.Delay(TimeSpan.FromMilliseconds(250));
+
+            var query = HybridQuery.FromFloat32(
+                Filter.Text("title").Prefix("He"),
+                "embedding",
+                [1f, 0f],
+                2,
+                Filter.Tag("genre").Eq("crime"),
+                ["title"],
+                scoreAlias: "distance");
+
+            var results = await index.SearchAsync(query);
+
+            Assert.Equal(2, results.Documents.Count);
+            Assert.Equal($"{schema.Index.Prefix}1", results.Documents[0].Id);
+            Assert.Equal($"{schema.Index.Prefix}2", results.Documents[1].Id);
+            Assert.Equal("Heat", results.Documents[0].Values["title"]);
+            Assert.Equal("Heatwave", results.Documents[1].Values["title"]);
+            Assert.True(double.Parse(results.Documents[0].Values["distance"]!, System.Globalization.CultureInfo.InvariantCulture) <
+                        double.Parse(results.Documents[1].Values["distance"]!, System.Globalization.CultureInfo.InvariantCulture));
+        }
+        finally
+        {
+            if (await index.ExistsAsync())
+            {
+                await index.DropAsync(deleteDocuments: true);
+            }
+        }
+    }
+
+    [RedisSearchIntegrationFact]
+    public async Task ExecutesVectorRangeQueriesWithThresholdOrdering()
+    {
+        await using var connection = await ConnectionMultiplexer.ConnectAsync(RedisSearchTestEnvironment.ConnectionString!);
+        var database = connection.GetDatabase();
+
+        var token = Guid.NewGuid().ToString("N");
+        var schema = new SearchSchema(
+            new IndexDefinition($"vector-range-idx-{token}", $"vrange:{token}:", StorageType.Hash),
+            [
+                new TagFieldDefinition("genre"),
+                new TextFieldDefinition("title"),
+                new VectorFieldDefinition(
+                    "embedding",
+                    new VectorFieldAttributes(
+                        VectorAlgorithm.Flat,
+                        VectorDataType.Float32,
+                        VectorDistanceMetric.Cosine,
+                        2))
+            ]);
+        var index = new SearchIndex(database, schema);
+
+        try
+        {
+            await index.CreateAsync();
+
+            await database.HashSetAsync(
+                $"{schema.Index.Prefix}1",
+                [
+                    new HashEntry("title", "Heat"),
+                    new HashEntry("genre", "crime"),
+                    new HashEntry("embedding", EncodeFloat32([1f, 0f]))
+                ]);
+            await database.HashSetAsync(
+                $"{schema.Index.Prefix}2",
+                [
+                    new HashEntry("title", "Thief"),
+                    new HashEntry("genre", "crime"),
+                    new HashEntry("embedding", EncodeFloat32([0.8f, 0.2f]))
+                ]);
+            await database.HashSetAsync(
+                $"{schema.Index.Prefix}3",
+                [
+                    new HashEntry("title", "Arrival"),
+                    new HashEntry("genre", "science-fiction"),
+                    new HashEntry("embedding", EncodeFloat32([0f, 1f]))
+                ]);
+
+            await Task.Delay(TimeSpan.FromMilliseconds(250));
+
+            var query = VectorRangeQuery.FromFloat32(
+                "embedding",
+                [1f, 0f],
+                0.3,
+                Filter.Tag("genre").Eq("crime"),
+                ["title"],
+                scoreAlias: "distance",
+                limit: 10);
+
+            var results = await index.SearchAsync(query);
+
+            Assert.Equal(2, results.Documents.Count);
+            Assert.Equal($"{schema.Index.Prefix}1", results.Documents[0].Id);
+            Assert.Equal($"{schema.Index.Prefix}2", results.Documents[1].Id);
+            Assert.Equal("Heat", results.Documents[0].Values["title"]);
+            Assert.Equal("Thief", results.Documents[1].Values["title"]);
+            Assert.True(double.Parse(results.Documents[0].Values["distance"]!, System.Globalization.CultureInfo.InvariantCulture) <
+                        double.Parse(results.Documents[1].Values["distance"]!, System.Globalization.CultureInfo.InvariantCulture));
+        }
+        finally
+        {
+            if (await index.ExistsAsync())
+            {
+                await index.DropAsync(deleteDocuments: true);
+            }
+        }
+    }
+
     private sealed record JsonMovieDocument(string Id, string Title, int Year, string Genre);
 
     private sealed record JsonMovieEnvelope(string ExternalId, string Title, int Year, string Genre);

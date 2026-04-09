@@ -84,10 +84,93 @@ internal static class SearchQueryCommandBuilder
         return arguments.ToArray();
     }
 
+    public static object[] BuildHybridSearchArguments(SearchSchema schema, HybridQuery query)
+    {
+        ArgumentNullException.ThrowIfNull(schema);
+        ArgumentNullException.ThrowIfNull(query);
+
+        var vectorField = ResolveVectorField(schema, query.VectorFieldName);
+        ValidateVectorPayload(vectorField.Attributes, query.VectorFieldName, query.Vector);
+
+        var arguments = new List<object>
+        {
+            schema.Index.Name,
+            BuildHybridSearchQuery(schema, vectorField, query),
+            "PARAMS",
+            "2",
+            "vector",
+            query.Vector,
+            "SORTBY",
+            query.ScoreAlias,
+            "ASC",
+            "RETURN",
+            query.ReturnFields.Count.ToString(CultureInfo.InvariantCulture)
+        };
+
+        arguments.AddRange(query.ReturnFields);
+        arguments.Add("LIMIT");
+        arguments.Add("0");
+        arguments.Add(query.TopK.ToString(CultureInfo.InvariantCulture));
+        arguments.Add("DIALECT");
+        arguments.Add("2");
+
+        return arguments.ToArray();
+    }
+
+    public static object[] BuildVectorRangeArguments(SearchSchema schema, VectorRangeQuery query)
+    {
+        ArgumentNullException.ThrowIfNull(schema);
+        ArgumentNullException.ThrowIfNull(query);
+
+        var vectorField = ResolveVectorField(schema, query.FieldName);
+        ValidateVectorPayload(vectorField.Attributes, query.FieldName, query.Vector);
+
+        var arguments = new List<object>
+        {
+            schema.Index.Name,
+            BuildVectorRangeSearchQuery(schema, vectorField, query),
+            "PARAMS",
+            "2",
+            "vector",
+            query.Vector,
+            "SORTBY",
+            query.ScoreAlias,
+            "ASC",
+            "RETURN",
+            query.ReturnFields.Count.ToString(CultureInfo.InvariantCulture)
+        };
+
+        arguments.AddRange(query.ReturnFields);
+        arguments.Add("LIMIT");
+        arguments.Add(query.Offset.ToString(CultureInfo.InvariantCulture));
+        arguments.Add(query.Limit.ToString(CultureInfo.InvariantCulture));
+        arguments.Add("DIALECT");
+        arguments.Add("2");
+
+        return arguments.ToArray();
+    }
+
     private static string BuildVectorSearchQuery(SearchSchema schema, VectorFieldDefinition field, VectorQuery query)
     {
         var filter = query.Filter?.ToQueryString() ?? "*";
         return $"{filter}=>[KNN {query.TopK.ToString(CultureInfo.InvariantCulture)} @{GetQueryFieldName(schema, field)} $vector AS {query.ScoreAlias}]";
+    }
+
+    private static string BuildHybridSearchQuery(SearchSchema schema, VectorFieldDefinition field, HybridQuery query)
+    {
+        var filter = query.CombinedFilter.ToQueryString();
+        return $"({filter})=>[KNN {query.TopK.ToString(CultureInfo.InvariantCulture)} @{GetQueryFieldName(schema, field)} $vector AS {query.ScoreAlias}]";
+    }
+
+    private static string BuildVectorRangeSearchQuery(SearchSchema schema, VectorFieldDefinition field, VectorRangeQuery query)
+    {
+        var vectorClause =
+            $"@{GetQueryFieldName(schema, field)}:[VECTOR_RANGE {query.DistanceThreshold.ToString("G", CultureInfo.InvariantCulture)} $vector]=>{{$YIELD_DISTANCE_AS: {query.ScoreAlias}}}";
+        var filter = query.Filter?.ToQueryString();
+
+        return string.IsNullOrWhiteSpace(filter)
+            ? vectorClause
+            : $"{filter} {vectorClause}";
     }
 
     private static VectorFieldDefinition ResolveVectorField(SearchSchema schema, string fieldName)
@@ -141,19 +224,24 @@ internal static class SearchQueryCommandBuilder
 
     private static void ValidateVectorPayload(VectorFieldDefinition field, VectorQuery query)
     {
-        var bytesPerDimension = field.Attributes.DataType switch
+        ValidateVectorPayload(field.Attributes, query.FieldName, query.Vector);
+    }
+
+    private static void ValidateVectorPayload(VectorFieldAttributes attributes, string fieldName, byte[] vector)
+    {
+        var bytesPerDimension = attributes.DataType switch
         {
             VectorDataType.Float32 => sizeof(float),
             VectorDataType.Float64 => sizeof(double),
-            _ => throw new ArgumentOutOfRangeException(nameof(field), field.Attributes.DataType, "Unsupported vector data type.")
+            _ => throw new ArgumentOutOfRangeException(nameof(attributes), attributes.DataType, "Unsupported vector data type.")
         };
 
-        var expectedLength = field.Attributes.Dimensions * bytesPerDimension;
-        if (query.Vector.Length != expectedLength)
+        var expectedLength = attributes.Dimensions * bytesPerDimension;
+        if (vector.Length != expectedLength)
         {
             throw new ArgumentException(
-                $"Vector payload for field '{query.FieldName}' must contain exactly {expectedLength} bytes.",
-                nameof(query));
+                $"Vector payload for field '{fieldName}' must contain exactly {expectedLength} bytes.",
+                nameof(vector));
         }
     }
 }

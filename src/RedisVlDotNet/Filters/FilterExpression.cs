@@ -183,14 +183,14 @@ internal sealed class LogicalFilterExpression(LogicalOperator operation, IReadOn
 
 internal sealed class NotFilterExpression(FilterExpression expression) : FilterExpression
 {
-    private readonly FilterExpression _expression = expression;
+    internal FilterExpression Expression { get; } = expression;
 
     internal override string Render(bool grouped)
     {
-        return _expression switch
+        return Expression switch
         {
-            LogicalFilterExpression => $"-{_expression.Render(grouped: true)}",
-            _ => $"-{_expression.Render(grouped: false)}"
+            LogicalFilterExpression => $"-{Expression.Render(grouped: true)}",
+            _ => $"-{Expression.Render(grouped: false)}"
         };
     }
 }

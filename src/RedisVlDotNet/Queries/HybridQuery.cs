@@ -3,17 +3,19 @@ using RedisVlDotNet.Filters;
 
 namespace RedisVlDotNet.Queries;
 
-public sealed class VectorQuery
+public sealed class HybridQuery
 {
-    public VectorQuery(
-        string fieldName,
+    public HybridQuery(
+        FilterExpression textFilter,
+        string vectorFieldName,
         byte[] vector,
         int topK,
         FilterExpression? filter = null,
         IEnumerable<string>? returnFields = null,
         string scoreAlias = "vector_distance")
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(fieldName);
+        ArgumentNullException.ThrowIfNull(textFilter);
+        ArgumentException.ThrowIfNullOrWhiteSpace(vectorFieldName);
         ArgumentNullException.ThrowIfNull(vector);
         ArgumentException.ThrowIfNullOrWhiteSpace(scoreAlias);
 
@@ -27,15 +29,23 @@ public sealed class VectorQuery
             throw new ArgumentOutOfRangeException(nameof(topK), topK, "TopK must be greater than zero.");
         }
 
-        FieldName = FilterExpression.NormalizeFieldName(fieldName);
+        if (!QueryFilterInspector.ContainsTextExpression(textFilter))
+        {
+            throw new ArgumentException("Hybrid queries require at least one text predicate in the text filter.", nameof(textFilter));
+        }
+
+        TextFilter = textFilter;
+        VectorFieldName = FilterExpression.NormalizeFieldName(vectorFieldName);
         Vector = vector.ToArray();
         TopK = topK;
         Filter = filter;
         ScoreAlias = FilterExpression.NormalizeFieldName(scoreAlias);
-        ReturnFields = NormalizeReturnFields(returnFields, ScoreAlias);
+        ReturnFields = QueryReturnFieldHelper.NormalizeReturnFields(returnFields, ScoreAlias);
     }
 
-    public string FieldName { get; }
+    public FilterExpression TextFilter { get; }
+
+    public string VectorFieldName { get; }
 
     public byte[] Vector { get; }
 
@@ -47,24 +57,25 @@ public sealed class VectorQuery
 
     public IReadOnlyList<string> ReturnFields { get; }
 
-    public static VectorQuery FromFloat32(
-        string fieldName,
+    internal FilterExpression CombinedFilter => Filter is null ? TextFilter : TextFilter & Filter;
+
+    public static HybridQuery FromFloat32(
+        FilterExpression textFilter,
+        string vectorFieldName,
         float[] vector,
         int topK,
         FilterExpression? filter = null,
         IEnumerable<string>? returnFields = null,
         string scoreAlias = "vector_distance") =>
-        new(fieldName, MemoryMarshal.AsBytes<float>(vector.AsSpan()).ToArray(), topK, filter, returnFields, scoreAlias);
+        new(textFilter, vectorFieldName, MemoryMarshal.AsBytes<float>(vector.AsSpan()).ToArray(), topK, filter, returnFields, scoreAlias);
 
-    public static VectorQuery FromFloat64(
-        string fieldName,
+    public static HybridQuery FromFloat64(
+        FilterExpression textFilter,
+        string vectorFieldName,
         double[] vector,
         int topK,
         FilterExpression? filter = null,
         IEnumerable<string>? returnFields = null,
         string scoreAlias = "vector_distance") =>
-        new(fieldName, MemoryMarshal.AsBytes<double>(vector.AsSpan()).ToArray(), topK, filter, returnFields, scoreAlias);
-
-    private static IReadOnlyList<string> NormalizeReturnFields(IEnumerable<string>? returnFields, string scoreAlias) =>
-        QueryReturnFieldHelper.NormalizeReturnFields(returnFields, scoreAlias);
+        new(textFilter, vectorFieldName, MemoryMarshal.AsBytes<double>(vector.AsSpan()).ToArray(), topK, filter, returnFields, scoreAlias);
 }
