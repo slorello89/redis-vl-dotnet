@@ -25,10 +25,10 @@ public sealed class SearchSchemaTests
             VectorDataType.Float32,
             VectorDistanceMetric.Cosine,
             1536,
-            InitialCapacity: 1000,
-            M: 16,
-            EfConstruction: 200,
-            EfRuntime: 10);
+            initialCapacity: 1000,
+            m: 16,
+            efConstruction: 200,
+            efRuntime: 10);
 
         FieldDefinition[] fields =
         [
@@ -93,5 +93,120 @@ public sealed class SearchSchemaTests
     {
         Assert.Throws<ArgumentException>(() => new IndexDefinition("", "docs:", StorageType.Json));
         Assert.Throws<ArgumentException>(() => new TextFieldDefinition(" "));
+    }
+
+    [Fact]
+    public void CreatesVectorFieldAttributesForSupportedConfigurations()
+    {
+        var flatAttributes = new VectorFieldAttributes(
+            VectorAlgorithm.Flat,
+            VectorDataType.Float32,
+            VectorDistanceMetric.L2,
+            768,
+            initialCapacity: 100,
+            blockSize: 64);
+
+        var hnswAttributes = new VectorFieldAttributes(
+            VectorAlgorithm.Hnsw,
+            VectorDataType.Float64,
+            VectorDistanceMetric.InnerProduct,
+            384,
+            m: 16,
+            efConstruction: 200,
+            efRuntime: 32);
+
+        Assert.Equal(VectorAlgorithm.Flat, flatAttributes.Algorithm);
+        Assert.Equal(64, flatAttributes.BlockSize);
+        Assert.Equal(VectorAlgorithm.Hnsw, hnswAttributes.Algorithm);
+        Assert.Equal(16, hnswAttributes.M);
+        Assert.Equal(200, hnswAttributes.EfConstruction);
+        Assert.Equal(32, hnswAttributes.EfRuntime);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    public void RejectsNonPositiveVectorDimensions(int dimensions)
+    {
+        var exception = Assert.Throws<ArgumentOutOfRangeException>(() => new VectorFieldAttributes(
+            VectorAlgorithm.Hnsw,
+            VectorDataType.Float32,
+            VectorDistanceMetric.Cosine,
+            dimensions));
+
+        Assert.Equal("dimensions", exception.ParamName);
+    }
+
+    [Theory]
+    [InlineData((VectorAlgorithm)99, VectorDataType.Float32, VectorDistanceMetric.Cosine, "algorithm")]
+    [InlineData(VectorAlgorithm.Flat, (VectorDataType)99, VectorDistanceMetric.Cosine, "dataType")]
+    [InlineData(VectorAlgorithm.Flat, VectorDataType.Float32, (VectorDistanceMetric)99, "distanceMetric")]
+    public void RejectsUnsupportedVectorEnumValues(
+        VectorAlgorithm algorithm,
+        VectorDataType dataType,
+        VectorDistanceMetric distanceMetric,
+        string expectedParamName)
+    {
+        var exception = Assert.Throws<ArgumentOutOfRangeException>(() => new VectorFieldAttributes(
+            algorithm,
+            dataType,
+            distanceMetric,
+            128));
+
+        Assert.Equal(expectedParamName, exception.ParamName);
+    }
+
+    [Theory]
+    [InlineData(-1, 0, 0, 0, "initialCapacity")]
+    [InlineData(0, -1, 0, 0, "blockSize")]
+    [InlineData(0, 0, -1, 0, "m")]
+    [InlineData(0, 0, 0, -1, "efConstruction")]
+    public void RejectsNegativeVectorTuningValues(
+        int initialCapacity,
+        int blockSize,
+        int m,
+        int efConstruction,
+        string expectedParamName)
+    {
+        var exception = Assert.Throws<ArgumentOutOfRangeException>(() => new VectorFieldAttributes(
+            VectorAlgorithm.Hnsw,
+            VectorDataType.Float32,
+            VectorDistanceMetric.Cosine,
+            256,
+            initialCapacity: initialCapacity,
+            blockSize: blockSize,
+            m: m,
+            efConstruction: efConstruction));
+
+        Assert.Equal(expectedParamName, exception.ParamName);
+    }
+
+    [Fact]
+    public void RejectsNegativeEfRuntime()
+    {
+        var exception = Assert.Throws<ArgumentOutOfRangeException>(() => new VectorFieldAttributes(
+            VectorAlgorithm.Hnsw,
+            VectorDataType.Float32,
+            VectorDistanceMetric.Cosine,
+            256,
+            efRuntime: -1));
+
+        Assert.Equal("efRuntime", exception.ParamName);
+    }
+
+    [Fact]
+    public void RejectsHnswOptionsForFlatVectorFields()
+    {
+        var exception = Assert.Throws<ArgumentException>(() => new VectorFieldAttributes(
+            VectorAlgorithm.Flat,
+            VectorDataType.Float32,
+            VectorDistanceMetric.Cosine,
+            256,
+            m: 16,
+            efConstruction: 200,
+            efRuntime: 32));
+
+        Assert.Equal("algorithm", exception.ParamName);
+        Assert.Contains("FLAT", exception.Message, StringComparison.Ordinal);
     }
 }

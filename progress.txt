@@ -6,6 +6,7 @@ Started: Thu Apr  9 16:10:38 EDT 2026
 - Keep durable product and architecture contracts under `docs/`, and use the root `README.md` only as the short entry point into those deeper specs.
 - Even for documentation-first iterations, keep a valid `.NET` solution and at least one buildable project in place so `dotnet build` remains a meaningful repository quality gate.
 - Keep production code under `src/` and mirror public API coverage under `tests/`, with schema and other contract tests grouped by feature namespace so `dotnet test` validates repository progress as the surface area grows.
+- Put schema guard clauses in the schema model constructors themselves so invalid configurations fail at object creation time and later Redis command builders can assume validated inputs.
 ---
 
 ## 2026-04-09 16:14 EDT - US-001
@@ -28,4 +29,14 @@ Started: Thu Apr  9 16:10:38 EDT 2026
   - Patterns discovered: use enums and focused option records for Redis schema flags instead of raw strings so later command builders and parsers can share one typed contract.
   - Gotchas encountered: positional record constructor parameter names do not align well with the lower-case named-argument style used elsewhere in the API, so explicit constructors are clearer for public schema types.
   - Useful context: vector schema support now includes typed placeholders for algorithm, datatype, and distance metric, while deeper compatibility validation is still reserved for `US-003`.
+---
+## 2026-04-09 16:21 EDT - US-003
+- Implemented constructor-level validation for vector schema attributes so unsupported enum values, non-positive dimensions, negative tuning values, and FLAT-plus-HNSW-only option combinations fail before any Redis command generation.
+- Expanded schema unit tests to cover valid FLAT and HNSW definitions plus invalid dimensions, invalid enum casts, negative tuning values, and incompatible FLAT/HNSW settings.
+- Files changed: `src/RedisVlDotNet/Schema/VectorFieldAttributes.cs`, `tests/RedisVlDotNet.Tests/Schema/SearchSchemaTests.cs`, `prd.json`, `progress.txt`
+- Quality checks run and result: `dotnet test redis-vl-dotnet.sln` passed; `dotnet build redis-vl-dotnet.sln` passed.
+- Learnings for future iterations:
+  - Patterns discovered: keep compatibility validation close to the typed schema object so later index command builders can treat vector attributes as already normalized and safe.
+  - Gotchas encountered: invalid enum handling in public .NET APIs requires explicit `Enum.IsDefined` checks because callers can cast arbitrary integers into enum-typed parameters.
+  - Useful context: HNSW-only tuning knobs currently accepted are `M`, `EfConstruction`, and `EfRuntime`; FLAT accepts shared capacity settings but rejects those HNSW-specific values.
 ---
