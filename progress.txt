@@ -17,6 +17,7 @@ Started: Thu Apr  9 16:10:38 EDT 2026
 - Keep RediSearch command shaping and raw response parsing in dedicated internal query builders and parsers so public query objects stay schema-focused and unit tests can validate command contracts without a live Redis connection.
 - For non-vector retrieval and count flows, keep using `FT.SEARCH` on the shared parser path; use `NOCONTENT LIMIT 0 0` for counts so filter, vector, and count abstractions all share one result-shaping pipeline.
 - Keep vector-derived query types responsible for normalizing their distance alias into `RETURN` fields, and enforce hybrid-query lexical intent by requiring at least one text predicate while still composing extra metadata filters through the shared filter DSL.
+- Layer typed search materialization on top of raw `SearchResults` with the shared web-default JSON serializer, and treat the Redis document id as a synthetic `id` field so projections can map into DTOs without a second query pipeline.
 ---
 
 ## 2026-04-09 16:14 EDT - US-001
@@ -136,4 +137,15 @@ Started: Thu Apr  9 16:10:38 EDT 2026
   - Patterns discovered: keep new RediSearch query families on the existing `SearchResultsParser` path so additional query abstractions only need schema validation and command shaping, not new response models.
   - Gotchas encountered: hybrid queries need an explicit lexical guard or they collapse into a renamed vector query, so requiring at least one text predicate keeps the public abstraction honest.
   - Useful context: vector-range queries can keep deterministic ordering by always yielding a distance alias and sorting ascending on that alias, even when a metadata filter is also present.
+---
+## 2026-04-09 17:04 EDT - US-012
+- Implemented typed search result materialization on top of the existing raw `SearchResults` contract, including `SearchDocument.Map<T>()`, `SearchResults.Map<T>()`, generic `SearchResults<T>`, and typed sync/async `SearchIndex.Search<T>()` overloads for filter, vector, hybrid, and vector-range queries.
+- Added a dedicated search-result mapper that respects web-default JSON property naming, projects the Redis document id as `id`, handles projected alias fields, deserializes nested JSON payloads, and converts binary vector projections into `float[]` or `double[]` when the target shape requests them.
+- Added clear `SearchResultMappingException` failures for missing required fields and incompatible projected values, plus unit coverage for primitive, nested, alias, and vector mapping behavior.
+- Files changed: `src/RedisVlDotNet/Indexes/SearchIndex.cs`, `src/RedisVlDotNet/Queries/SearchResults.cs`, `src/RedisVlDotNet/Queries/SearchResultMapper.cs`, `tests/RedisVlDotNet.Tests/Queries/SearchResultMappingTests.cs`, `prd.json`, `progress.txt`
+- Quality checks run and result: `dotnet test redis-vl-dotnet.sln` passed with 7 Redis integration tests skipped because `REDIS_VL_REDIS_URL` was not set; `dotnet build redis-vl-dotnet.sln` passed.
+- Learnings for future iterations:
+  - Patterns discovered: typed query APIs can stay thin if they map from the existing raw search document model instead of duplicating RediSearch parsing logic per query family.
+  - Gotchas encountered: projected binary vector fields need explicit byte-array handling before any JSON-based materialization logic, otherwise typed vector DTOs silently fall back into string parsing failures.
+  - Useful context: alias-aware typed mapping now works through `JsonPropertyName` or the default camel-case naming policy, and missing non-nullable DTO properties fail fast with a document-scoped mapping exception.
 ---

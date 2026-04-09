@@ -249,14 +249,26 @@ public sealed class SearchIndex
     public SearchResults Search(VectorQuery query) =>
         SearchAsync(query).GetAwaiter().GetResult();
 
+    public SearchResults<TDocument> Search<TDocument>(VectorQuery query, JsonSerializerOptions? serializerOptions = null) =>
+        SearchAsync<TDocument>(query, serializerOptions).GetAwaiter().GetResult();
+
     public SearchResults Search(FilterQuery query) =>
         SearchAsync(query).GetAwaiter().GetResult();
+
+    public SearchResults<TDocument> Search<TDocument>(FilterQuery query, JsonSerializerOptions? serializerOptions = null) =>
+        SearchAsync<TDocument>(query, serializerOptions).GetAwaiter().GetResult();
 
     public SearchResults Search(HybridQuery query) =>
         SearchAsync(query).GetAwaiter().GetResult();
 
+    public SearchResults<TDocument> Search<TDocument>(HybridQuery query, JsonSerializerOptions? serializerOptions = null) =>
+        SearchAsync<TDocument>(query, serializerOptions).GetAwaiter().GetResult();
+
     public SearchResults Search(VectorRangeQuery query) =>
         SearchAsync(query).GetAwaiter().GetResult();
+
+    public SearchResults<TDocument> Search<TDocument>(VectorRangeQuery query, JsonSerializerOptions? serializerOptions = null) =>
+        SearchAsync<TDocument>(query, serializerOptions).GetAwaiter().GetResult();
 
     public async Task<SearchResults> SearchAsync(VectorQuery query, CancellationToken cancellationToken = default)
     {
@@ -270,6 +282,12 @@ public sealed class SearchIndex
         return SearchResultsParser.Parse(result);
     }
 
+    public async Task<SearchResults<TDocument>> SearchAsync<TDocument>(
+        VectorQuery query,
+        JsonSerializerOptions? serializerOptions = null,
+        CancellationToken cancellationToken = default) =>
+        (await SearchAsync(query, cancellationToken).ConfigureAwait(false)).Map<TDocument>(serializerOptions);
+
     public async Task<SearchResults> SearchAsync(HybridQuery query, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(query);
@@ -281,6 +299,12 @@ public sealed class SearchIndex
 
         return SearchResultsParser.Parse(result);
     }
+
+    public async Task<SearchResults<TDocument>> SearchAsync<TDocument>(
+        HybridQuery query,
+        JsonSerializerOptions? serializerOptions = null,
+        CancellationToken cancellationToken = default) =>
+        (await SearchAsync(query, cancellationToken).ConfigureAwait(false)).Map<TDocument>(serializerOptions);
 
     public async Task<SearchResults> SearchAsync(VectorRangeQuery query, CancellationToken cancellationToken = default)
     {
@@ -294,6 +318,12 @@ public sealed class SearchIndex
         return SearchResultsParser.Parse(result);
     }
 
+    public async Task<SearchResults<TDocument>> SearchAsync<TDocument>(
+        VectorRangeQuery query,
+        JsonSerializerOptions? serializerOptions = null,
+        CancellationToken cancellationToken = default) =>
+        (await SearchAsync(query, cancellationToken).ConfigureAwait(false)).Map<TDocument>(serializerOptions);
+
     public async Task<SearchResults> SearchAsync(FilterQuery query, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(query);
@@ -305,6 +335,12 @@ public sealed class SearchIndex
 
         return SearchResultsParser.Parse(result);
     }
+
+    public async Task<SearchResults<TDocument>> SearchAsync<TDocument>(
+        FilterQuery query,
+        JsonSerializerOptions? serializerOptions = null,
+        CancellationToken cancellationToken = default) =>
+        (await SearchAsync(query, cancellationToken).ConfigureAwait(false)).Map<TDocument>(serializerOptions);
 
     public long Count(CountQuery query) =>
         CountAsync(query).GetAwaiter().GetResult();
