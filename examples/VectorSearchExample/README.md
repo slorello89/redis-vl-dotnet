@@ -29,3 +29,9 @@ dotnet run --project examples/VectorSearchExample/VectorSearchExample.csproj
 ```
 
 The example uses `REDIS_VL_REDIS_URL` when it is set, and otherwise falls back to `localhost:6379`.
+
+## Related Docs
+
+- [Examples index](/Users/steve.lorello/projects/redis/redis-vl-dotnet/examples/README.md)
+- [Getting started guide](/Users/steve.lorello/projects/redis/redis-vl-dotnet/docs/getting-started.md)
+- [Testing and local Redis setup](/Users/steve.lorello/projects/redis/redis-vl-dotnet/docs/testing.md)

@@ -24,6 +24,7 @@ Started: Thu Apr  9 16:10:38 EDT 2026
 - For higher-level semantic workflows, layer on `SearchIndex` with dedicated HASH-backed workflow documents and write vector bytes directly into hash fields so provider-agnostic routing or cache APIs can reuse the query stack without depending on the generic POCO hash mapper.
 - For Redis-backed integration coverage, keep deterministic seed datasets in shared test fixtures and wait on index readiness with bounded polling helpers instead of fixed `Task.Delay(...)` sleeps.
 - Keep end-to-end onboarding docs in `docs/` with copy-pasteable commands and API-accurate snippets, and use the root `README.md` as a short navigator into those longer guides.
+- Add directory-level `README.md` files when a repo area grows multiple runnable entry points, and cross-link those indexes from the root `README.md`, nearby guides, and leaf example docs so navigation mirrors the repository structure.
 - Keep runnable samples as checked-in console apps under `examples/` with direct project references to `src/RedisVlDotNet`, and include them in the solution so `dotnet build` validates example drift alongside the library.
 - For HASH-backed vector fixtures and examples, seed vector fields with raw float32 bytes via direct `HashEntry` writes and wait for index readiness before issuing nearest-neighbor queries.
 ---
@@ -239,4 +240,14 @@ Started: Thu Apr  9 16:10:38 EDT 2026
   - Patterns discovered: HASH-backed vector examples are most reliable when they seed raw float32 embedding bytes directly and poll `FT.INFO` readiness before querying.
   - Gotchas encountered: the generic hash POCO mapper is not the right fit for vector fields because RediSearch expects binary vector payloads rather than JSON-serialized arrays.
   - Useful context: the example uses a `distance` score alias and inspects raw `SearchResults` values so it demonstrates the current vector-query surface area without requiring extra DTO mapping.
+---
+## 2026-04-09 17:42 EDT - US-021
+- Implemented an `examples/README.md` index that summarizes the JSON and vector runnable samples, lists the Redis capabilities each one needs, and shows the shared local startup command for Redis Stack.
+- Updated the root `README.md`, `docs/getting-started.md`, and both example-level READMEs so docs navigation now flows cleanly between the root guide, the examples index, and the per-example run instructions.
+- Files changed: `README.md`, `docs/getting-started.md`, `examples/README.md`, `examples/JsonStorageExample/README.md`, `examples/VectorSearchExample/README.md`, `prd.json`, `progress.txt`
+- Quality checks run and result: `dotnet build redis-vl-dotnet.sln` passed.
+- Learnings for future iterations:
+  - Patterns discovered: add a directory-level `README.md` once `examples/` or another area has multiple runnable entry points, then use that file as the canonical navigation hub.
+  - Gotchas encountered: linking directly to individual example READMEs from the root works initially, but it scales poorly once multiple docs and examples need reciprocal navigation.
+  - Useful context: there are still no `AGENTS.md` files in this repository, so reusable guidance for docs navigation was recorded in the shared `## Codebase Patterns` section instead.
 ---
