@@ -14,6 +14,7 @@ Started: Thu Apr  9 16:10:38 EDT 2026
 - For JSON document lifecycle APIs, resolve Redis keys from an explicit key first, then an explicit or selected id, and finally a conventional public `Id` property so single-document and batch loads stay on one predictable key contract.
 - For `ON HASH` document lifecycle APIs, serialize POCOs with the shared web-default JSON naming policy so Redis hash fields stay camel-cased like schema field names, then rehydrate typed documents from `HashEntry[]` using the same property-name contract.
 - Keep RediSearch query DSL features as immutable expression objects that render query fragments directly, with `And`/`Or`/`Not` helpers and operator overloads as thin composition sugar rather than embedding string concatenation in later query APIs.
+- Keep RediSearch command shaping and raw response parsing in dedicated internal query builders and parsers so public query objects stay schema-focused and unit tests can validate command contracts without a live Redis connection.
 ---
 
 ## 2026-04-09 16:14 EDT - US-001
@@ -100,4 +101,15 @@ Started: Thu Apr  9 16:10:38 EDT 2026
   - Patterns discovered: model RediSearch filters as standalone expression objects that own their escaping and rendering rules so vector, filter-only, and hybrid queries can share the same syntax contract.
   - Gotchas encountered: this repo can hit transient test-assembly file locks if `dotnet test` and `dotnet build` overlap, so keep those checks sequential when recording final validation.
   - Useful context: logical composition currently flattens nested `And` and `Or` expressions while preserving explicit parentheses around `Or` groups inside larger filters.
+---
+## 2026-04-09 16:49 EDT - US-009
+- Implemented a first-class vector query API with binary and float-array input helpers, top-k search, metadata pre-filters, return-field projection, configurable distance aliases, and sync/async execution on `SearchIndex`.
+- Added internal `FT.SEARCH` command-building and raw result parsing support so vector queries validate against the schema, enforce vector byte-length compatibility, and return ordered document ids plus projected fields and score values.
+- Added unit coverage for vector command structure, JSON alias resolution, result parsing, and validation failures, plus an opt-in Redis integration test that seeds deterministic vector data and verifies nearest-neighbor ranking behavior.
+- Files changed: `src/RedisVlDotNet/Indexes/SearchIndex.cs`, `src/RedisVlDotNet/Indexes/SearchQueryCommandBuilder.cs`, `src/RedisVlDotNet/Indexes/SearchResultsParser.cs`, `src/RedisVlDotNet/Queries/VectorQuery.cs`, `src/RedisVlDotNet/Queries/SearchResults.cs`, `tests/RedisVlDotNet.Tests/Indexes/SearchQueryCommandBuilderTests.cs`, `tests/RedisVlDotNet.Tests/Indexes/SearchIndexIntegrationTests.cs`, `prd.json`, `progress.txt`
+- Quality checks run and result: `dotnet test redis-vl-dotnet.sln` passed with 4 Redis integration tests skipped because `REDIS_VL_REDIS_URL` was not set; `dotnet build redis-vl-dotnet.sln` passed.
+- Learnings for future iterations:
+  - Patterns discovered: let query abstractions validate target fields against `SearchSchema` and derive the actual RediSearch query field name from schema aliases so HASH and JSON storage modes share one query API.
+  - Gotchas encountered: vector query payloads need byte-length validation against schema dimensions and datatype size before sending `FT.SEARCH`, otherwise Redis-side errors are much harder to diagnose.
+  - Useful context: the current vector query result type is intentionally raw and projection-oriented, returning document ids plus projected `RedisValue` fields, which keeps `US-012` free to add typed materialization on top without reshaping the search execution contract.
 ---

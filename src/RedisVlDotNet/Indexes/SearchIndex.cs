@@ -1,4 +1,5 @@
 using RedisVlDotNet.Schema;
+using RedisVlDotNet.Queries;
 using StackExchange.Redis;
 using System.Text.Json;
 
@@ -244,6 +245,21 @@ public sealed class SearchIndex
 
     public Task<bool> DeleteHashByIdAsync(string id, CancellationToken cancellationToken = default) =>
         DeleteHashByKeyAsync(DocumentKeyResolver.ResolveKeyFromId(Schema, id), cancellationToken);
+
+    public SearchResults Search(VectorQuery query) =>
+        SearchAsync(query).GetAwaiter().GetResult();
+
+    public async Task<SearchResults> SearchAsync(VectorQuery query, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(query);
+
+        var result = await ExecuteAsync(
+            "FT.SEARCH",
+            SearchQueryCommandBuilder.BuildVectorSearchArguments(Schema, query),
+            cancellationToken).ConfigureAwait(false);
+
+        return SearchResultsParser.Parse(result);
+    }
 
     private async Task<RedisResult> ExecuteAsync(string command, object[] arguments, CancellationToken cancellationToken)
     {
