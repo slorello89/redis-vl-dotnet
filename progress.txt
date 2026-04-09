@@ -7,6 +7,8 @@ Started: Thu Apr  9 16:10:38 EDT 2026
 - Even for documentation-first iterations, keep a valid `.NET` solution and at least one buildable project in place so `dotnet build` remains a meaningful repository quality gate.
 - Keep production code under `src/` and mirror public API coverage under `tests/`, with schema and other contract tests grouped by feature namespace so `dotnet test` validates repository progress as the surface area grows.
 - Put schema guard clauses in the schema model constructors themselves so invalid configurations fail at object creation time and later Redis command builders can assume validated inputs.
+- For file-based schema loading, deserialize into a small DTO layer that matches upstream YAML keys, then map into the validated public schema model so code-first and file-first flows share the same invariants.
+- Run `dotnet test` and `dotnet build` sequentially in this repo; running them concurrently can contend on `tests/.../bin/Debug/net9.0/*.deps.json`.
 ---
 
 ## 2026-04-09 16:14 EDT - US-001
@@ -39,4 +41,14 @@ Started: Thu Apr  9 16:10:38 EDT 2026
   - Patterns discovered: keep compatibility validation close to the typed schema object so later index command builders can treat vector attributes as already normalized and safe.
   - Gotchas encountered: invalid enum handling in public .NET APIs requires explicit `Enum.IsDefined` checks because callers can cast arbitrary integers into enum-typed parameters.
   - Useful context: HNSW-only tuning knobs currently accepted are `M`, `EfConstruction`, and `EfRuntime`; FLAT accepts shared capacity settings but rejects those HNSW-specific values.
+---
+## 2026-04-09 16:24 EDT - US-004
+- Implemented YAML schema loading with `SearchSchema.FromYaml(...)` and `SearchSchema.FromYamlFile(...)`, mapping upstream-style `index` and `fields` definitions into the existing typed schema records.
+- Added YAML parsing coverage for successful in-memory and file-based loads plus invalid schema cases for missing fields, unsupported field types, and vector validation failures.
+- Files changed: `src/RedisVlDotNet/RedisVlDotNet.csproj`, `src/RedisVlDotNet/Schema/SearchSchema.cs`, `tests/RedisVlDotNet.Tests/Schema/SearchSchemaTests.cs`, `prd.json`, `progress.txt`
+- Quality checks run and result: `dotnet test redis-vl-dotnet.sln` passed; `dotnet build redis-vl-dotnet.sln` passed.
+- Learnings for future iterations:
+  - Patterns discovered: keep file-format-specific concerns in private DTOs annotated for exact YAML key aliases, then construct the public schema model so constructor validation remains the single source of truth.
+  - Gotchas encountered: YAML values like Redis key prefixes ending in `:` must be quoted in fixtures, and parallel `dotnet build` plus `dotnet test` can fail on shared deps-file writes.
+  - Useful context: the supported v1 YAML shape expects `index.name`, `index.prefix`, `index.storage_type`, and field entries with `type`, optional aliases and flags, plus vector `attrs` keys such as `algorithm`, `datatype`, `dims`, and `distance_metric`.
 ---
