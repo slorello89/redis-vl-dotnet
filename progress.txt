@@ -25,6 +25,7 @@ Started: Thu Apr  9 16:10:38 EDT 2026
 - For Redis-backed integration coverage, keep deterministic seed datasets in shared test fixtures and wait on index readiness with bounded polling helpers instead of fixed `Task.Delay(...)` sleeps.
 - Keep end-to-end onboarding docs in `docs/` with copy-pasteable commands and API-accurate snippets, and use the root `README.md` as a short navigator into those longer guides.
 - Keep runnable samples as checked-in console apps under `examples/` with direct project references to `src/RedisVlDotNet`, and include them in the solution so `dotnet build` validates example drift alongside the library.
+- For HASH-backed vector fixtures and examples, seed vector fields with raw float32 bytes via direct `HashEntry` writes and wait for index readiness before issuing nearest-neighbor queries.
 ---
 
 ## 2026-04-09 16:14 EDT - US-001
@@ -228,4 +229,14 @@ Started: Thu Apr  9 16:10:38 EDT 2026
   - Patterns discovered: keep runnable examples as real console projects in the solution rather than doc-only snippets so compile drift is caught by normal repository builds.
   - Gotchas encountered: adding a new example project requires a fresh `dotnet restore` before `--no-restore` build checks will pass, and this repo still benefits from running `dotnet test` and `dotnet build` sequentially.
   - Useful context: the example reads `REDIS_VL_REDIS_URL` first and otherwise defaults to `localhost:6379`, matching the existing integration-test and local Redis documentation conventions.
+---
+## 2026-04-09 17:39 EDT - US-020
+- Implemented a checked-in `examples/VectorSearchExample` .NET 9 console app that defines a HASH-backed vector schema, seeds deterministic float32 embeddings, runs a nearest-neighbor query against the `embedding` field, and prints returned distances.
+- Documented how to start Redis and run the example in `examples/VectorSearchExample/README.md`, linked the sample from the root `README.md`, and added it to the solution so repository builds validate the vector example project.
+- Files changed: `examples/VectorSearchExample/VectorSearchExample.csproj`, `examples/VectorSearchExample/Program.cs`, `examples/VectorSearchExample/README.md`, `README.md`, `redis-vl-dotnet.sln`, `prd.json`, `progress.txt`
+- Quality checks run and result: `dotnet restore redis-vl-dotnet.sln` passed; `dotnet test redis-vl-dotnet.sln --no-restore` passed with 14 Redis integration tests skipped because `REDIS_VL_REDIS_URL` was not set; `dotnet build redis-vl-dotnet.sln --no-restore` passed.
+- Learnings for future iterations:
+  - Patterns discovered: HASH-backed vector examples are most reliable when they seed raw float32 embedding bytes directly and poll `FT.INFO` readiness before querying.
+  - Gotchas encountered: the generic hash POCO mapper is not the right fit for vector fields because RediSearch expects binary vector payloads rather than JSON-serialized arrays.
+  - Useful context: the example uses a `distance` score alias and inspects raw `SearchResults` values so it demonstrates the current vector-query surface area without requiring extra DTO mapping.
 ---

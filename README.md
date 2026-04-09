@@ -6,6 +6,7 @@ The implementation plan for v1 is defined in [docs/v1-architecture.md](/Users/st
 
 Start with [docs/getting-started.md](/Users/steve.lorello/projects/redis/redis-vl-dotnet/docs/getting-started.md) for the core install, connection, schema, index, document, and query flow.
 Run [examples/JsonStorageExample/README.md](/Users/steve.lorello/projects/redis/redis-vl-dotnet/examples/JsonStorageExample/README.md) for a checked-in console app that exercises the JSON storage workflow end to end.
+Run [examples/VectorSearchExample/README.md](/Users/steve.lorello/projects/redis/redis-vl-dotnet/examples/VectorSearchExample/README.md) for a checked-in console app that seeds deterministic embeddings and executes a nearest-neighbor vector query.
 
 ## Current Workspace
 
@@ -13,6 +14,7 @@ Run [examples/JsonStorageExample/README.md](/Users/steve.lorello/projects/redis/
 - `docs/getting-started.md`: end-to-end guide for creating an index, loading documents, and running basic queries
 - `docs/testing.md`: local and CI test harness instructions for unit and Redis-backed integration coverage
 - `examples/JsonStorageExample`: runnable console app for JSON-backed schema, load, fetch, and query flows
+- `examples/VectorSearchExample`: runnable console app for vector-field schema, deterministic seed data, and nearest-neighbor search
 - `redis-vl-dotnet.sln`: minimal solution scaffold so `dotnet build` is a valid repository quality gate from the first iteration
 - `prd.json`: Ralph execution plan
 - `progress.txt`: iteration log and reusable codebase patterns
