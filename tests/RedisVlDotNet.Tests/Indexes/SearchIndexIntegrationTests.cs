@@ -49,6 +49,61 @@ public sealed class SearchIndexIntegrationTests
     }
 
     [RedisSearchIntegrationFact]
+    public async Task ExecutesAsyncIndexAndTypedQueryFlowWithCancellationToken()
+    {
+        await using var connection = await ConnectionMultiplexer.ConnectAsync(RedisSearchTestEnvironment.ConnectionString!);
+        var database = connection.GetDatabase();
+
+        var token = Guid.NewGuid().ToString("N");
+        var schema = new SearchSchema(
+            new IndexDefinition($"async-flow-idx-{token}", $"async-flow:{token}:", StorageType.Hash),
+            [
+                new TextFieldDefinition("title"),
+                new NumericFieldDefinition("year"),
+                new TagFieldDefinition("genre")
+            ]);
+        var index = new SearchIndex(database, schema);
+        using var cancellationTokenSource = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+
+        try
+        {
+            await index.CreateAsync(cancellationToken: cancellationTokenSource.Token);
+            await index.LoadHashAsync(
+                [
+                    new HashMovieDocument("movie-1", "Heat", 1995, "crime"),
+                    new HashMovieDocument("movie-2", "Arrival", 2016, "science-fiction")
+                ],
+                cancellationToken: cancellationTokenSource.Token);
+
+            await Task.Delay(TimeSpan.FromMilliseconds(250), cancellationTokenSource.Token);
+
+            var results = await index.SearchAsync<HashMovieDocument>(
+                new FilterQuery(
+                    Filter.Numeric("year").GreaterThan(1990),
+                    ["title", "year", "genre"]),
+                cancellationToken: cancellationTokenSource.Token);
+            var count = await index.CountAsync(
+                new CountQuery(Filter.Tag("genre").Eq("crime")),
+                cancellationTokenSource.Token);
+            var fetched = await index.FetchHashByIdAsync<HashMovieDocument>("movie-1", cancellationTokenSource.Token);
+            var deleted = await index.DeleteHashByIdAsync("movie-1", cancellationTokenSource.Token);
+
+            Assert.Single(results.Documents);
+            Assert.Equal("Heat", results.Documents[0].Title);
+            Assert.Equal(1, count);
+            Assert.Equal("Heat", fetched!.Title);
+            Assert.True(deleted);
+        }
+        finally
+        {
+            if (await index.ExistsAsync(cancellationTokenSource.Token))
+            {
+                await index.DropAsync(deleteDocuments: true, cancellationTokenSource.Token);
+            }
+        }
+    }
+
+    [RedisSearchIntegrationFact]
     public async Task LoadsFetchesAndDeletesJsonDocuments()
     {
         await using var connection = await ConnectionMultiplexer.ConnectAsync(RedisSearchTestEnvironment.ConnectionString!);

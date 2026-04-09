@@ -215,6 +215,7 @@ public sealed class SearchIndex
     {
         EnsureHashStorage();
         ArgumentException.ThrowIfNullOrWhiteSpace(key);
+        cancellationToken.ThrowIfCancellationRequested();
 
         var entries = await _database.HashGetAllAsync(key.Trim()).WaitAsync(cancellationToken).ConfigureAwait(false);
         return entries.Length == 0
@@ -235,6 +236,7 @@ public sealed class SearchIndex
     {
         EnsureHashStorage();
         ArgumentException.ThrowIfNullOrWhiteSpace(key);
+        cancellationToken.ThrowIfCancellationRequested();
 
         var deleted = await _database.KeyDeleteAsync(key.Trim()).WaitAsync(cancellationToken).ConfigureAwait(false);
         return deleted;
@@ -285,8 +287,12 @@ public sealed class SearchIndex
     public async Task<SearchResults<TDocument>> SearchAsync<TDocument>(
         VectorQuery query,
         JsonSerializerOptions? serializerOptions = null,
-        CancellationToken cancellationToken = default) =>
-        (await SearchAsync(query, cancellationToken).ConfigureAwait(false)).Map<TDocument>(serializerOptions);
+        CancellationToken cancellationToken = default)
+    {
+        var results = await SearchAsync(query, cancellationToken).ConfigureAwait(false);
+        cancellationToken.ThrowIfCancellationRequested();
+        return results.Map<TDocument>(serializerOptions);
+    }
 
     public async Task<SearchResults> SearchAsync(HybridQuery query, CancellationToken cancellationToken = default)
     {
@@ -303,8 +309,12 @@ public sealed class SearchIndex
     public async Task<SearchResults<TDocument>> SearchAsync<TDocument>(
         HybridQuery query,
         JsonSerializerOptions? serializerOptions = null,
-        CancellationToken cancellationToken = default) =>
-        (await SearchAsync(query, cancellationToken).ConfigureAwait(false)).Map<TDocument>(serializerOptions);
+        CancellationToken cancellationToken = default)
+    {
+        var results = await SearchAsync(query, cancellationToken).ConfigureAwait(false);
+        cancellationToken.ThrowIfCancellationRequested();
+        return results.Map<TDocument>(serializerOptions);
+    }
 
     public async Task<SearchResults> SearchAsync(VectorRangeQuery query, CancellationToken cancellationToken = default)
     {
@@ -321,8 +331,12 @@ public sealed class SearchIndex
     public async Task<SearchResults<TDocument>> SearchAsync<TDocument>(
         VectorRangeQuery query,
         JsonSerializerOptions? serializerOptions = null,
-        CancellationToken cancellationToken = default) =>
-        (await SearchAsync(query, cancellationToken).ConfigureAwait(false)).Map<TDocument>(serializerOptions);
+        CancellationToken cancellationToken = default)
+    {
+        var results = await SearchAsync(query, cancellationToken).ConfigureAwait(false);
+        cancellationToken.ThrowIfCancellationRequested();
+        return results.Map<TDocument>(serializerOptions);
+    }
 
     public async Task<SearchResults> SearchAsync(FilterQuery query, CancellationToken cancellationToken = default)
     {
@@ -339,8 +353,12 @@ public sealed class SearchIndex
     public async Task<SearchResults<TDocument>> SearchAsync<TDocument>(
         FilterQuery query,
         JsonSerializerOptions? serializerOptions = null,
-        CancellationToken cancellationToken = default) =>
-        (await SearchAsync(query, cancellationToken).ConfigureAwait(false)).Map<TDocument>(serializerOptions);
+        CancellationToken cancellationToken = default)
+    {
+        var results = await SearchAsync(query, cancellationToken).ConfigureAwait(false);
+        cancellationToken.ThrowIfCancellationRequested();
+        return results.Map<TDocument>(serializerOptions);
+    }
 
     public long Count(CountQuery query) =>
         CountAsync(query).GetAwaiter().GetResult();
@@ -381,12 +399,14 @@ public sealed class SearchIndex
 
     private async Task SetJsonDocumentAsync<TDocument>(string key, TDocument document, CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         var payload = JsonSerializer.Serialize(document, _serializerOptions);
         await ExecuteAsync("JSON.SET", [key, "$", payload], cancellationToken).ConfigureAwait(false);
     }
 
     private async Task SetHashDocumentAsync<TDocument>(string key, TDocument document, CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         var entries = HashDocumentMapper.ToHashEntries(document, _serializerOptions);
         await _database.HashSetAsync(key, entries).WaitAsync(cancellationToken).ConfigureAwait(false);
     }

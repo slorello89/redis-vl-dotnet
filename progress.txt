@@ -18,6 +18,7 @@ Started: Thu Apr  9 16:10:38 EDT 2026
 - For non-vector retrieval and count flows, keep using `FT.SEARCH` on the shared parser path; use `NOCONTENT LIMIT 0 0` for counts so filter, vector, and count abstractions all share one result-shaping pipeline.
 - Keep vector-derived query types responsible for normalizing their distance alias into `RETURN` fields, and enforce hybrid-query lexical intent by requiring at least one text predicate while still composing extra metadata filters through the shared filter DSL.
 - Layer typed search materialization on top of raw `SearchResults` with the shared web-default JSON serializer, and treat the Redis document id as a synthetic `id` field so projections can map into DTOs without a second query pipeline.
+- For async Redis-backed APIs, throw on cancellation before issuing direct `IDatabase` calls or doing expensive serialization/mapping work, and cover that behavior with unit tests that use a `DispatchProxy` `IDatabase` recorder instead of a live server.
 ---
 
 ## 2026-04-09 16:14 EDT - US-001
@@ -148,4 +149,14 @@ Started: Thu Apr  9 16:10:38 EDT 2026
   - Patterns discovered: typed query APIs can stay thin if they map from the existing raw search document model instead of duplicating RediSearch parsing logic per query family.
   - Gotchas encountered: projected binary vector fields need explicit byte-array handling before any JSON-based materialization logic, otherwise typed vector DTOs silently fall back into string parsing failures.
   - Useful context: alias-aware typed mapping now works through `JsonPropertyName` or the default camel-case naming policy, and missing non-nullable DTO properties fail fast with a document-scoped mapping exception.
+---
+## 2026-04-09 17:08 EDT - US-013
+- Tightened `SearchIndex` async cancellation behavior so canceled tokens short-circuit before direct Redis hash calls, before JSON or HASH serialization work, and before typed result materialization after an async query completes.
+- Added async-focused tests: a new unit test suite validates cancellation without a live Redis server via a `DispatchProxy` `IDatabase` recorder, and an opt-in integration test exercises async index, document, typed query, count, fetch, and delete flow with an explicit `CancellationToken`.
+- Files changed: `src/RedisVlDotNet/Indexes/SearchIndex.cs`, `tests/RedisVlDotNet.Tests/Indexes/SearchIndexAsyncTests.cs`, `tests/RedisVlDotNet.Tests/Indexes/SearchIndexIntegrationTests.cs`, `prd.json`, `progress.txt`
+- Quality checks run and result: `dotnet test redis-vl-dotnet.sln` passed with 8 Redis integration tests skipped because `REDIS_VL_REDIS_URL` was not set; `dotnet build redis-vl-dotnet.sln` passed.
+- Learnings for future iterations:
+  - Patterns discovered: async API tests can assert cancellation semantics cheaply by recording `IDatabase` invocations through `DispatchProxy` and verifying no Redis command starts when the token is already canceled.
+  - Gotchas encountered: `WaitAsync(cancellationToken)` alone does not prevent direct `IDatabase` operations from being initiated, so explicit `ThrowIfCancellationRequested()` checks are still needed before direct Redis calls and local serialization or mapping work.
+  - Useful context: the new async integration flow is guarded by the existing `RedisSearchIntegrationFact` gate, so it documents the intended task-based API contract without making default local test runs require Redis Stack.
 ---
