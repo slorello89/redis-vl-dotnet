@@ -139,9 +139,13 @@ public sealed record GenreSummary(string Genre, int MovieCount, double AverageYe
 - `AggregateAsync<T>(...)` runs `FT.AGGREGATE` and maps grouped rows into typed reducer projections
 - `ClearAsync(...)` deletes Redis keys matched by the schema prefixes and preserves the index definition for both JSON and HASH storage
 
-## Connect To A Redis Cluster
+## Connect To Redis Topologies
 
-Use `RedisConnectionFactory` when you want to seed a cluster connection from one or more cluster nodes and still work with the same `IDatabase`-based APIs:
+Use `RedisConnectionFactory` when you want StackExchange.Redis `ConfigurationOptions` and connection setup for cluster or Sentinel deployments while keeping the rest of the library on the same `IDatabase`-based APIs.
+
+### Cluster
+
+Use one or more cluster seed nodes to connect to a Redis cluster:
 
 ```csharp
 using RedisVlDotNet;
@@ -168,6 +172,40 @@ Cluster connections are validated for Redis cluster semantics:
 - duplicate seed nodes are removed after trimming
 - host-only seed nodes default to port `6379`
 - Redis cluster only supports database `0`, so non-zero `DefaultDatabase` values are rejected before connecting
+
+### Sentinel
+
+Use one or more Sentinel nodes plus the monitored service name to connect to the current primary for a high-availability deployment:
+
+```csharp
+using RedisVlDotNet;
+using StackExchange.Redis;
+
+var primary = await RedisConnectionFactory.ConnectSentinelPrimaryAsync(
+    "sentinel-1:26379,sentinel-2:26379,sentinel-3:26379",
+    "mymaster",
+    options =>
+    {
+        options.User = "default";
+        options.Password = "secret";
+        options.Ssl = true;
+        options.ClientName = "redis-vl-dotnet-app";
+    });
+
+var database = primary.GetDatabase();
+```
+
+`RedisConnectionFactory.CreateSentinelOptions(...)` returns the underlying `ConfigurationOptions` if you want to inspect or reuse the parsed Sentinel configuration before connecting.
+
+`RedisConnectionFactory.ConnectSentinelAsync(...)` returns a Sentinel multiplexer when you need to issue Sentinel-specific commands directly. `ConnectSentinelPrimaryAsync(...)` is the normal path for library usage because it discovers and tracks the current primary for the configured `ServiceName`.
+
+Sentinel connections are validated for the supported StackExchange.Redis Sentinel flow:
+
+- Sentinel nodes can be provided as a comma-, semicolon-, or newline-delimited string, or as an enumerable
+- duplicate Sentinel nodes are removed after trimming
+- host-only Sentinel nodes default to port `26379`
+- a non-empty Sentinel `ServiceName` is required
+- the helper keeps `CommandMap.Sentinel` enabled so StackExchange.Redis can use Sentinel discovery semantics
 
 ## Run Full-Text Search With `TextQuery`
 

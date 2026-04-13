@@ -7,17 +7,29 @@ using StackExchange.Redis;
 
 var redisUrl = Environment.GetEnvironmentVariable("REDIS_VL_REDIS_URL") ?? "localhost:6379";
 var clusterNodes = Environment.GetEnvironmentVariable("REDIS_VL_REDIS_CLUSTER_NODES");
+var sentinelNodes = Environment.GetEnvironmentVariable("REDIS_VL_REDIS_SENTINEL_NODES");
+var sentinelServiceName = Environment.GetEnvironmentVariable("REDIS_VL_REDIS_SENTINEL_SERVICE_NAME");
 var redisUser = Environment.GetEnvironmentVariable("REDIS_VL_REDIS_USER");
 var redisPassword = Environment.GetEnvironmentVariable("REDIS_VL_REDIS_PASSWORD");
 var redisSsl = bool.TryParse(Environment.GetEnvironmentVariable("REDIS_VL_REDIS_SSL"), out var parsedRedisSsl) && parsedRedisSsl;
 var schemaPath = Path.Combine(AppContext.BaseDirectory, "schema.yaml");
 
-Console.WriteLine(string.IsNullOrWhiteSpace(clusterNodes)
-    ? $"Connecting to Redis at {redisUrl}..."
-    : $"Connecting to Redis cluster via seed nodes: {clusterNodes}...");
+Console.WriteLine(
+    !string.IsNullOrWhiteSpace(sentinelNodes) && !string.IsNullOrWhiteSpace(sentinelServiceName)
+        ? $"Connecting to Redis Sentinel service '{sentinelServiceName}' via nodes: {sentinelNodes}..."
+        : !string.IsNullOrWhiteSpace(clusterNodes)
+            ? $"Connecting to Redis cluster via seed nodes: {clusterNodes}..."
+            : $"Connecting to Redis at {redisUrl}...");
 Console.WriteLine($"Loading schema from {schemaPath}...");
 
-using var redis = await ConnectAsync(redisUrl, clusterNodes, redisUser, redisPassword, redisSsl);
+using var redis = await ConnectAsync(
+    redisUrl,
+    clusterNodes,
+    sentinelNodes,
+    sentinelServiceName,
+    redisUser,
+    redisPassword,
+    redisSsl);
 var database = redis.GetDatabase();
 
 var schema = SearchSchema.FromYamlFile(schemaPath);
@@ -130,10 +142,40 @@ Console.WriteLine("Dropped the example index after clearing its documents.");
 static async Task<IConnectionMultiplexer> ConnectAsync(
     string redisUrl,
     string? clusterNodes,
+    string? sentinelNodes,
+    string? sentinelServiceName,
     string? redisUser,
     string? redisPassword,
     bool redisSsl)
 {
+    if (!string.IsNullOrWhiteSpace(sentinelNodes))
+    {
+        if (string.IsNullOrWhiteSpace(sentinelServiceName))
+        {
+            throw new InvalidOperationException(
+                "Set REDIS_VL_REDIS_SENTINEL_SERVICE_NAME when REDIS_VL_REDIS_SENTINEL_NODES is provided.");
+        }
+
+        return await RedisConnectionFactory.ConnectSentinelPrimaryAsync(
+            sentinelNodes,
+            sentinelServiceName,
+            options =>
+            {
+                if (!string.IsNullOrWhiteSpace(redisUser))
+                {
+                    options.User = redisUser;
+                }
+
+                if (!string.IsNullOrWhiteSpace(redisPassword))
+                {
+                    options.Password = redisPassword;
+                }
+
+                options.Ssl = redisSsl;
+                options.ClientName = "redis-vl-dotnet-json-example";
+            }).ConfigureAwait(false);
+    }
+
     if (!string.IsNullOrWhiteSpace(clusterNodes))
     {
         return await RedisConnectionFactory.ConnectClusterAsync(

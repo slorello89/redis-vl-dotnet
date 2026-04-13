@@ -31,6 +31,7 @@ Started: Mon Apr 13 10:35:34 EDT 2026
 - HTTP-based reranker integrations should send only provider-supported document text in the payload, then remap provider result indexes back onto the original `RerankDocument` instances locally so caller metadata survives reranking without custom server-side schemas.
 - AI extension seams stay easier to evolve when the abstractions assembly owns immutable request/result DTOs and convenience extensions, while future provider packages enter the solution first as marker scaffolds that reference only the shared abstractions package.
 - Redis topology helpers should stay outside `SearchIndex` and return plain `ConfigurationOptions` or `IConnectionMultiplexer`, so cluster and Sentinel support can evolve independently while the rest of the library continues to consume `IDatabase`.
+- Sentinel helpers should build one reusable `ConfigurationOptions` object with `CommandMap.Sentinel`, a required `ServiceName`, default host-only node port `26379`, and a separate primary-connection helper that reuses that same option shape for failover-aware discovery.
 
 ---
 ## 2026-04-13 13:49:55 EDT - US-027
@@ -49,6 +50,15 @@ Started: Mon Apr 13 10:35:34 EDT 2026
 - Learnings for future iterations:
   - Patterns discovered: topology-specific connection support stays reusable when the helper returns plain `ConfigurationOptions` and `IConnectionMultiplexer`, leaving `SearchIndex`, caches, and workflows unchanged on `IDatabase`.
   - Gotchas encountered: StackExchange.Redis endpoint `ToString()` output includes transport metadata for DNS endpoints, so endpoint assertions should normalize host and port explicitly instead of comparing raw `ToString()` values.
+  - Useful context: there are still no `AGENTS.md` files anywhere in this repository, so reusable implementation guidance remains centralized in `progress.txt`.
+---
+## 2026-04-13 14:01:19 EDT - US-029
+- Implemented Sentinel-aware connection support in `RedisConnectionFactory` with `CreateSentinelOptions(...)`, direct Sentinel connection helpers, and a primary-discovery helper that works with StackExchange.Redis Sentinel-managed failover flows.
+- Files changed: `src/RedisVlDotNet/RedisConnectionFactory.cs`, `tests/RedisVlDotNet.Tests/RedisConnectionFactoryTests.cs`, `tests/RedisVlDotNet.Tests/Indexes/RedisSentinelTestEnvironment.cs`, `tests/RedisVlDotNet.Tests/Indexes/RedisSentinelIntegrationFactAttribute.cs`, `tests/RedisVlDotNet.Tests/Indexes/RedisSentinelConnectionIntegrationTests.cs`, `examples/JsonStorageExample/Program.cs`, `examples/JsonStorageExample/README.md`, `examples/README.md`, `docs/getting-started.md`, `docs/testing.md`, `README.md`, `prd.json`, `progress.txt`
+- Quality checks run and result: `dotnet test tests/RedisVlDotNet.Tests/RedisVlDotNet.Tests.csproj --filter "FullyQualifiedName~RedisConnectionFactoryTests|FullyQualifiedName~RedisSentinelConnectionIntegrationTests|FullyQualifiedName~RedisClusterConnectionIntegrationTests"` passed with the Redis cluster and Sentinel integration tests skipped because `REDIS_VL_REDIS_CLUSTER_NODES`, `REDIS_VL_REDIS_SENTINEL_NODES`, and `REDIS_VL_REDIS_SENTINEL_SERVICE_NAME` were not configured locally. `dotnet build examples/JsonStorageExample/JsonStorageExample.csproj` passed. `dotnet build redis-vl-dotnet.sln --no-restore` passed. `dotnet test redis-vl-dotnet.sln --no-restore` passed with 45 Redis/provider topology-gated integration and smoke tests skipped because `REDIS_VL_REDIS_URL`, `REDIS_VL_REDIS_CLUSTER_NODES`, `REDIS_VL_REDIS_SENTINEL_NODES`, `REDIS_VL_REDIS_SENTINEL_SERVICE_NAME`, `OPENAI_API_KEY`, `HF_TOKEN`, and `COHERE_API_KEY` were not configured locally.
+- Learnings for future iterations:
+  - Patterns discovered: Sentinel support stays aligned with the existing topology seam when one helper owns endpoint parsing and option defaults while a second helper turns those same options into the failover-aware primary connection returned to callers.
+  - Gotchas encountered: StackExchange.Redis 2.10.1 exposes `SentinelConnectAsync(...)` as the static entry point, but primary discovery comes from the instance method `GetSentinelMasterConnection(...)` on the Sentinel multiplexer rather than a static `SentinelPrimaryConnectAsync(...)` helper.
   - Useful context: there are still no `AGENTS.md` files anywhere in this repository, so reusable implementation guidance remains centralized in `progress.txt`.
 ---
 ## 2026-04-13 13:41:07 EDT - US-025

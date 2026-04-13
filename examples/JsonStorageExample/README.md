@@ -34,6 +34,16 @@ export REDIS_VL_REDIS_PASSWORD=secret
 export REDIS_VL_REDIS_SSL=false
 ```
 
+For a Redis Sentinel deployment, set the Sentinel nodes and service name instead:
+
+```bash
+export REDIS_VL_REDIS_SENTINEL_NODES=127.0.0.1:26379,127.0.0.1:26380,127.0.0.1:26381
+export REDIS_VL_REDIS_SENTINEL_SERVICE_NAME=mymaster
+export REDIS_VL_REDIS_USER=default
+export REDIS_VL_REDIS_PASSWORD=secret
+export REDIS_VL_REDIS_SSL=false
+```
+
 ## Run
 
 From the repository root:
@@ -43,7 +53,8 @@ dotnet run --project examples/JsonStorageExample/JsonStorageExample.csproj
 ```
 
 The example uses `REDIS_VL_REDIS_URL` when it is set, and otherwise falls back to `localhost:6379`.
-When `REDIS_VL_REDIS_CLUSTER_NODES` is set, the example uses `RedisConnectionFactory.ConnectClusterAsync(...)` and treats those seed nodes as the primary connection path.
+When `REDIS_VL_REDIS_SENTINEL_NODES` and `REDIS_VL_REDIS_SENTINEL_SERVICE_NAME` are set, the example uses `RedisConnectionFactory.ConnectSentinelPrimaryAsync(...)` and treats Sentinel discovery as the primary connection path.
+When `REDIS_VL_REDIS_CLUSTER_NODES` is set without Sentinel settings, the example uses `RedisConnectionFactory.ConnectClusterAsync(...)` and treats those seed nodes as the primary connection path.
 
 ## Related Docs
 

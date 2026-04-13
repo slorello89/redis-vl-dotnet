@@ -7,7 +7,7 @@ The active implementation roadmap is defined in [docs/parity-roadmap.md](/Users/
 Start with [docs/getting-started.md](/Users/steve.lorello/projects/redis/redis-vl-dotnet/docs/getting-started.md) for the core install, connection, schema, index, document, and query flow.
 Browse [examples/README.md](/Users/steve.lorello/projects/redis/redis-vl-dotnet/examples/README.md) for the runnable sample index, Redis prerequisites, and links to each example's local run instructions.
 Read [docs/extensions.md](/Users/steve.lorello/projects/redis/redis-vl-dotnet/docs/extensions.md) for the vectorizer and reranker abstractions package split plus the provider-extension layout.
-See the getting-started cluster section and `RedisConnectionFactory` when you need cluster seed-node parsing and `ConfigurationOptions` setup for StackExchange.Redis.
+See the getting-started topology section and `RedisConnectionFactory` when you need cluster or Sentinel endpoint parsing plus `ConfigurationOptions` setup for StackExchange.Redis.
 See [examples/OpenAiVectorizerExample/README.md](/Users/steve.lorello/projects/redis/redis-vl-dotnet/examples/OpenAiVectorizerExample/README.md) for a provider-backed OpenAI embedding flow with `SemanticCache`.
 See [examples/HuggingFaceVectorizerExample/README.md](/Users/steve.lorello/projects/redis/redis-vl-dotnet/examples/HuggingFaceVectorizerExample/README.md) for the equivalent Hugging Face `hf-inference` flow.
 See [examples/CohereRerankerExample/README.md](/Users/steve.lorello/projects/redis/redis-vl-dotnet/examples/CohereRerankerExample/README.md) for a Redis search plus Cohere reranking flow.
