@@ -256,7 +256,7 @@ public sealed class RedisVlCliApplicationTests
     [Fact]
     public async Task RequiresRedisConnectionStringWhenEnvironmentFallbackIsMissing()
     {
-        var application = new RedisVlCliApplication(new FakeCliService());
+        var application = new RedisVlCliApplication(new FakeCliService(), static _ => null);
         using var output = new StringWriter();
         using var error = new StringWriter();
 

@@ -28,8 +28,6 @@ public sealed class SemanticMessageHistoryTests
                 "PREFIX",
                 "1",
                 "semantic-message-history:unit-history:tests:msg:",
-                "SEPARATOR",
-                ":",
                 "SCHEMA",
                 "sessionId",
                 "TAG",

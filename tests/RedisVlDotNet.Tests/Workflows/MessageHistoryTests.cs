@@ -25,8 +25,6 @@ public sealed class MessageHistoryTests
                 "PREFIX",
                 "1",
                 "message-history:unit-history:tests:msg:",
-                "SEPARATOR",
-                ":",
                 "SCHEMA",
                 "sessionId",
                 "TAG",

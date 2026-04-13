@@ -137,7 +137,7 @@ public sealed class SearchIndexIntegrationTests
 
             Assert.Equal(schema.Index.Name, reconnectedIndex.Schema.Index.Name);
             Assert.Equal(schema.Index.Prefixes, reconnectedIndex.Schema.Index.Prefixes);
-            Assert.Equal(schema.Index.KeySeparator, reconnectedIndex.Schema.Index.KeySeparator);
+            Assert.Equal(':', reconnectedIndex.Schema.Index.KeySeparator);
             Assert.Equal(schema.Index.StorageType, reconnectedIndex.Schema.Index.StorageType);
             Assert.True(reconnectedIndex.Schema.Index.MaxTextFields);
             Assert.True(reconnectedIndex.Schema.Index.NoOffsets);
@@ -228,7 +228,6 @@ public sealed class SearchIndexIntegrationTests
             var definition = ToFlatStringDictionary(definitionValue);
             var stopwords = ((RedisResult[])stopwordsValue!).Select(static entry => entry.ToString()!).ToArray();
 
-            Assert.Equal("|", definition["separator"]);
             Assert.Equal(["the", "a", "an"], stopwords);
         }
         finally

@@ -33,7 +33,7 @@ public sealed class SearchIndexCommandBuilderTests
 
         Assert.Equal(
             [
-                "movies-idx", "ON", "HASH", "PREFIX", "1", "movie:", "SEPARATOR", ":", "SCHEMA",
+                "movies-idx", "ON", "HASH", "PREFIX", "1", "movie:", "SCHEMA",
                 "title", "TEXT", "SORTABLE", "NOSTEM", "PHONETIC", "dm:en",
                 "genre", "TAG", "SEPARATOR", ";", "CASESENSITIVE",
                 "rating", "NUMERIC", "SORTABLE",
@@ -67,7 +67,7 @@ public sealed class SearchIndexCommandBuilderTests
 
         Assert.Equal(
             [
-                "docs-idx", "ON", "JSON", "PREFIX", "1", "docs:", "SEPARATOR", ":", "SCHEMA",
+                "docs-idx", "ON", "JSON", "PREFIX", "1", "docs:", "SCHEMA",
                 "$.title", "AS", "title", "TEXT",
                 "$.rating", "AS", "score", "NUMERIC",
                 "$.embedding", "AS", "embedding", "VECTOR", "FLAT", "8",
@@ -89,7 +89,7 @@ public sealed class SearchIndexCommandBuilderTests
 
         Assert.Equal(
             [
-                "docs-idx", "ON", "HASH", "PREFIX", "2", "docs:", "archive:", "SEPARATOR", ":", "SCHEMA",
+                "docs-idx", "ON", "HASH", "PREFIX", "2", "docs:", "archive:", "SCHEMA",
                 "title", "TEXT"
             ],
             arguments.Select(static argument => argument.ToString()!).ToArray());
@@ -108,7 +108,7 @@ public sealed class SearchIndexCommandBuilderTests
 
         Assert.Equal(
             [
-                "docs-idx", "ON", "HASH", "PREFIX", "1", "docs:", "SEPARATOR", "|", "STOPWORDS", "0", "SCHEMA",
+                "docs-idx", "ON", "HASH", "PREFIX", "1", "docs:", "STOPWORDS", "0", "SCHEMA",
                 "title", "TEXT"
             ],
             arguments.Select(static argument => argument.ToString()!).ToArray());
@@ -127,7 +127,7 @@ public sealed class SearchIndexCommandBuilderTests
 
         Assert.Equal(
             [
-                "docs-idx", "ON", "HASH", "PREFIX", "1", "docs:", "SEPARATOR", ":", "STOPWORDS", "3", "the", "a", "an", "SCHEMA",
+                "docs-idx", "ON", "HASH", "PREFIX", "1", "docs:", "STOPWORDS", "3", "the", "a", "an", "SCHEMA",
                 "title", "TEXT"
             ],
             arguments.Select(static argument => argument.ToString()!).ToArray());
@@ -188,7 +188,7 @@ public sealed class SearchIndexCommandBuilderTests
 
         Assert.Equal(
             [
-                "docs-idx", "ON", "HASH", "PREFIX", "1", "docs:", "SEPARATOR", ":",
+                "docs-idx", "ON", "HASH", "PREFIX", "1", "docs:",
                 "MAXTEXTFIELDS", "TEMPORARY", "300", "NOOFFSETS", "NOHL", "NOFIELDS", "NOFREQS", "SKIPINITIALSCAN",
                 "SCHEMA",
                 "title", "TEXT", "WEIGHT", "2.5", "INDEXEMPTY", "INDEXMISSING", "SORTABLE", "UNF", "NOSTEM", "PHONETIC", "dm:en", "WITHSUFFIXTRIE",

@@ -14,10 +14,14 @@ public sealed class RedisVlCliApplication
     };
 
     private readonly IRedisVlCliService _service;
+    private readonly Func<string, string?> _environmentVariableReader;
 
-    public RedisVlCliApplication(IRedisVlCliService? service = null)
+    public RedisVlCliApplication(
+        IRedisVlCliService? service = null,
+        Func<string, string?>? environmentVariableReader = null)
     {
         _service = service ?? new RedisVlCliService();
+        _environmentVariableReader = environmentVariableReader ?? Environment.GetEnvironmentVariable;
     }
 
     public async Task<int> RunAsync(
@@ -30,7 +34,7 @@ public sealed class RedisVlCliApplication
         ArgumentNullException.ThrowIfNull(output);
         ArgumentNullException.ThrowIfNull(error);
 
-        var parseResult = CliParser.Parse(args, Environment.GetEnvironmentVariable(RedisUrlEnvironmentVariable));
+        var parseResult = CliParser.Parse(args, _environmentVariableReader(RedisUrlEnvironmentVariable));
         if (parseResult.ErrorText is not null)
         {
             await error.WriteLineAsync(parseResult.ErrorText).ConfigureAwait(false);

@@ -18,8 +18,6 @@ internal static class SearchIndexCommandBuilder
             schema.Index.Prefixes.Count.ToString(CultureInfo.InvariantCulture)
         };
         arguments.AddRange(schema.Index.Prefixes);
-        arguments.Add("SEPARATOR");
-        arguments.Add(schema.Index.KeySeparator.ToString());
         AddIndexOption(arguments, "MAXTEXTFIELDS", schema.Index.MaxTextFields);
         if (schema.Index.TemporarySeconds > 0)
         {
