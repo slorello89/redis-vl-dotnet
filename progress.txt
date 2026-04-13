@@ -6,6 +6,7 @@ Started: Mon Apr 13 10:35:34 EDT 2026
 - When parity decisions depend on Java and Python comparisons, record intentional .NET-native differences explicitly so later feature work targets capabilities rather than cross-language API cloning.
 - For index metadata extensions, preserve `IndexDefinition.Prefix` as the primary write-path namespace and add new FT.CREATE metadata via separate strongly typed properties so document loading APIs stay backward compatible.
 - Model optional FT.CREATE metadata as nullable index properties where `null` means Redis defaults and an empty collection means an explicit `0`-count clause, so default and disabled behaviors remain distinguishable in both code-first and YAML schema paths.
+- Emit RediSearch field modifiers in parser-safe order: `INDEXEMPTY`/`INDEXMISSING` before `SORTABLE`, `UNF` immediately after `SORTABLE`, and `NOINDEX` after sortable modifiers; vector `INDEXMISSING` belongs inside the vector attribute payload rather than after the field definition.
 
 ---
 
@@ -35,4 +36,13 @@ Started: Mon Apr 13 10:35:34 EDT 2026
   - Patterns discovered: index-level schema options fit best on `IndexDefinition`, while YAML keeps upstream-compatible names like `key_separator` and `stopwords`.
   - Gotchas encountered: Redis default stopwords are represented by omitting the `STOPWORDS` clause entirely, so the model needs `null` for default behavior and an empty collection for `STOPWORDS 0`.
   - Useful context: `SearchIndexInfo` can still validate FT.INFO metadata for integration tests by inspecting the raw `index_definition` and `stopwords_list` bags even before typed parsing exists.
+---
+## 2026-04-13 10:48:25 EDT - US-004
+- Implemented the remaining typed schema parity options for FT.CREATE by adding index-level flags (`MAXTEXTFIELDS`, `TEMPORARY`, `NOOFFSETS`, `NOHL`, `NOFIELDS`, `NOFREQS`, `SKIPINITIALSCAN`) plus field-level modifiers for text, tag, numeric, geo, and vector definitions (`WEIGHT`, `WITHSUFFIXTRIE`, `INDEXEMPTY`, `INDEXMISSING`, `NOINDEX`, `UNF`).
+- Files changed: `src/RedisVlDotNet/Schema/IndexDefinition.cs`, `src/RedisVlDotNet/Schema/TextFieldDefinition.cs`, `src/RedisVlDotNet/Schema/TagFieldDefinition.cs`, `src/RedisVlDotNet/Schema/NumericFieldDefinition.cs`, `src/RedisVlDotNet/Schema/GeoFieldDefinition.cs`, `src/RedisVlDotNet/Schema/VectorFieldDefinition.cs`, `src/RedisVlDotNet/Indexes/SearchIndexCommandBuilder.cs`, `tests/RedisVlDotNet.Tests/Schema/SearchSchemaTests.cs`, `tests/RedisVlDotNet.Tests/Indexes/SearchIndexCommandBuilderTests.cs`, `tests/RedisVlDotNet.Tests/Indexes/SearchIndexIntegrationTests.cs`, `examples/JsonStorageExample/Program.cs`, `prd.json`, `progress.txt`
+- Quality checks run and result: `dotnet build redis-vl-dotnet.sln --no-restore` passed. `dotnet test tests/RedisVlDotNet.Tests/RedisVlDotNet.Tests.csproj --filter "FullyQualifiedName~SearchSchemaTests|FullyQualifiedName~SearchIndexCommandBuilderTests|FullyQualifiedName~SearchIndexIntegrationTests"` passed with Redis-backed integration tests skipped because the Redis search test environment was not configured locally.
+- Learnings for future iterations:
+  - Patterns discovered: RediSearch field modifier ordering is parser-sensitive, so `SearchIndexCommandBuilder` should keep advanced field options emitted in a canonical order instead of appending flags ad hoc.
+  - Gotchas encountered: `dotnet test --no-build` can reuse a stale test assembly after assertion-only edits, so rerun without `--no-build` if failure output disagrees with the current source.
+  - Useful context: `FT.INFO` exposes advanced index flags in `index_options` and field modifiers in the nested `attributes` array, which is enough for broad integration assertions before adding typed info models.
 ---

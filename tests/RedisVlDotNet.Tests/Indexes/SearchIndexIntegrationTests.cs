@@ -134,6 +134,97 @@ public sealed class SearchIndexIntegrationTests
     }
 
     [RedisSearchIntegrationFact]
+    public async Task CreatesIndexWithAdvancedFieldAndIndexOptions()
+    {
+        await using var connection = await RedisSearchTestEnvironment.ConnectAsync();
+        var database = connection.GetDatabase();
+
+        var token = Guid.NewGuid().ToString("N");
+        var schema = new SearchSchema(
+            new IndexDefinition(
+                $"movies-advanced-idx-{token}",
+                $"movie:{token}:",
+                StorageType.Hash,
+                maxTextFields: true,
+                temporarySeconds: 300,
+                noOffsets: true,
+                noHighlight: true,
+                noFields: true,
+                noFrequencies: true,
+                skipInitialScan: true),
+            [
+                new TextFieldDefinition(
+                    "title",
+                    sortable: true,
+                    weight: 2.5,
+                    withSuffixTrie: true,
+                    indexMissing: true,
+                    indexEmpty: true,
+                    unNormalizedForm: true),
+                new TagFieldDefinition(
+                    "genre",
+                    sortable: true,
+                    withSuffixTrie: true,
+                    indexMissing: true,
+                    indexEmpty: true,
+                    noIndex: true),
+                new NumericFieldDefinition("rating", sortable: true, indexMissing: true, noIndex: true, unNormalizedForm: true),
+                new GeoFieldDefinition("location", sortable: true, indexMissing: true, noIndex: true),
+                new VectorFieldDefinition(
+                    "embedding",
+                    new VectorFieldAttributes(
+                        VectorAlgorithm.Hnsw,
+                        VectorDataType.Float32,
+                        VectorDistanceMetric.Cosine,
+                        3,
+                        initialCapacity: 100,
+                        m: 16,
+                        efConstruction: 200,
+                        efRuntime: 10),
+                    indexMissing: true)
+            ]);
+        var index = new SearchIndex(database, schema);
+
+        try
+        {
+            await index.CreateAsync();
+
+            var info = await index.InfoAsync();
+
+            Assert.True(info.TryGetValue("index_options", out var indexOptionsValue));
+            Assert.True(info.TryGetValue("attributes", out var attributesValue));
+
+            var indexOptions = FlattenRedisResult(indexOptionsValue).ToArray();
+            var attributeRows = (RedisResult[])attributesValue!;
+            var flattenedAttributes = attributeRows.SelectMany(FlattenRedisResult).ToArray();
+
+            Assert.Contains("NOOFFSETS", indexOptions);
+            Assert.Contains("NOHL", indexOptions);
+            Assert.Contains("NOFIELDS", indexOptions);
+            Assert.Contains("NOFREQS", indexOptions);
+            Assert.Contains("MAXTEXTFIELDS", indexOptions);
+            Assert.Contains("SKIPINITIALSCAN", indexOptions);
+            Assert.Contains("TEMPORARY", indexOptions);
+            Assert.Contains("300", indexOptions);
+
+            Assert.Contains("WITHSUFFIXTRIE", flattenedAttributes);
+            Assert.Contains("INDEXEMPTY", flattenedAttributes);
+            Assert.Contains("INDEXMISSING", flattenedAttributes);
+            Assert.Contains("NOINDEX", flattenedAttributes);
+            Assert.Contains("UNF", flattenedAttributes);
+            Assert.Contains("WEIGHT", flattenedAttributes);
+            Assert.Contains("2.5", flattenedAttributes);
+        }
+        finally
+        {
+            if (await index.ExistsAsync())
+            {
+                await index.DropAsync(deleteDocuments: true);
+            }
+        }
+    }
+
+    [RedisSearchIntegrationFact]
     public async Task ExecutesAsyncIndexAndTypedQueryFlowWithCancellationToken()
     {
         await using var connection = await RedisSearchTestEnvironment.ConnectAsync();
@@ -553,6 +644,30 @@ public sealed class SearchIndexIntegrationTests
         }
 
         return dictionary;
+    }
+
+    private static IEnumerable<string> FlattenRedisResult(RedisResult result)
+    {
+        if (result.IsNull)
+        {
+            yield break;
+        }
+
+        if (result.Resp2Type == ResultType.Array)
+        {
+            var entries = (RedisResult[]?)result ?? [];
+            foreach (var entry in entries)
+            {
+                foreach (var value in FlattenRedisResult(entry))
+                {
+                    yield return value;
+                }
+            }
+
+            yield break;
+        }
+
+        yield return result.ToString()!;
     }
 
     private static async Task SeedHashDocumentsAsync(

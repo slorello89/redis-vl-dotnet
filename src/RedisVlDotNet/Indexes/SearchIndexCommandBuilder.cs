@@ -20,6 +20,18 @@ internal static class SearchIndexCommandBuilder
         arguments.AddRange(schema.Index.Prefixes);
         arguments.Add("SEPARATOR");
         arguments.Add(schema.Index.KeySeparator.ToString());
+        AddIndexOption(arguments, "MAXTEXTFIELDS", schema.Index.MaxTextFields);
+        if (schema.Index.TemporarySeconds > 0)
+        {
+            arguments.Add("TEMPORARY");
+            arguments.Add(schema.Index.TemporarySeconds.ToString(CultureInfo.InvariantCulture));
+        }
+
+        AddIndexOption(arguments, "NOOFFSETS", schema.Index.NoOffsets);
+        AddIndexOption(arguments, "NOHL", schema.Index.NoHighlight);
+        AddIndexOption(arguments, "NOFIELDS", schema.Index.NoFields);
+        AddIndexOption(arguments, "NOFREQS", schema.Index.NoFrequencies);
+        AddIndexOption(arguments, "SKIPINITIALSCAN", schema.Index.SkipInitialScan);
         if (schema.Index.Stopwords is not null)
         {
             arguments.Add("STOPWORDS");
@@ -66,9 +78,21 @@ internal static class SearchIndexCommandBuilder
         {
             case TextFieldDefinition textField:
                 arguments.Add("TEXT");
+                if (textField.Weight != 1d)
+                {
+                    arguments.Add("WEIGHT");
+                    arguments.Add(textField.Weight.ToString("0.################", CultureInfo.InvariantCulture));
+                }
+
+                AddFieldOption(arguments, "INDEXEMPTY", textField.IndexEmpty);
+                AddFieldOption(arguments, "INDEXMISSING", textField.IndexMissing);
                 if (textField.Sortable)
                 {
                     arguments.Add("SORTABLE");
+                    if (textField.UnNormalizedForm)
+                    {
+                        arguments.Add("UNF");
+                    }
                 }
 
                 if (textField.NoStem)
@@ -82,6 +106,8 @@ internal static class SearchIndexCommandBuilder
                     arguments.Add("dm:en");
                 }
 
+                AddFieldOption(arguments, "NOINDEX", textField.NoIndex);
+                AddFieldOption(arguments, "WITHSUFFIXTRIE", textField.WithSuffixTrie);
                 break;
             case TagFieldDefinition tagField:
                 arguments.Add("TAG");
@@ -92,27 +118,39 @@ internal static class SearchIndexCommandBuilder
                     arguments.Add("CASESENSITIVE");
                 }
 
+                AddFieldOption(arguments, "INDEXEMPTY", tagField.IndexEmpty);
+                AddFieldOption(arguments, "INDEXMISSING", tagField.IndexMissing);
                 if (tagField.Sortable)
                 {
                     arguments.Add("SORTABLE");
                 }
 
+                AddFieldOption(arguments, "NOINDEX", tagField.NoIndex);
+                AddFieldOption(arguments, "WITHSUFFIXTRIE", tagField.WithSuffixTrie);
                 break;
             case NumericFieldDefinition numericField:
                 arguments.Add("NUMERIC");
+                AddFieldOption(arguments, "INDEXMISSING", numericField.IndexMissing);
                 if (numericField.Sortable)
                 {
                     arguments.Add("SORTABLE");
+                    if (numericField.UnNormalizedForm)
+                    {
+                        arguments.Add("UNF");
+                    }
                 }
 
+                AddFieldOption(arguments, "NOINDEX", numericField.NoIndex);
                 break;
             case GeoFieldDefinition geoField:
                 arguments.Add("GEO");
+                AddFieldOption(arguments, "INDEXMISSING", geoField.IndexMissing);
                 if (geoField.Sortable)
                 {
                     arguments.Add("SORTABLE");
                 }
 
+                AddFieldOption(arguments, "NOINDEX", geoField.NoIndex);
                 break;
             case VectorFieldDefinition vectorField:
                 AddVectorArguments(arguments, vectorField);
@@ -136,6 +174,10 @@ internal static class SearchIndexCommandBuilder
         AddOptionalAttribute(attributeArguments, "M", field.Attributes.M);
         AddOptionalAttribute(attributeArguments, "EF_CONSTRUCTION", field.Attributes.EfConstruction);
         AddOptionalAttribute(attributeArguments, "EF_RUNTIME", field.Attributes.EfRuntime);
+        if (field.IndexMissing)
+        {
+            attributeArguments.Add("INDEXMISSING");
+        }
 
         arguments.Add("VECTOR");
         arguments.Add(ToRedisKeyword(field.Attributes.Algorithm));
@@ -152,6 +194,22 @@ internal static class SearchIndexCommandBuilder
 
         arguments.Add(keyword);
         arguments.Add(value.ToString(CultureInfo.InvariantCulture));
+    }
+
+    private static void AddIndexOption(List<object> arguments, string keyword, bool enabled)
+    {
+        if (enabled)
+        {
+            arguments.Add(keyword);
+        }
+    }
+
+    private static void AddFieldOption(List<object> arguments, string keyword, bool enabled)
+    {
+        if (enabled)
+        {
+            arguments.Add(keyword);
+        }
     }
 
     private static string ToJsonPath(string value) =>

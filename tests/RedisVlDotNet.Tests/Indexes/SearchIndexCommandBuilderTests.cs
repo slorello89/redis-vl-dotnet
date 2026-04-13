@@ -134,6 +134,75 @@ public sealed class SearchIndexCommandBuilderTests
     }
 
     [Fact]
+    public void BuildsCreateArgumentsWithAdvancedFieldAndIndexOptions()
+    {
+        var schema = new SearchSchema(
+            new IndexDefinition(
+                "docs-idx",
+                "docs:",
+                StorageType.Hash,
+                maxTextFields: true,
+                temporarySeconds: 300,
+                noOffsets: true,
+                noHighlight: true,
+                noFields: true,
+                noFrequencies: true,
+                skipInitialScan: true),
+            [
+                new TextFieldDefinition(
+                    "title",
+                    sortable: true,
+                    weight: 2.5,
+                    noStem: true,
+                    phoneticMatch: true,
+                    withSuffixTrie: true,
+                    indexMissing: true,
+                    indexEmpty: true,
+                    unNormalizedForm: true),
+                new TagFieldDefinition(
+                    "genre",
+                    sortable: true,
+                    separator: ';',
+                    caseSensitive: true,
+                    withSuffixTrie: true,
+                    indexMissing: true,
+                    indexEmpty: true,
+                    noIndex: true),
+                new NumericFieldDefinition("rating", sortable: true, indexMissing: true, noIndex: true, unNormalizedForm: true),
+                new GeoFieldDefinition("location", sortable: true, indexMissing: true, noIndex: true),
+                new VectorFieldDefinition(
+                    "embedding",
+                    new VectorFieldAttributes(
+                        VectorAlgorithm.Hnsw,
+                        VectorDataType.Float32,
+                        VectorDistanceMetric.Cosine,
+                        3,
+                        initialCapacity: 1000,
+                        m: 16,
+                        efConstruction: 200,
+                        efRuntime: 10),
+                    indexMissing: true)
+            ]);
+
+        var arguments = SearchIndexCommandBuilder.BuildCreateArguments(schema);
+
+        Assert.Equal(
+            [
+                "docs-idx", "ON", "HASH", "PREFIX", "1", "docs:", "SEPARATOR", ":",
+                "MAXTEXTFIELDS", "TEMPORARY", "300", "NOOFFSETS", "NOHL", "NOFIELDS", "NOFREQS", "SKIPINITIALSCAN",
+                "SCHEMA",
+                "title", "TEXT", "WEIGHT", "2.5", "INDEXEMPTY", "INDEXMISSING", "SORTABLE", "UNF", "NOSTEM", "PHONETIC", "dm:en", "WITHSUFFIXTRIE",
+                "genre", "TAG", "SEPARATOR", ";", "CASESENSITIVE", "INDEXEMPTY", "INDEXMISSING", "SORTABLE", "NOINDEX", "WITHSUFFIXTRIE",
+                "rating", "NUMERIC", "INDEXMISSING", "SORTABLE", "UNF", "NOINDEX",
+                "location", "GEO", "INDEXMISSING", "SORTABLE", "NOINDEX",
+                "embedding", "VECTOR", "HNSW", "15",
+                "TYPE", "FLOAT32", "DIM", "3", "DISTANCE_METRIC", "COSINE",
+                "INITIAL_CAP", "1000", "M", "16", "EF_CONSTRUCTION", "200", "EF_RUNTIME", "10", "INDEXMISSING"
+            ],
+            arguments.Select(static argument => argument.ToString()!).ToArray());
+    }
+
+    [Fact]
     public void BuildsDropArgumentsWithDeleteDocumentsFlag()
     {
         var schema = new SearchSchema(

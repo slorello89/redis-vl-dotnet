@@ -5,12 +5,16 @@ public sealed record VectorFieldDefinition : FieldDefinition
     public VectorFieldDefinition(
         string name,
         VectorFieldAttributes attributes,
-        string? alias = null) : base(name, alias)
+        string? alias = null,
+        bool indexMissing = false) : base(name, alias)
     {
         ArgumentNullException.ThrowIfNull(attributes);
 
         Attributes = attributes;
+        IndexMissing = indexMissing;
     }
 
     public VectorFieldAttributes Attributes { get; }
+
+    public bool IndexMissing { get; }
 }

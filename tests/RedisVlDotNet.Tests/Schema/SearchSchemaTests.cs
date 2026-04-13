@@ -235,6 +235,94 @@ public sealed class SearchSchemaTests
     }
 
     [Fact]
+    public void CreatesSchemaWithAdvancedFieldAndIndexOptions()
+    {
+        var schema = new SearchSchema(
+            new IndexDefinition(
+                "docs-idx",
+                "docs:",
+                StorageType.Json,
+                maxTextFields: true,
+                temporarySeconds: 600,
+                noOffsets: true,
+                noHighlight: true,
+                noFields: true,
+                noFrequencies: true,
+                skipInitialScan: true),
+            [
+                new TextFieldDefinition(
+                    "title",
+                    sortable: true,
+                    weight: 2.5,
+                    withSuffixTrie: true,
+                    indexMissing: true,
+                    indexEmpty: true,
+                    unNormalizedForm: true),
+                new TagFieldDefinition(
+                    "genre",
+                    sortable: true,
+                    separator: ';',
+                    caseSensitive: true,
+                    withSuffixTrie: true,
+                    indexMissing: true,
+                    indexEmpty: true,
+                    noIndex: true),
+                new NumericFieldDefinition("rating", sortable: true, indexMissing: true, noIndex: true, unNormalizedForm: true),
+                new GeoFieldDefinition("location", sortable: true, indexMissing: true, noIndex: true),
+                new VectorFieldDefinition(
+                    "embedding",
+                    new VectorFieldAttributes(VectorAlgorithm.Hnsw, VectorDataType.Float32, VectorDistanceMetric.Cosine, 1536),
+                    indexMissing: true)
+            ]);
+
+        Assert.True(schema.Index.MaxTextFields);
+        Assert.Equal(600, schema.Index.TemporarySeconds);
+        Assert.True(schema.Index.NoOffsets);
+        Assert.True(schema.Index.NoHighlight);
+        Assert.True(schema.Index.NoFields);
+        Assert.True(schema.Index.NoFrequencies);
+        Assert.True(schema.Index.SkipInitialScan);
+
+        Assert.Collection(
+            schema.Fields,
+            field =>
+            {
+                var textField = Assert.IsType<TextFieldDefinition>(field);
+                Assert.Equal(2.5, textField.Weight);
+                Assert.True(textField.WithSuffixTrie);
+                Assert.True(textField.IndexMissing);
+                Assert.True(textField.IndexEmpty);
+                Assert.True(textField.UnNormalizedForm);
+            },
+            field =>
+            {
+                var tagField = Assert.IsType<TagFieldDefinition>(field);
+                Assert.True(tagField.WithSuffixTrie);
+                Assert.True(tagField.IndexMissing);
+                Assert.True(tagField.IndexEmpty);
+                Assert.True(tagField.NoIndex);
+            },
+            field =>
+            {
+                var numericField = Assert.IsType<NumericFieldDefinition>(field);
+                Assert.True(numericField.IndexMissing);
+                Assert.True(numericField.NoIndex);
+                Assert.True(numericField.UnNormalizedForm);
+            },
+            field =>
+            {
+                var geoField = Assert.IsType<GeoFieldDefinition>(field);
+                Assert.True(geoField.IndexMissing);
+                Assert.True(geoField.NoIndex);
+            },
+            field =>
+            {
+                var vectorField = Assert.IsType<VectorFieldDefinition>(field);
+                Assert.True(vectorField.IndexMissing);
+            });
+    }
+
+    [Fact]
     public void PreservesConfiguredFieldDefinitions()
     {
         var vectorAttributes = new VectorFieldAttributes(
@@ -314,6 +402,20 @@ public sealed class SearchSchemaTests
         Assert.Throws<ArgumentException>(() => new IndexDefinition("docs-idx", "docs:", StorageType.Json, keySeparator: ' '));
         Assert.Throws<ArgumentException>(() => new IndexDefinition("docs-idx", "docs:", StorageType.Json, stopwords: ["the", " "]));
         Assert.Throws<ArgumentException>(() => new TextFieldDefinition(" "));
+    }
+
+    [Fact]
+    public void RejectsInvalidAdvancedFieldAndIndexConfigurations()
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() => new IndexDefinition("docs-idx", "docs:", StorageType.Json, temporarySeconds: -1));
+        Assert.Throws<ArgumentOutOfRangeException>(() => new TextFieldDefinition("title", weight: 0));
+        Assert.Throws<ArgumentException>(() => new TextFieldDefinition("title", noIndex: true));
+        Assert.Throws<ArgumentException>(() => new TextFieldDefinition("title", unNormalizedForm: true));
+        Assert.Throws<ArgumentException>(() => new TagFieldDefinition("genre", separator: ' '));
+        Assert.Throws<ArgumentException>(() => new TagFieldDefinition("genre", noIndex: true));
+        Assert.Throws<ArgumentException>(() => new NumericFieldDefinition("rating", noIndex: true));
+        Assert.Throws<ArgumentException>(() => new NumericFieldDefinition("rating", unNormalizedForm: true));
+        Assert.Throws<ArgumentException>(() => new GeoFieldDefinition("location", noIndex: true));
     }
 
     [Fact]

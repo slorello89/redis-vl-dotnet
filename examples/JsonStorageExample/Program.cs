@@ -17,12 +17,23 @@ var schema = new SearchSchema(
         ["json-example:", "json-example-archive:"],
         StorageType.Json,
         keySeparator: '|',
-        stopwords: []),
+        stopwords: [],
+        maxTextFields: true,
+        noOffsets: true,
+        noHighlight: true,
+        skipInitialScan: true),
     [
-        new TextFieldDefinition("title"),
-        new NumericFieldDefinition("year"),
-        new TagFieldDefinition("genre"),
-        new TextFieldDefinition("summary")
+        new TextFieldDefinition(
+            "title",
+            sortable: true,
+            weight: 2.0,
+            withSuffixTrie: true,
+            indexMissing: true,
+            indexEmpty: true,
+            unNormalizedForm: true),
+        new NumericFieldDefinition("year", sortable: true, indexMissing: true, unNormalizedForm: true),
+        new TagFieldDefinition("genre", sortable: true, withSuffixTrie: true, indexMissing: true, indexEmpty: true),
+        new TextFieldDefinition("summary", sortable: true, noIndex: true)
     ]);
 
 var index = new SearchIndex(database, schema);
@@ -52,7 +63,7 @@ var scienceFictionCount = await index.CountAsync(
 Console.WriteLine($"Loaded keys: {string.Join(", ", loadedKeys)}");
 Console.WriteLine($"Fetched by id: {fetchedMovie?.Title} ({fetchedMovie?.Year})");
 Console.WriteLine($"Science fiction count: {scienceFictionCount}");
-Console.WriteLine($"Index metadata: separator '{schema.Index.KeySeparator}', stopwords disabled.");
+Console.WriteLine($"Index metadata: separator '{schema.Index.KeySeparator}', stopwords disabled, advanced FT.CREATE options enabled.");
 Console.WriteLine("Query results:");
 
 foreach (var movie in searchResults.Documents)
