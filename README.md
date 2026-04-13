@@ -7,6 +7,7 @@ The active implementation roadmap is defined in [docs/parity-roadmap.md](/Users/
 Start with [docs/getting-started.md](/Users/steve.lorello/projects/redis/redis-vl-dotnet/docs/getting-started.md) for the core install, connection, schema, index, document, and query flow.
 Browse [examples/README.md](/Users/steve.lorello/projects/redis/redis-vl-dotnet/examples/README.md) for the runnable sample index, Redis prerequisites, and links to each example's local run instructions.
 Read [docs/extensions.md](/Users/steve.lorello/projects/redis/redis-vl-dotnet/docs/extensions.md) for the vectorizer and reranker abstractions package split plus the provider-extension layout.
+Use `src/RedisVlDotNet.Cli` when you want terminal-oriented index inspection and lifecycle commands without writing a custom bootstrap app first.
 See the getting-started topology section and `RedisConnectionFactory` when you need cluster or Sentinel endpoint parsing plus `ConfigurationOptions` setup for StackExchange.Redis.
 See [examples/OpenAiVectorizerExample/README.md](/Users/steve.lorello/projects/redis/redis-vl-dotnet/examples/OpenAiVectorizerExample/README.md) for a provider-backed OpenAI embedding flow with `SemanticCache`.
 See [examples/HuggingFaceVectorizerExample/README.md](/Users/steve.lorello/projects/redis/redis-vl-dotnet/examples/HuggingFaceVectorizerExample/README.md) for the equivalent Hugging Face `hf-inference` flow.
@@ -17,6 +18,7 @@ See [examples/CohereRerankerExample/README.md](/Users/steve.lorello/projects/red
 - `docs/parity-roadmap.md`: current .NET/Java/Python parity matrix and roadmap decisions
 - `docs/getting-started.md`: end-to-end guide for creating an index, loading documents, and running basic queries
 - `docs/extensions.md`: extension package architecture and shared text vectorizer contracts
+- `src/RedisVlDotNet.Cli`: console app for index create, info, list, clear, and delete workflows
 - `src/RedisVlDotNet.Rerankers.Abstractions`: provider-agnostic reranker contracts kept outside the core package boundary
 - `src/RedisVlDotNet.Rerankers.Cohere`: Cohere-backed reranker package for post-search relevance tuning
 - `docs/testing.md`: local and CI test harness instructions for unit and Redis-backed integration coverage
@@ -52,3 +54,36 @@ dotnet test tests/RedisVlDotNet.Tests/RedisVlDotNet.Tests.csproj --no-restore
 ```
 
 The full local and CI workflow is documented in [docs/testing.md](/Users/steve.lorello/projects/redis/redis-vl-dotnet/docs/testing.md).
+
+## CLI
+
+Build the CLI:
+
+```bash
+dotnet build src/RedisVlDotNet.Cli/RedisVlDotNet.Cli.csproj
+```
+
+Show help:
+
+```bash
+dotnet run --project src/RedisVlDotNet.Cli -- --help
+```
+
+List indexes:
+
+```bash
+dotnet run --project src/RedisVlDotNet.Cli -- index list --redis localhost:6379
+```
+
+Create a simple HASH index from inline field definitions:
+
+```bash
+dotnet run --project src/RedisVlDotNet.Cli -- index create \
+  --redis localhost:6379 \
+  --name movies-cli-idx \
+  --prefix movie: \
+  --storage hash \
+  --field text:title \
+  --field tag:genre \
+  --field numeric:year
+```

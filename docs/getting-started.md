@@ -11,6 +11,7 @@ This guide walks through the smallest end-to-end `redis-vl-dotnet` flow for v1:
 7. run full-text search with `TextQuery`
 8. run grouped aggregations with typed reducer output
 9. optionally clear indexed documents without dropping the index
+10. optionally manage indexes from the CLI
 
 The current repository does not publish a NuGet package yet, so local development uses a project reference.
 
@@ -299,6 +300,45 @@ var hybridResults = await index.AggregateAsync<GenreHybridSummary>(
 - `textFilter` must contain at least one text predicate so RediSearch can constrain the hybrid text side of the query
 - `vectorFieldName`, `vector`, `topK`, and `scoreAlias` define the KNN portion of the aggregate query
 - reducer aliases can reference the hybrid distance alias, for example `AggregationReducer.Average("vector_distance", "avgDistance")`
+
+## Manage Indexes From The CLI
+
+Use `src/RedisVlDotNet.Cli` when you want common operational commands from the terminal instead of a one-off console app.
+
+Show the available commands:
+
+```bash
+dotnet run --project src/RedisVlDotNet.Cli -- --help
+```
+
+List indexes:
+
+```bash
+dotnet run --project src/RedisVlDotNet.Cli -- index list --redis localhost:6379
+```
+
+Create a simple index from inline schema options:
+
+```bash
+dotnet run --project src/RedisVlDotNet.Cli -- index create \
+  --redis localhost:6379 \
+  --name movies-cli-idx \
+  --prefix movie: \
+  --storage json \
+  --field text:title \
+  --field numeric:year \
+  --field tag:genre
+```
+
+Inspect or clean up the same index:
+
+```bash
+dotnet run --project src/RedisVlDotNet.Cli -- index info --redis localhost:6379 --name movies-cli-idx
+dotnet run --project src/RedisVlDotNet.Cli -- index clear --redis localhost:6379 --name movies-cli-idx
+dotnet run --project src/RedisVlDotNet.Cli -- index delete --redis localhost:6379 --name movies-cli-idx
+```
+
+The current CLI create flow is intentionally inline-schema only. YAML-backed schema commands are tracked separately from this initial scaffold.
 
 ## Run the Flow Locally
 

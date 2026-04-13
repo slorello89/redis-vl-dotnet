@@ -32,6 +32,7 @@ Started: Mon Apr 13 10:35:34 EDT 2026
 - AI extension seams stay easier to evolve when the abstractions assembly owns immutable request/result DTOs and convenience extensions, while future provider packages enter the solution first as marker scaffolds that reference only the shared abstractions package.
 - Redis topology helpers should stay outside `SearchIndex` and return plain `ConfigurationOptions` or `IConnectionMultiplexer`, so cluster and Sentinel support can evolve independently while the rest of the library continues to consume `IDatabase`.
 - Sentinel helpers should build one reusable `ConfigurationOptions` object with `CommandMap.Sentinel`, a required `ServiceName`, default host-only node port `26379`, and a separate primary-connection helper that reuses that same option shape for failover-aware discovery.
+- CLI workflows stay easiest to test when argument parsing produces immutable request records and one Redis-backed service layer handles the actual `SearchIndex` calls, so command help/output can be unit-tested in-process while Redis integration coverage reuses the existing env-gated harness.
 
 ---
 ## 2026-04-13 13:49:55 EDT - US-027
@@ -87,7 +88,6 @@ Started: Mon Apr 13 10:35:34 EDT 2026
   - Patterns discovered: semantic workflows fit the existing API cleanly when they reuse HASH storage plus monotonic sequence fields for recency and add one vector field queried through `VectorRangeQuery` with session filters.
   - Gotchas encountered: vector range command assertions need to account for the inserted `PARAMS` clause before `SORTBY`, even when only the query vector is supplied.
   - Useful context: there are still no `AGENTS.md` files anywhere in this repository, so reusable implementation guidance remains centralized in `progress.txt`.
----
 ## 2026-04-13 13:34:42 EDT - US-024
 - Implemented a real `RedisVlDotNet.Vectorizers.OpenAI` package with `OpenAiTextVectorizer` and `OpenAiVectorizerOptions`, supporting single-text and batch embedding requests through the official OpenAI `EmbeddingClient` while keeping the core library vendor-agnostic.
 - Files changed: `src/RedisVlDotNet.Vectorizers.OpenAI/RedisVlDotNet.Vectorizers.OpenAI.csproj`, `src/RedisVlDotNet.Vectorizers.OpenAI/OpenAiTextVectorizer.cs`, `src/RedisVlDotNet.Vectorizers.OpenAI/OpenAiVectorizerOptions.cs`, `tests/RedisVlDotNet.Tests/RedisVlDotNet.Tests.csproj`, `tests/RedisVlDotNet.Tests/Vectorizers/OpenAiIntegrationFactAttribute.cs`, `tests/RedisVlDotNet.Tests/Vectorizers/OpenAiTestEnvironment.cs`, `tests/RedisVlDotNet.Tests/Vectorizers/OpenAiTextVectorizerTests.cs`, `tests/RedisVlDotNet.Tests/Vectorizers/OpenAiTextVectorizerSmokeTests.cs`, `examples/OpenAiVectorizerExample/OpenAiVectorizerExample.csproj`, `examples/OpenAiVectorizerExample/Program.cs`, `examples/OpenAiVectorizerExample/README.md`, `examples/README.md`, `docs/extensions.md`, `README.md`, `redis-vl-dotnet.sln`, `prd.json`, `progress.txt`
@@ -295,5 +295,14 @@ Started: Mon Apr 13 10:35:34 EDT 2026
 - Learnings for future iterations:
   - Patterns discovered: vectorizer integrations are easiest to evolve when the core library references only a tiny abstractions assembly and batch support is modeled as an optional second interface with a shared fallback helper.
   - Gotchas encountered: running `dotnet build` and `dotnet test` concurrently against the same solution can lock generated `.deps.json` files, so repo-wide .NET validation should stay sequential for this workspace.
+  - Useful context: there are still no `AGENTS.md` files anywhere in this repository, so reusable implementation guidance remains centralized in `progress.txt`.
+---
+## 2026-04-13 14:09:01 EDT - US-030
+- Implemented a new `RedisVlDotNet.Cli` console project with stable help text and `index create`, `info`, `list`, `clear`, and `delete` commands backed by the existing `SearchIndex` APIs; `create` currently accepts repeatable inline `--field <type:name>` definitions for `text`, `tag`, `numeric`, and `geo` fields.
+- Files changed: `src/RedisVlDotNet.Cli/RedisVlDotNet.Cli.csproj`, `src/RedisVlDotNet.Cli/Program.cs`, `src/RedisVlDotNet.Cli/RedisVlCliApplication.cs`, `src/RedisVlDotNet.Cli/RedisVlCliService.cs`, `tests/RedisVlDotNet.Tests/RedisVlDotNet.Tests.csproj`, `tests/RedisVlDotNet.Tests/Cli/RedisVlCliApplicationTests.cs`, `tests/RedisVlDotNet.Tests/Cli/RedisVlCliIntegrationTests.cs`, `README.md`, `docs/getting-started.md`, `docs/testing.md`, `redis-vl-dotnet.sln`, `prd.json`, `progress.txt`
+- Quality checks run and result: `dotnet build src/RedisVlDotNet.Cli/RedisVlDotNet.Cli.csproj` passed. `dotnet test tests/RedisVlDotNet.Tests/RedisVlDotNet.Tests.csproj --filter "FullyQualifiedName~RedisVlCliApplicationTests|FullyQualifiedName~RedisVlCliIntegrationTests"` passed with the Redis-backed CLI integration test skipped because `REDIS_VL_REDIS_URL` was not configured locally. `dotnet build redis-vl-dotnet.sln --no-restore` passed. `dotnet test redis-vl-dotnet.sln --no-restore` passed with 46 env-gated Redis/provider/topology integration and smoke tests skipped because `REDIS_VL_REDIS_URL`, `REDIS_VL_REDIS_CLUSTER_NODES`, `REDIS_VL_REDIS_SENTINEL_NODES`, `REDIS_VL_REDIS_SENTINEL_SERVICE_NAME`, `OPENAI_API_KEY`, `HF_TOKEN`, and `COHERE_API_KEY` were not configured locally.
+- Learnings for future iterations:
+  - Patterns discovered: keep the CLI parser and help surface inside the app project, but route command execution through a separate service layer that only depends on `SearchIndex` and connection creation.
+  - Gotchas encountered: executable projects on this local .NET/macOS toolchain can fail apphost signing during build, so `<UseAppHost>false</UseAppHost>` keeps the CLI buildable as a standard `dotnet`-launched console app.
   - Useful context: there are still no `AGENTS.md` files anywhere in this repository, so reusable implementation guidance remains centralized in `progress.txt`.
 ---

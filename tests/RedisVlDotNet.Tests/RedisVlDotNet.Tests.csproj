@@ -20,6 +20,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\src\RedisVlDotNet.Cli\RedisVlDotNet.Cli.csproj" />
     <ProjectReference Include="..\..\src\RedisVlDotNet\RedisVlDotNet.csproj" />
     <ProjectReference Include="..\..\src\RedisVlDotNet.Rerankers.Abstractions\RedisVlDotNet.Rerankers.Abstractions.csproj" />
     <ProjectReference Include="..\..\src\RedisVlDotNet.Rerankers.Cohere\RedisVlDotNet.Rerankers.Cohere.csproj" />

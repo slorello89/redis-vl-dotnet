@@ -43,6 +43,12 @@ Run the test project:
 dotnet test tests/RedisVlDotNet.Tests/RedisVlDotNet.Tests.csproj --no-restore
 ```
 
+To exercise the CLI-specific coverage only:
+
+```bash
+dotnet test tests/RedisVlDotNet.Tests/RedisVlDotNet.Tests.csproj --no-restore --filter FullyQualifiedName~RedisVlCli
+```
+
 To run the gated cluster integration test, point the suite at a Redis cluster instead:
 
 ```bash
@@ -77,6 +83,7 @@ The Redis-backed tests keep query assertions reproducible by:
 - Using shared seed datasets under `tests/RedisVlDotNet.Tests/Indexes/SearchIndexSeedData.cs` for filter, vector, and hybrid scenarios.
 - Creating unique index names and key prefixes per test so parallel or repeated runs do not reuse stale Redis data.
 - Polling for index readiness through `RedisSearchTestEnvironment.WaitForIndexDocumentCountAsync(...)` or `WaitForAsync(...)` instead of fixed sleeps.
+- Running CLI integration coverage in-process through `RedisVlCliApplication` so parser behavior and Redis operations share the same environment-gated test harness.
 
 ## CI
 
