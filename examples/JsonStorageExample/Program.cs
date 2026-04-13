@@ -1,3 +1,4 @@
+using RedisVlDotNet;
 using RedisVlDotNet.Filters;
 using RedisVlDotNet.Indexes;
 using RedisVlDotNet.Queries;
@@ -5,12 +6,18 @@ using RedisVlDotNet.Schema;
 using StackExchange.Redis;
 
 var redisUrl = Environment.GetEnvironmentVariable("REDIS_VL_REDIS_URL") ?? "localhost:6379";
+var clusterNodes = Environment.GetEnvironmentVariable("REDIS_VL_REDIS_CLUSTER_NODES");
+var redisUser = Environment.GetEnvironmentVariable("REDIS_VL_REDIS_USER");
+var redisPassword = Environment.GetEnvironmentVariable("REDIS_VL_REDIS_PASSWORD");
+var redisSsl = bool.TryParse(Environment.GetEnvironmentVariable("REDIS_VL_REDIS_SSL"), out var parsedRedisSsl) && parsedRedisSsl;
 var schemaPath = Path.Combine(AppContext.BaseDirectory, "schema.yaml");
 
-Console.WriteLine($"Connecting to Redis at {redisUrl}...");
+Console.WriteLine(string.IsNullOrWhiteSpace(clusterNodes)
+    ? $"Connecting to Redis at {redisUrl}..."
+    : $"Connecting to Redis cluster via seed nodes: {clusterNodes}...");
 Console.WriteLine($"Loading schema from {schemaPath}...");
 
-using var redis = await ConnectionMultiplexer.ConnectAsync(redisUrl);
+using var redis = await ConnectAsync(redisUrl, clusterNodes, redisUser, redisPassword, redisSsl);
 var database = redis.GetDatabase();
 
 var schema = SearchSchema.FromYamlFile(schemaPath);
@@ -119,6 +126,37 @@ foreach (var row in aggregationResults.Rows)
 await index.DropAsync();
 
 Console.WriteLine("Dropped the example index after clearing its documents.");
+
+static async Task<IConnectionMultiplexer> ConnectAsync(
+    string redisUrl,
+    string? clusterNodes,
+    string? redisUser,
+    string? redisPassword,
+    bool redisSsl)
+{
+    if (!string.IsNullOrWhiteSpace(clusterNodes))
+    {
+        return await RedisConnectionFactory.ConnectClusterAsync(
+            clusterNodes,
+            options =>
+            {
+                if (!string.IsNullOrWhiteSpace(redisUser))
+                {
+                    options.User = redisUser;
+                }
+
+                if (!string.IsNullOrWhiteSpace(redisPassword))
+                {
+                    options.Password = redisPassword;
+                }
+
+                options.Ssl = redisSsl;
+                options.ClientName = "redis-vl-dotnet-json-example";
+            }).ConfigureAwait(false);
+    }
+
+    return await ConnectionMultiplexer.ConnectAsync(redisUrl).ConfigureAwait(false);
+}
 
 public sealed record Movie(string Id, string Title, int Year, string Genre, string Summary);
 

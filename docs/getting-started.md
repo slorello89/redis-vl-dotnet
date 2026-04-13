@@ -139,6 +139,36 @@ public sealed record GenreSummary(string Genre, int MovieCount, double AverageYe
 - `AggregateAsync<T>(...)` runs `FT.AGGREGATE` and maps grouped rows into typed reducer projections
 - `ClearAsync(...)` deletes Redis keys matched by the schema prefixes and preserves the index definition for both JSON and HASH storage
 
+## Connect To A Redis Cluster
+
+Use `RedisConnectionFactory` when you want to seed a cluster connection from one or more cluster nodes and still work with the same `IDatabase`-based APIs:
+
+```csharp
+using RedisVlDotNet;
+using StackExchange.Redis;
+
+var cluster = await RedisConnectionFactory.ConnectClusterAsync(
+    "redis-cluster-1:7000,redis-cluster-2:7001,redis-cluster-3:7002",
+    options =>
+    {
+        options.User = "default";
+        options.Password = "secret";
+        options.Ssl = true;
+        options.ClientName = "redis-vl-dotnet-app";
+    });
+
+var database = cluster.GetDatabase();
+```
+
+`RedisConnectionFactory.CreateClusterOptions(...)` returns the underlying `ConfigurationOptions` if you want to inspect or reuse the parsed seed-node configuration before connecting.
+
+Cluster connections are validated for Redis cluster semantics:
+
+- seed nodes can be provided as a comma-, semicolon-, or newline-delimited string, or as an enumerable
+- duplicate seed nodes are removed after trimming
+- host-only seed nodes default to port `6379`
+- Redis cluster only supports database `0`, so non-zero `DefaultDatabase` values are rejected before connecting
+
 ## Run Full-Text Search With `TextQuery`
 
 Use `TextQuery` when you want RediSearch text matching semantics instead of the structured filter builder:

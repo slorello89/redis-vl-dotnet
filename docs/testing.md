@@ -14,6 +14,7 @@ dotnet test redis-vl-dotnet.sln --no-restore
 ```
 
 The integration tests are guarded by `RedisSearchIntegrationFact` and are skipped unless `REDIS_VL_REDIS_URL` is set.
+Cluster-specific integration coverage is guarded by `REDIS_VL_REDIS_CLUSTER_NODES` and is skipped unless a RediSearch-capable cluster is available.
 
 Provider smoke tests are also guarded by provider-specific environment variables:
 
@@ -39,6 +40,16 @@ Run the test project:
 
 ```bash
 dotnet test tests/RedisVlDotNet.Tests/RedisVlDotNet.Tests.csproj --no-restore
+```
+
+To run the gated cluster integration test, point the suite at a Redis cluster instead:
+
+```bash
+export REDIS_VL_REDIS_CLUSTER_NODES=127.0.0.1:7000,127.0.0.1:7001,127.0.0.1:7002
+export REDIS_VL_REDIS_USER=default
+export REDIS_VL_REDIS_PASSWORD=secret
+export REDIS_VL_REDIS_SSL=false
+dotnet test tests/RedisVlDotNet.Tests/RedisVlDotNet.Tests.csproj --no-restore --filter FullyQualifiedName~RedisClusterConnectionIntegrationTests
 ```
 
 Stop the local Redis Stack container when you are done:

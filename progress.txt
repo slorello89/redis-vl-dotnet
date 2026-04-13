@@ -30,6 +30,7 @@ Started: Mon Apr 13 10:35:34 EDT 2026
 - HTTP-based provider vectorizers should model the provider's published JSON payload directly, omit unset optional fields from serialized requests, and allow an endpoint override so shared tests can assert request shape without depending on one hosted route.
 - HTTP-based reranker integrations should send only provider-supported document text in the payload, then remap provider result indexes back onto the original `RerankDocument` instances locally so caller metadata survives reranking without custom server-side schemas.
 - AI extension seams stay easier to evolve when the abstractions assembly owns immutable request/result DTOs and convenience extensions, while future provider packages enter the solution first as marker scaffolds that reference only the shared abstractions package.
+- Redis topology helpers should stay outside `SearchIndex` and return plain `ConfigurationOptions` or `IConnectionMultiplexer`, so cluster and Sentinel support can evolve independently while the rest of the library continues to consume `IDatabase`.
 
 ---
 ## 2026-04-13 13:49:55 EDT - US-027
@@ -39,6 +40,15 @@ Started: Mon Apr 13 10:35:34 EDT 2026
 - Learnings for future iterations:
   - Patterns discovered: HTTP-based reranker providers fit the existing extension seam cleanly when the package serializes only string documents to the provider API and preserves richer caller metadata by remapping the returned document indexes afterward.
   - Gotchas encountered: adding a new example project to the solution requires a restore before the repo's `--no-restore` build gate will pass, because the first build otherwise fails on the missing assets file for the new project.
+  - Useful context: there are still no `AGENTS.md` files anywhere in this repository, so reusable implementation guidance remains centralized in `progress.txt`.
+---
+## 2026-04-13 13:55:39 EDT - US-028
+- Implemented a new `RedisConnectionFactory` helper that builds cluster-ready `ConfigurationOptions` from seed nodes, validates cluster-only database semantics, and opens `IConnectionMultiplexer` instances for cluster workflows without changing the library's existing `IDatabase`-based APIs.
+- Files changed: `src/RedisVlDotNet/RedisConnectionFactory.cs`, `tests/RedisVlDotNet.Tests/RedisConnectionFactoryTests.cs`, `tests/RedisVlDotNet.Tests/Indexes/RedisClusterTestEnvironment.cs`, `tests/RedisVlDotNet.Tests/Indexes/RedisClusterIntegrationFactAttribute.cs`, `tests/RedisVlDotNet.Tests/Indexes/RedisClusterConnectionIntegrationTests.cs`, `examples/JsonStorageExample/Program.cs`, `examples/JsonStorageExample/README.md`, `docs/getting-started.md`, `docs/testing.md`, `README.md`, `prd.json`, `progress.txt`
+- Quality checks run and result: `dotnet test tests/RedisVlDotNet.Tests/RedisVlDotNet.Tests.csproj --filter FullyQualifiedName~RedisConnectionFactoryTests` passed. `dotnet build examples/JsonStorageExample/JsonStorageExample.csproj` passed. `dotnet build redis-vl-dotnet.sln --no-restore` passed. `dotnet test redis-vl-dotnet.sln --no-restore` passed with 44 env-gated Redis/provider integration tests skipped because `REDIS_VL_REDIS_URL`, `REDIS_VL_REDIS_CLUSTER_NODES`, `OPENAI_API_KEY`, `HF_TOKEN`, and `COHERE_API_KEY` were not configured locally.
+- Learnings for future iterations:
+  - Patterns discovered: topology-specific connection support stays reusable when the helper returns plain `ConfigurationOptions` and `IConnectionMultiplexer`, leaving `SearchIndex`, caches, and workflows unchanged on `IDatabase`.
+  - Gotchas encountered: StackExchange.Redis endpoint `ToString()` output includes transport metadata for DNS endpoints, so endpoint assertions should normalize host and port explicitly instead of comparing raw `ToString()` values.
   - Useful context: there are still no `AGENTS.md` files anywhere in this repository, so reusable implementation guidance remains centralized in `progress.txt`.
 ---
 ## 2026-04-13 13:41:07 EDT - US-025
