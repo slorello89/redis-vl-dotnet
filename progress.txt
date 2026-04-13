@@ -23,8 +23,19 @@ Started: Mon Apr 13 10:35:34 EDT 2026
 - Shared query paging should flow through `QueryPagination`; vector-style queries keep `topK` as the retrieval window and must reject `offset + limit` values that would page past that window.
 - Batch query iterators should reuse the existing query execution paths by cloning the original query with a new `QueryPagination` each round; vector-style batches must clamp the final page to the remaining `topK` window instead of widening it.
 - Recency-based workflow storage should use Redis-side monotonic sequence counters per logical scope (for example, per session) and sort on that sequence, which avoids nondeterministic ordering when caller-supplied timestamps collide.
+- Semantic workflow retrieval should keep session scoping in the RediSearch filter and express similarity as a `VectorRangeQuery` distance threshold, which lets role filters compose cleanly while preserving deterministic recency metadata on the stored HASH documents.
 
 ---
+## 2026-04-13 14:06:56 EDT - US-021
+- Implemented a new `SemanticMessageHistory` workflow with FLOAT32 vector storage, semantic retrieval by direct embedding or `ITextEmbeddingGenerator`, configurable distance thresholds, session and optional role scoping, and retained recent-message retrieval on the same workflow.
+- Files changed: `src/RedisVlDotNet/Workflows/SemanticMessageHistory.cs`, `src/RedisVlDotNet/Workflows/SemanticMessageHistoryOptions.cs`, `src/RedisVlDotNet/Workflows/SemanticMessageHistoryMatch.cs`, `tests/RedisVlDotNet.Tests/Workflows/SemanticMessageHistoryTests.cs`, `tests/RedisVlDotNet.Tests/Workflows/SemanticMessageHistoryIntegrationTests.cs`, `examples/MessageHistoryExample/Program.cs`, `examples/MessageHistoryExample/README.md`, `examples/README.md`, `prd.json`, `progress.txt`
+- Quality checks run and result: `dotnet test tests/RedisVlDotNet.Tests/RedisVlDotNet.Tests.csproj --filter "FullyQualifiedName~SemanticMessageHistoryTests|FullyQualifiedName~SemanticMessageHistoryIntegrationTests"` passed with the Redis-backed integration test skipped because `REDIS_VL_REDIS_URL` was not configured locally. `dotnet build examples/MessageHistoryExample/MessageHistoryExample.csproj` passed. `dotnet build redis-vl-dotnet.sln --no-restore` passed. `dotnet test redis-vl-dotnet.sln --no-restore` passed with 37 Redis-backed integration tests skipped because `REDIS_VL_REDIS_URL` was not configured locally.
+- Learnings for future iterations:
+  - Patterns discovered: semantic workflows fit the existing API cleanly when they reuse HASH storage plus monotonic sequence fields for recency and add one vector field queried through `VectorRangeQuery` with session filters.
+  - Gotchas encountered: vector range command assertions need to account for the inserted `PARAMS` clause before `SORTBY`, even when only the query vector is supplied.
+  - Useful context: there are still no `AGENTS.md` files anywhere in this repository, so reusable implementation guidance remains centralized in `progress.txt`.
+---
+
 ## 2026-04-13 13:08:26 EDT - US-020
 - Implemented a new `MessageHistory` workflow with append-only HASH storage for session id, role, content, metadata JSON, timestamp, and a per-session Redis sequence that powers deterministic recent-message retrieval with optional role filtering.
 - Files changed: `src/RedisVlDotNet/Workflows/MessageHistory.cs`, `src/RedisVlDotNet/Workflows/MessageHistoryOptions.cs`, `src/RedisVlDotNet/Workflows/MessageHistoryMessage.cs`, `tests/RedisVlDotNet.Tests/Workflows/MessageHistoryTests.cs`, `tests/RedisVlDotNet.Tests/Workflows/MessageHistoryIntegrationTests.cs`, `examples/MessageHistoryExample/MessageHistoryExample.csproj`, `examples/MessageHistoryExample/Program.cs`, `examples/MessageHistoryExample/README.md`, `examples/README.md`, `prd.json`, `progress.txt`

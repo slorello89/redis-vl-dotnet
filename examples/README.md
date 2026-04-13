@@ -67,17 +67,17 @@ dotnet run --project examples/VectorSearchExample/VectorSearchExample.csproj
 
 ### [MessageHistoryExample](/Users/steve.lorello/projects/redis/redis-vl-dotnet/examples/MessageHistoryExample/README.md)
 
-Demonstrates the base message history workflow:
+Demonstrates semantic message history retrieval:
 
-- create a HASH-backed message history index
-- append session messages with role and metadata
+- create a HASH-backed semantic message history index
+- append session messages with embeddings and metadata
 - retrieve the most recent messages for one session
-- filter recent messages by role
+- retrieve semantically relevant messages within the same session
 - drop the example index and documents
 
 Redis prerequisites:
 
-- RediSearch
+- RediSearch with vector similarity support
 
 Run it from the repository root:
 

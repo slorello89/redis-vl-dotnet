@@ -1,11 +1,11 @@
 # Message History Example
 
-Demonstrates the base message history workflow:
+Demonstrates semantic message history retrieval:
 
-- create a message history index
-- append session messages with role, timestamped sequence order, and metadata payloads
+- create a semantic message history index with a vector field
+- append session messages with generated embeddings and metadata payloads
 - retrieve the most recent messages for a session
-- filter recent retrieval by role
+- retrieve semantically relevant messages for a prompt within the same session
 - clean up the example index and documents
 
 Run it from the repository root:
