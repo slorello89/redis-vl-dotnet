@@ -22,6 +22,21 @@ export REDIS_VL_REDIS_URL=localhost:6379
 
 ## Available Examples
 
+## Feature Coverage
+
+Use this map when you want the fastest path to a parity feature area:
+
+| Feature area | Example or doc entry point | Notes |
+| --- | --- | --- |
+| Advanced schema options, YAML loading, from-existing index, index listing, JSON partial updates, `TextQuery`, aggregation, clear helper | [JsonStorageExample](/Users/steve.lorello/projects/redis/redis-vl-dotnet/examples/JsonStorageExample/README.md) | Also covers cluster and Sentinel connection environment variables |
+| Vector query basics, runtime vector search tuning, `MultiVectorQuery`, aggregate hybrid search, HASH partial updates | [VectorSearchExample](/Users/steve.lorello/projects/redis/redis-vl-dotnet/examples/VectorSearchExample/README.md) | HASH-backed workflow with deterministic vector seed data |
+| Semantic message history with recency and semantic retrieval | [MessageHistoryExample](/Users/steve.lorello/projects/redis/redis-vl-dotnet/examples/MessageHistoryExample/README.md) | Uses an in-process sample vectorizer so no provider credentials are required |
+| Semantic cache filter fields and metadata payloads | [SemanticCacheExample](/Users/steve.lorello/projects/redis/redis-vl-dotnet/examples/SemanticCacheExample/README.md) | Shows tenant/model filter composition |
+| OpenAI vectorizer package | [OpenAiVectorizerExample](/Users/steve.lorello/projects/redis/redis-vl-dotnet/examples/OpenAiVectorizerExample/README.md) | Requires `OPENAI_API_KEY` |
+| Hugging Face vectorizer package | [HuggingFaceVectorizerExample](/Users/steve.lorello/projects/redis/redis-vl-dotnet/examples/HuggingFaceVectorizerExample/README.md) | Requires `HF_TOKEN` |
+| Cohere reranker package | [CohereRerankerExample](/Users/steve.lorello/projects/redis/redis-vl-dotnet/examples/CohereRerankerExample/README.md) | Requires `COHERE_API_KEY` |
+| CLI index and schema commands | [README.md](/Users/steve.lorello/projects/redis/redis-vl-dotnet/README.md) and [docs/getting-started.md](/Users/steve.lorello/projects/redis/redis-vl-dotnet/docs/getting-started.md) | Covers `index create`, `index list`, `schema validate`, and `schema show` |
+
 ### [JsonStorageExample](/Users/steve.lorello/projects/redis/redis-vl-dotnet/examples/JsonStorageExample/README.md)
 
 Demonstrates the core JSON workflow:
@@ -183,4 +198,4 @@ dotnet run --project examples/CohereRerankerExample/CohereRerankerExample.csproj
 
 - [Getting started guide](/Users/steve.lorello/projects/redis/redis-vl-dotnet/docs/getting-started.md)
 - [Testing and local Redis setup](/Users/steve.lorello/projects/redis/redis-vl-dotnet/docs/testing.md)
-- [v1 architecture and parity matrix](/Users/steve.lorello/projects/redis/redis-vl-dotnet/docs/v1-architecture.md)
+- [Current parity roadmap and matrix](/Users/steve.lorello/projects/redis/redis-vl-dotnet/docs/parity-roadmap.md)

@@ -2,6 +2,7 @@
 Started: Mon Apr 13 10:35:34 EDT 2026
 
 ## Codebase Patterns
+- Keep parity-surface docs anchored by an examples feature map in `examples/README.md` and a command-level validation matrix in `docs/testing.md`, then validate doc/example updates by building every example project so discoverability and runnable coverage stay in sync.
 - Keep the active roadmap contract in a dedicated doc and link it from `README.md` and `docs/getting-started.md` so implementation work and user-facing navigation stay aligned.
 - When parity decisions depend on Java and Python comparisons, record intentional .NET-native differences explicitly so later feature work targets capabilities rather than cross-language API cloning.
 - For index metadata extensions, preserve `IndexDefinition.Prefix` as the primary write-path namespace and add new FT.CREATE metadata via separate strongly typed properties so document loading APIs stay backward compatible.
@@ -35,6 +36,15 @@ Started: Mon Apr 13 10:35:34 EDT 2026
 - CLI workflows stay easiest to test when argument parsing produces immutable request records and one Redis-backed service layer handles the actual `SearchIndex` calls, so command help/output can be unit-tested in-process while Redis integration coverage reuses the existing env-gated harness.
 - For YAML-backed CLI flows, validate schema files while constructing the immutable request and pass the realized `SearchSchema` through the service layer, so `schema` commands and `index create --schema` stay on one parsing path.
 
+---
+## 2026-04-13 14:17:55 EDT - US-032
+- Expanded the parity adoption docs with an examples feature-coverage map, an explicit local and CI test matrix, provider prerequisite cross-references, and fuller prerequisite/run guidance for the message-history and semantic-cache samples.
+- Files changed: `README.md`, `docs/testing.md`, `examples/README.md`, `examples/MessageHistoryExample/README.md`, `examples/SemanticCacheExample/README.md`, `prd.json`, `progress.txt`
+- Quality checks run and result: `dotnet restore redis-vl-dotnet.sln` passed. `dotnet build` passed for all example projects under `examples/`. `dotnet build redis-vl-dotnet.sln --no-restore` passed. `dotnet test redis-vl-dotnet.sln --no-build --verbosity normal` passed with 47 env-gated Redis, cluster, Sentinel, and provider smoke tests skipped because local Redis/provider settings were not configured.
+- Learnings for future iterations:
+  - Patterns discovered: parity-surface documentation is easiest to keep coherent when `examples/README.md` maps each feature area to one runnable sample and `docs/testing.md` maps each validation tier to one concrete command plus its required environment variables.
+  - Gotchas encountered: the default solution test suite intentionally reports success with many skipped tests when Redis or provider credentials are absent, so progress notes should call out the exact gated variables rather than treating the skips as failures.
+  - Useful context: there are still no `AGENTS.md` files anywhere in this repository, so reusable guidance for examples and validation stays centralized in `progress.txt`.
 ---
 ## 2026-04-13 14:14:32 EDT - US-031
 - Implemented `redisvl schema validate` and `redisvl schema show`, added `index create --schema <path>` support for YAML-backed index creation, and reused `SearchSchema.FromYamlFile` so CLI schema validation and create flows share the same parsing path.

@@ -23,6 +23,29 @@ Provider smoke tests are also guarded by provider-specific environment variables
 - `HF_TOKEN` for Hugging Face vectorizer smoke tests
 - `COHERE_API_KEY` for Cohere reranker smoke tests
 
+## Test Matrix
+
+Use these tiers to validate the parity surface locally and in CI:
+
+| Tier | Scope | Command | Environment |
+| --- | --- | --- | --- |
+| Solution build | All library, CLI, and test projects compile | `dotnet build redis-vl-dotnet.sln --no-restore` | None |
+| Default test suite | Unit tests plus any Redis/provider tests whose env vars are present | `dotnet test redis-vl-dotnet.sln --no-build --verbosity normal` | None required; gated tests skip themselves |
+| Redis integration suite | Search index, schema, workflow, cache, and CLI integration coverage against one Redis deployment | `dotnet test tests/RedisVlDotNet.Tests/RedisVlDotNet.Tests.csproj --no-restore` | `REDIS_VL_REDIS_URL` |
+| CLI-focused subset | CLI parser plus Redis-backed CLI lifecycle coverage | `dotnet test tests/RedisVlDotNet.Tests/RedisVlDotNet.Tests.csproj --no-restore --filter FullyQualifiedName~RedisVlCli` | `REDIS_VL_REDIS_URL` for integration cases |
+| Cluster topology subset | Cluster connection helpers | `dotnet test tests/RedisVlDotNet.Tests/RedisVlDotNet.Tests.csproj --no-restore --filter FullyQualifiedName~RedisClusterConnectionIntegrationTests` | `REDIS_VL_REDIS_CLUSTER_NODES` and any auth or TLS vars |
+| Sentinel topology subset | Sentinel discovery helpers | `dotnet test tests/RedisVlDotNet.Tests/RedisVlDotNet.Tests.csproj --no-restore --filter FullyQualifiedName~RedisSentinelConnectionIntegrationTests` | `REDIS_VL_REDIS_SENTINEL_NODES`, `REDIS_VL_REDIS_SENTINEL_SERVICE_NAME`, and any auth or TLS vars |
+| OpenAI smoke | Provider package request and live embedding flow | `dotnet test tests/RedisVlDotNet.Tests/RedisVlDotNet.Tests.csproj --no-restore --filter FullyQualifiedName~OpenAi` | `OPENAI_API_KEY` |
+| Hugging Face smoke | Provider package request and live embedding flow | `dotnet test tests/RedisVlDotNet.Tests/RedisVlDotNet.Tests.csproj --no-restore --filter FullyQualifiedName~HuggingFace` | `HF_TOKEN` |
+| Cohere smoke | Provider package request and live rerank flow | `dotnet test tests/RedisVlDotNet.Tests/RedisVlDotNet.Tests.csproj --no-restore --filter FullyQualifiedName~Cohere` | `COHERE_API_KEY` |
+| Example build sweep | Confirms all runnable sample projects still compile | `find examples -name '*.csproj' -print0 | xargs -0 -n1 dotnet build --no-restore` | Provider env vars not required for build-only validation |
+
+Provider package prerequisites for the runnable examples match the smoke-test gates:
+
+- `examples/OpenAiVectorizerExample` and `OpenAiTextVectorizerSmokeTests`: `OPENAI_API_KEY`
+- `examples/HuggingFaceVectorizerExample` and `HuggingFaceTextVectorizerSmokeTests`: `HF_TOKEN`
+- `examples/CohereRerankerExample` and `CohereTextRerankerSmokeTests`: `COHERE_API_KEY`
+
 ## Integration Tests
 
 Start Redis Stack locally:
@@ -91,5 +114,6 @@ GitHub Actions runs:
 
 1. `dotnet build redis-vl-dotnet.sln --no-restore`
 2. `dotnet test redis-vl-dotnet.sln --no-build --verbosity normal`
+3. Example builds should remain green locally before merging parity-surface doc or sample updates, even though they are not yet part of the default CI workflow.
 
 The workflow provisions `redis/redis-stack-server` as a service container and sets `REDIS_VL_REDIS_URL=localhost:6379`, so the same integration tests that are opt-in locally run automatically in CI.

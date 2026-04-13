@@ -53,7 +53,13 @@ Then run the Redis-backed integration suite:
 dotnet test tests/RedisVlDotNet.Tests/RedisVlDotNet.Tests.csproj --no-restore
 ```
 
-The full local and CI workflow is documented in [docs/testing.md](/Users/steve.lorello/projects/redis/redis-vl-dotnet/docs/testing.md).
+Build every runnable example project:
+
+```bash
+find examples -name '*.csproj' -print0 | xargs -0 -n1 dotnet build --no-restore
+```
+
+The full local and CI workflow, including the parity test matrix and provider-specific gates, is documented in [docs/testing.md](/Users/steve.lorello/projects/redis/redis-vl-dotnet/docs/testing.md).
 
 ## CLI
 
