@@ -28,8 +28,18 @@ var movies = new[]
     new Movie("movie-3", "Alien", 1979, "science-fiction", "The Nostromo crew faces a lethal alien organism.")
 };
 
-var loadedKeys = await index.LoadJsonAsync(movies);
+var loadedKeys = await index.LoadJsonAsync(movies.AsEnumerable());
 var fetchedMovie = await index.FetchJsonByIdAsync<Movie>("movie-2");
+var updatedById = await index.UpdateJsonByIdAsync(
+    "movie-2",
+    [
+        new JsonPartialUpdate("$.summary", "A linguist helps decode the intent of alien visitors."),
+        new JsonPartialUpdate("$.year", 2017)
+    ]);
+var updatedByKey = await index.UpdateJsonByKeyAsync(
+    loadedKeys[2],
+    [new JsonPartialUpdate("$.title", "Alien (1979)")]);
+var updatedMovie = await index.FetchJsonByIdAsync<Movie>("movie-2");
 
 var scienceFictionQuery = new FilterQuery(
     Filter.And(
@@ -45,6 +55,8 @@ var clearedCount = await rediscoveredIndex.ClearAsync();
 
 Console.WriteLine($"Loaded keys: {string.Join(", ", loadedKeys)}");
 Console.WriteLine($"Fetched by id: {fetchedMovie?.Title} ({fetchedMovie?.Year})");
+Console.WriteLine($"Updated movie-2 by id: {updatedById}, now '{updatedMovie?.Title}' ({updatedMovie?.Year})");
+Console.WriteLine($"Updated movie-3 by key: {updatedByKey}");
 Console.WriteLine($"Available indexes: {string.Join(", ", indexes.Select(static item => item.Name))}");
 Console.WriteLine($"Rediscovered index '{rediscoveredIndex.Schema.Index.Name}' with prefixes: {string.Join(", ", rediscoveredIndex.Schema.Index.Prefixes)}");
 Console.WriteLine($"Fetched via rediscovered index: {rediscoveredMovie?.Title} ({rediscoveredMovie?.Year})");

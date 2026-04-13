@@ -489,6 +489,59 @@ public sealed class SearchIndexIntegrationTests
     }
 
     [RedisSearchIntegrationFact]
+    public async Task PartiallyUpdatesJsonDocumentsByIdAndByKey()
+    {
+        await using var connection = await RedisSearchTestEnvironment.ConnectAsync();
+        var database = connection.GetDatabase();
+
+        var token = Guid.NewGuid().ToString("N");
+        var schema = new SearchSchema(
+            new IndexDefinition($"json-update-idx-{token}", $"jsonupdate:{token}:", StorageType.Json),
+            [
+                new TextFieldDefinition("title"),
+                new NumericFieldDefinition("year"),
+                new TagFieldDefinition("genre")
+            ]);
+        var index = new SearchIndex(database, schema);
+
+        try
+        {
+            await index.CreateAsync();
+
+            var key = await index.LoadJsonAsync(new JsonMovieWithMetadata(
+                "movie-1",
+                "Heat",
+                1995,
+                "crime",
+                new JsonMovieMetadata("Michael Mann", 8.0d)));
+
+            var updatedById = await index.UpdateJsonByIdAsync(
+                "movie-1",
+                [
+                    new JsonPartialUpdate("$.title", "Heat: Director's Cut"),
+                    new JsonPartialUpdate("$.metadata.rating", 9.25d)
+                ]);
+            var updatedByKey = await index.UpdateJsonByKeyAsync(
+                key,
+                [new JsonPartialUpdate("$.metadata.director", "M. Mann")]);
+            var updated = await index.FetchJsonByIdAsync<JsonMovieWithMetadata>("movie-1");
+
+            Assert.True(updatedById);
+            Assert.True(updatedByKey);
+            Assert.Equal("Heat: Director's Cut", updated!.Title);
+            Assert.Equal(9.25d, updated.Metadata.Rating);
+            Assert.Equal("M. Mann", updated.Metadata.Director);
+        }
+        finally
+        {
+            if (await index.ExistsAsync())
+            {
+                await index.DropAsync(deleteDocuments: true);
+            }
+        }
+    }
+
+    [RedisSearchIntegrationFact]
     public async Task LoadsFetchesAndDeletesHashDocuments()
     {
         await using var connection = await RedisSearchTestEnvironment.ConnectAsync();
@@ -825,6 +878,10 @@ public sealed class SearchIndexIntegrationTests
     private sealed record JsonMovieDocument(string Id, string Title, int Year, string Genre);
 
     private sealed record JsonMovieEnvelope(string ExternalId, string Title, int Year, string Genre);
+
+    private sealed record JsonMovieWithMetadata(string Id, string Title, int Year, string Genre, JsonMovieMetadata Metadata);
+
+    private sealed record JsonMovieMetadata(string Director, double Rating);
 
     private sealed record HashMovieDocument(string Id, string Title, int Year, string Genre);
 

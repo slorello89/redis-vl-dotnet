@@ -211,6 +211,46 @@ public sealed class SearchIndex
     public Task<bool> DeleteJsonByIdAsync(string id, CancellationToken cancellationToken = default) =>
         DeleteJsonByKeyAsync(DocumentKeyResolver.ResolveKeyFromId(Schema, id), cancellationToken);
 
+    public bool UpdateJsonByKey(string key, params JsonPartialUpdate[] updates) =>
+        UpdateJsonByKeyAsync(key, updates).GetAwaiter().GetResult();
+
+    public async Task<bool> UpdateJsonByKeyAsync(
+        string key,
+        IEnumerable<JsonPartialUpdate> updates,
+        CancellationToken cancellationToken = default)
+    {
+        EnsureJsonStorage();
+        ArgumentException.ThrowIfNullOrWhiteSpace(key);
+
+        var normalizedKey = key.Trim();
+        var normalizedUpdates = NormalizeJsonPartialUpdates(updates);
+        if (!await JsonDocumentExistsAsync(normalizedKey, cancellationToken).ConfigureAwait(false))
+        {
+            return false;
+        }
+
+        foreach (var update in normalizedUpdates)
+        {
+            var payload = JsonSerializer.Serialize(update.Value, _serializerOptions);
+            var result = await ExecuteAsync("JSON.SET", [normalizedKey, update.Path, payload], cancellationToken).ConfigureAwait(false);
+            if (result.IsNull)
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    public bool UpdateJsonById(string id, params JsonPartialUpdate[] updates) =>
+        UpdateJsonByIdAsync(id, updates).GetAwaiter().GetResult();
+
+    public Task<bool> UpdateJsonByIdAsync(
+        string id,
+        IEnumerable<JsonPartialUpdate> updates,
+        CancellationToken cancellationToken = default) =>
+        UpdateJsonByKeyAsync(DocumentKeyResolver.ResolveKeyFromId(Schema, id), updates, cancellationToken);
+
     public string LoadHash<TDocument>(TDocument document, string? key = null, string? id = null) =>
         LoadHashAsync(document, key, id).GetAwaiter().GetResult();
 
@@ -519,4 +559,52 @@ public sealed class SearchIndex
     private static bool IsUnknownIndexException(RedisServerException exception) =>
         exception.Message.Contains("Unknown Index name", StringComparison.OrdinalIgnoreCase) ||
         exception.Message.Contains("Unknown index name", StringComparison.OrdinalIgnoreCase);
+
+    private async Task<bool> JsonDocumentExistsAsync(string key, CancellationToken cancellationToken)
+    {
+        var result = await ExecuteAsync("JSON.GET", [key, "$"], cancellationToken).ConfigureAwait(false);
+        return result is not null && !result.IsNull;
+    }
+
+    private static IReadOnlyList<JsonPartialUpdate> NormalizeJsonPartialUpdates(IEnumerable<JsonPartialUpdate> updates)
+    {
+        ArgumentNullException.ThrowIfNull(updates);
+
+        var normalizedUpdates = new List<JsonPartialUpdate>();
+        var uniquePaths = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var update in updates)
+        {
+            var normalizedPath = NormalizeJsonPath(update.Path);
+            if (!uniquePaths.Add(normalizedPath))
+            {
+                throw new ArgumentException($"Duplicate JSON update path '{normalizedPath}' is not allowed.", nameof(updates));
+            }
+
+            normalizedUpdates.Add(update with { Path = normalizedPath });
+        }
+
+        if (normalizedUpdates.Count == 0)
+        {
+            throw new ArgumentException("At least one JSON partial update is required.", nameof(updates));
+        }
+
+        return normalizedUpdates;
+    }
+
+    private static string NormalizeJsonPath(string path)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(path);
+
+        var normalizedPath = path.Trim();
+        if (normalizedPath == "$" ||
+            (!normalizedPath.StartsWith("$.", StringComparison.Ordinal) &&
+             !normalizedPath.StartsWith("$[", StringComparison.Ordinal)))
+        {
+            throw new ArgumentException(
+                "JSON partial update paths must be absolute JSONPath expressions like '$.title' or '$.items[0]'.",
+                nameof(path));
+        }
+
+        return normalizedPath;
+    }
 }

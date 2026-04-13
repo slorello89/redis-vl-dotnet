@@ -11,6 +11,7 @@ Started: Mon Apr 13 10:35:34 EDT 2026
 - Index maintenance helpers should operate on `Schema.Index.Prefixes` with batched Redis key scans and deletes so JSON and HASH storage share one implementation while the RediSearch index definition remains intact.
 - Database-wide RediSearch discovery helpers should stay static on `SearchIndex` and map Redis array replies into small named DTOs, which keeps environment inspection APIs available without requiring a schema-bound instance.
 - When rebuilding `SearchSchema` from `FT.INFO`, collapse JSON fields back to alias-less definitions only when the Redis `attribute` matches the default alias for the JSON path; otherwise preserve the raw identifier path plus explicit alias so recreated schemas round-trip cleanly.
+- JSON partial update helpers should accept only absolute JSONPath expressions like `$.field` or `$[0]`, trim and deduplicate paths before issuing Redis commands, and treat missing root documents as a `false` return instead of implicitly creating new JSON keys.
 
 ---
 
@@ -84,5 +85,14 @@ Started: Mon Apr 13 10:35:34 EDT 2026
 - Learnings for future iterations:
   - Patterns discovered: FT.INFO schema reconstruction fits best as an internal mapper that normalizes Redis metadata back into the existing strongly typed schema records, keeping the public API surface small.
   - Gotchas encountered: JSON FT.INFO rows expose both `identifier` and `attribute`, and only the default alias case should collapse back to a short field name; custom JSON aliases need the raw path preserved.
+  - Useful context: no `AGENTS.md` files were present under the edited paths, so there was no area-local agent guidance to update for this iteration.
+---
+## 2026-04-13 12:04:01 EDT - US-009
+- Implemented JSON partial update helpers on `SearchIndex` for updates by key and by id, backed by validated absolute JSONPath expressions and missing-document detection that returns `false` instead of creating new JSON keys.
+- Files changed: `src/RedisVlDotNet/Indexes/SearchIndex.cs`, `src/RedisVlDotNet/Indexes/JsonPartialUpdate.cs`, `tests/RedisVlDotNet.Tests/Indexes/SearchIndexAsyncTests.cs`, `tests/RedisVlDotNet.Tests/Indexes/SearchIndexIntegrationTests.cs`, `examples/JsonStorageExample/Program.cs`, `examples/JsonStorageExample/README.md`, `prd.json`, `progress.txt`
+- Quality checks run and result: `dotnet test tests/RedisVlDotNet.Tests/RedisVlDotNet.Tests.csproj --filter "FullyQualifiedName~SearchIndexAsyncTests|FullyQualifiedName~SearchIndexIntegrationTests"` passed with Redis-backed integration tests skipped because `REDIS_VL_REDIS_URL` was not configured locally. `dotnet build redis-vl-dotnet.sln --no-restore` passed. `dotnet test redis-vl-dotnet.sln --no-restore` passed with 22 Redis-backed integration tests skipped because `REDIS_VL_REDIS_URL` was not configured locally.
+- Learnings for future iterations:
+  - Patterns discovered: JSON partial update APIs fit the existing `SearchIndex` lifecycle best when they reuse key/id resolution and accept a small path/value descriptor rather than a separate command-builder abstraction.
+  - Gotchas encountered: passing an array directly to `LoadJsonAsync(...)` binds to the single-document overload, so example and test code should call the batch overload explicitly with `IEnumerable<T>`.
   - Useful context: no `AGENTS.md` files were present under the edited paths, so there was no area-local agent guidance to update for this iteration.
 ---

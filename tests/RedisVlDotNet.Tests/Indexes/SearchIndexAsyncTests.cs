@@ -88,6 +88,22 @@ public sealed class SearchIndexAsyncTests
     }
 
     [Fact]
+    public async Task UpdateJsonByKeyAsync_WithCancelledToken_DoesNotExecuteRedisCommand()
+    {
+        var (database, recorder) = RecordingDatabaseProxy.CreatePair();
+        var index = new SearchIndex(database, CreateJsonSchema("cancel-update"));
+
+        using var cancellationTokenSource = new CancellationTokenSource();
+        await cancellationTokenSource.CancelAsync();
+
+        await Assert.ThrowsAsync<OperationCanceledException>(() => index.UpdateJsonByKeyAsync(
+            "movie:1",
+            [new JsonPartialUpdate("$.title", "Updated")],
+            cancellationTokenSource.Token));
+        Assert.Equal(0, recorder.ExecuteAsyncCallCount);
+    }
+
+    [Fact]
     public async Task LoadHashAsync_CancelsBetweenBatchDocuments()
     {
         var (database, recorder) = RecordingDatabaseProxy.CreatePair();
@@ -136,6 +152,70 @@ public sealed class SearchIndexAsyncTests
             recorder.KeyDeleteBatches
                 .Select(static batch => string.Join(',', batch.Select(static key => key.ToString())))
                 .ToArray());
+    }
+
+    [Fact]
+    public async Task UpdateJsonByKeyAsync_ValidatesAndExecutesEachUpdatePath()
+    {
+        var (database, recorder) = RecordingDatabaseProxy.CreatePair();
+        var index = new SearchIndex(database, CreateJsonSchema("partial-update"));
+
+        recorder.ExecuteAsyncResponses.Enqueue(RedisResult.Create((RedisValue)"{\"id\":\"movie-1\"}"));
+
+        var updated = await index.UpdateJsonByKeyAsync(
+            " movie:1 ",
+            [
+                new JsonPartialUpdate(" $.title ", "Updated title"),
+                new JsonPartialUpdate("$.metadata.rating", 9.5d)
+            ]);
+
+        Assert.True(updated);
+        Assert.Equal(3, recorder.ExecuteAsyncCallCount);
+        Assert.Equal("JSON.GET", recorder.ExecuteAsyncCalls[0].Command);
+        Assert.Equal("movie:1", recorder.ExecuteAsyncCalls[0].Arguments[0]);
+        Assert.Equal("$", recorder.ExecuteAsyncCalls[0].Arguments[1]);
+        Assert.Equal("JSON.SET", recorder.ExecuteAsyncCalls[1].Command);
+        Assert.Equal("movie:1", recorder.ExecuteAsyncCalls[1].Arguments[0]);
+        Assert.Equal("$.title", recorder.ExecuteAsyncCalls[1].Arguments[1]);
+        Assert.Equal("\"Updated title\"", recorder.ExecuteAsyncCalls[1].Arguments[2]);
+        Assert.Equal("JSON.SET", recorder.ExecuteAsyncCalls[2].Command);
+        Assert.Equal("$.metadata.rating", recorder.ExecuteAsyncCalls[2].Arguments[1]);
+        Assert.Equal("9.5", recorder.ExecuteAsyncCalls[2].Arguments[2]);
+    }
+
+    [Fact]
+    public async Task UpdateJsonByIdAsync_ReturnsFalseWhenDocumentIsMissing()
+    {
+        var (database, recorder) = RecordingDatabaseProxy.CreatePair();
+        var index = new SearchIndex(database, CreateJsonSchema("missing-doc"));
+        recorder.OnExecuteAsync = (command, _) => command == "JSON.GET"
+            ? Task.FromResult<RedisResult>(null!)
+            : Task.FromResult(RedisResult.Create((RedisValue)"OK"));
+
+        var updated = await index.UpdateJsonByIdAsync(
+            "movie-1",
+            [new JsonPartialUpdate("$.title", "Updated title")]);
+
+        Assert.False(updated);
+        Assert.Equal(1, recorder.ExecuteAsyncCallCount);
+        Assert.Equal("JSON.GET", recorder.ExecuteAsyncCalls[0].Command);
+        Assert.Equal($"{index.Schema.Index.Prefix}movie-1", recorder.ExecuteAsyncCalls[0].Arguments[0]);
+    }
+
+    [Fact]
+    public async Task UpdateJsonByKeyAsync_RejectsInvalidUpdateRequests()
+    {
+        var (database, recorder) = RecordingDatabaseProxy.CreatePair();
+        var index = new SearchIndex(database, CreateJsonSchema("invalid-update"));
+
+        await Assert.ThrowsAsync<ArgumentException>(() => index.UpdateJsonByKeyAsync("movie:1", Array.Empty<JsonPartialUpdate>()));
+        await Assert.ThrowsAsync<ArgumentException>(() => index.UpdateJsonByKeyAsync("movie:1", [new JsonPartialUpdate("$", "invalid")]));
+        await Assert.ThrowsAsync<ArgumentException>(() => index.UpdateJsonByKeyAsync("movie:1", [new JsonPartialUpdate("title", "invalid")]));
+        await Assert.ThrowsAsync<ArgumentException>(() => index.UpdateJsonByKeyAsync(
+            "movie:1",
+            [new JsonPartialUpdate("$.title", "a"), new JsonPartialUpdate(" $.title ", "b")]));
+
+        Assert.Equal(0, recorder.ExecuteAsyncCallCount);
     }
 
     [Fact]
@@ -226,6 +306,15 @@ public sealed class SearchIndexAsyncTests
     private static SearchSchema CreateHashSchema(string token) =>
         new(
             new IndexDefinition($"hash-{token}", $"movie:{token}:", StorageType.Hash),
+            [
+                new TextFieldDefinition("title"),
+                new NumericFieldDefinition("year"),
+                new TagFieldDefinition("genre")
+            ]);
+
+    private static SearchSchema CreateJsonSchema(string token) =>
+        new(
+            new IndexDefinition($"json-{token}", $"movie:{token}:", StorageType.Json),
             [
                 new TextFieldDefinition("title"),
                 new NumericFieldDefinition("year"),
@@ -372,11 +461,13 @@ public sealed class SearchIndexAsyncTests
 
         public int KeyDeleteAsyncCallCount { get; private set; }
 
+        public Func<string, object[], Task<RedisResult>>? OnExecuteAsync { get; set; }
+
         public Func<RedisKey, HashEntry[], Task<bool>>? OnHashSetAsync { get; set; }
 
         public Queue<RedisResult> ExecuteAsyncResponses { get; } = new();
 
-        public List<(string Command, string Pattern)> ExecuteAsyncCalls { get; } = [];
+        public List<(string Command, string Pattern, object[] Arguments)> ExecuteAsyncCalls { get; } = [];
 
         public List<RedisKey[]> KeyDeleteBatches { get; } = [];
 
@@ -411,7 +502,12 @@ public sealed class SearchIndexAsyncTests
             var pattern = command.Equals("SCAN", StringComparison.Ordinal)
                 ? commandArgs[2]?.ToString() ?? string.Empty
                 : string.Empty;
-            ExecuteAsyncCalls.Add((command, pattern));
+            ExecuteAsyncCalls.Add((command, pattern, commandArgs));
+
+            if (OnExecuteAsync is not null)
+            {
+                return OnExecuteAsync(command, commandArgs);
+            }
 
             if (ExecuteAsyncResponses.Count > 0)
             {
