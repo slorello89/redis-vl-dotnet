@@ -609,14 +609,15 @@ public sealed class SearchIndexAsyncTests
                 loadFields: ["title"],
                 groupBy: new AggregationGroupBy(
                     ["genre"],
-                    [AggregationReducer.Count("matchCount")])));
+                    [AggregationReducer.Count("matchCount")]),
+                runtimeOptions: new VectorKnnRuntimeOptions(efRuntime: 80)));
 
         Assert.Equal("FT.AGGREGATE", recorder.ExecuteAsyncCalls[0].Command);
         Assert.Equal(
             [
                 "vector-aggregate-hybrid",
-                "(@title:He*)=>[KNN 2 @embedding $vector AS vector_distance]",
-                "PARAMS", "2", "vector", "System.Byte[]",
+                "(@title:He*)=>[KNN 2 @embedding $vector EF_RUNTIME $ef_runtime AS vector_distance]",
+                "PARAMS", "4", "vector", "System.Byte[]", "ef_runtime", "80",
                 "LOAD", "1", "@title",
                 "GROUPBY", "1", "@genre",
                 "REDUCE", "COUNT", "0", "AS", "matchCount",
@@ -834,10 +835,12 @@ public sealed class SearchIndexAsyncTests
                 new VectorFieldDefinition(
                     "embedding",
                     new VectorFieldAttributes(
-                        VectorAlgorithm.Flat,
+                        VectorAlgorithm.Hnsw,
                         VectorDataType.Float32,
                         VectorDistanceMetric.Cosine,
-                        2))
+                        2,
+                        m: 16,
+                        efConstruction: 200))
             ]);
 
     private static SearchSchema CreateMultiVectorSchema(string token) =>

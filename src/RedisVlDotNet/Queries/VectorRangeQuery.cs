@@ -13,7 +13,8 @@ public sealed class VectorRangeQuery
         IEnumerable<string>? returnFields = null,
         string scoreAlias = "vector_distance",
         int offset = 0,
-        int limit = 10)
+        int limit = 10,
+        VectorRangeRuntimeOptions? runtimeOptions = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(fieldName);
         ArgumentNullException.ThrowIfNull(vector);
@@ -47,6 +48,7 @@ public sealed class VectorRangeQuery
         Offset = offset;
         Limit = limit;
         ReturnFields = QueryReturnFieldHelper.NormalizeReturnFields(returnFields, ScoreAlias);
+        RuntimeOptions = runtimeOptions;
     }
 
     public string FieldName { get; }
@@ -65,6 +67,8 @@ public sealed class VectorRangeQuery
 
     public IReadOnlyList<string> ReturnFields { get; }
 
+    public VectorRangeRuntimeOptions? RuntimeOptions { get; }
+
     public static VectorRangeQuery FromFloat32(
         string fieldName,
         float[] vector,
@@ -73,8 +77,9 @@ public sealed class VectorRangeQuery
         IEnumerable<string>? returnFields = null,
         string scoreAlias = "vector_distance",
         int offset = 0,
-        int limit = 10) =>
-        new(fieldName, MemoryMarshal.AsBytes<float>(vector.AsSpan()).ToArray(), distanceThreshold, filter, returnFields, scoreAlias, offset, limit);
+        int limit = 10,
+        VectorRangeRuntimeOptions? runtimeOptions = null) =>
+        new(fieldName, MemoryMarshal.AsBytes<float>(vector.AsSpan()).ToArray(), distanceThreshold, filter, returnFields, scoreAlias, offset, limit, runtimeOptions);
 
     public static VectorRangeQuery FromFloat64(
         string fieldName,
@@ -84,6 +89,7 @@ public sealed class VectorRangeQuery
         IEnumerable<string>? returnFields = null,
         string scoreAlias = "vector_distance",
         int offset = 0,
-        int limit = 10) =>
-        new(fieldName, MemoryMarshal.AsBytes<double>(vector.AsSpan()).ToArray(), distanceThreshold, filter, returnFields, scoreAlias, offset, limit);
+        int limit = 10,
+        VectorRangeRuntimeOptions? runtimeOptions = null) =>
+        new(fieldName, MemoryMarshal.AsBytes<double>(vector.AsSpan()).ToArray(), distanceThreshold, filter, returnFields, scoreAlias, offset, limit, runtimeOptions);
 }

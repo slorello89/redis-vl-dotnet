@@ -11,7 +11,8 @@ public sealed class VectorQuery
         int topK,
         FilterExpression? filter = null,
         IEnumerable<string>? returnFields = null,
-        string scoreAlias = "vector_distance")
+        string scoreAlias = "vector_distance",
+        VectorKnnRuntimeOptions? runtimeOptions = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(fieldName);
         ArgumentNullException.ThrowIfNull(vector);
@@ -33,6 +34,7 @@ public sealed class VectorQuery
         Filter = filter;
         ScoreAlias = FilterExpression.NormalizeFieldName(scoreAlias);
         ReturnFields = NormalizeReturnFields(returnFields, ScoreAlias);
+        RuntimeOptions = runtimeOptions;
     }
 
     public string FieldName { get; }
@@ -47,14 +49,17 @@ public sealed class VectorQuery
 
     public IReadOnlyList<string> ReturnFields { get; }
 
+    public VectorKnnRuntimeOptions? RuntimeOptions { get; }
+
     public static VectorQuery FromFloat32(
         string fieldName,
         float[] vector,
         int topK,
         FilterExpression? filter = null,
         IEnumerable<string>? returnFields = null,
-        string scoreAlias = "vector_distance") =>
-        new(fieldName, MemoryMarshal.AsBytes<float>(vector.AsSpan()).ToArray(), topK, filter, returnFields, scoreAlias);
+        string scoreAlias = "vector_distance",
+        VectorKnnRuntimeOptions? runtimeOptions = null) =>
+        new(fieldName, MemoryMarshal.AsBytes<float>(vector.AsSpan()).ToArray(), topK, filter, returnFields, scoreAlias, runtimeOptions);
 
     public static VectorQuery FromFloat64(
         string fieldName,
@@ -62,8 +67,9 @@ public sealed class VectorQuery
         int topK,
         FilterExpression? filter = null,
         IEnumerable<string>? returnFields = null,
-        string scoreAlias = "vector_distance") =>
-        new(fieldName, MemoryMarshal.AsBytes<double>(vector.AsSpan()).ToArray(), topK, filter, returnFields, scoreAlias);
+        string scoreAlias = "vector_distance",
+        VectorKnnRuntimeOptions? runtimeOptions = null) =>
+        new(fieldName, MemoryMarshal.AsBytes<double>(vector.AsSpan()).ToArray(), topK, filter, returnFields, scoreAlias, runtimeOptions);
 
     private static IReadOnlyList<string> NormalizeReturnFields(IEnumerable<string>? returnFields, string scoreAlias) =>
         QueryReturnFieldHelper.NormalizeReturnFields(returnFields, scoreAlias);

@@ -19,6 +19,7 @@ Started: Mon Apr 13 10:35:34 EDT 2026
 - Typed aggregation projections should use reducer aliases that match the serializer naming policy used by `SearchResultMapper` (for example `movieCount` instead of `movie_count`) unless the target properties add explicit `JsonPropertyName` attributes.
 - Aggregate hybrid support should reuse the plain aggregation pipeline model and treat the KNN score alias like any other aggregation property reference, so reducers and sort clauses can operate on `vector_distance` without a separate result-mapping path.
 - Multi-vector search on the current Redis 7.4 test target should compose existing per-field `FT.SEARCH` calls, restrict inputs to cosine vector fields, and merge only intersection candidates using weighted distance ordering plus stable per-clause and document-id tie-breaks.
+- Runtime vector tuning should stay query-local and flow through the shared vector command builder so composed queries reuse one `PARAMS` serializer while schema-based algorithm checks reject HNSW-only options on `FLAT` fields before Redis execution.
 
 ---
 
@@ -165,4 +166,13 @@ Started: Mon Apr 13 10:35:34 EDT 2026
   - Patterns discovered: multi-vector ranking fits the existing query stack cleanly when each vector clause reuses `VectorQuery` argument generation and the final merge adds only one public combined score field.
   - Gotchas encountered: `dotnet test --no-build` can report stale results if a prior run started before the latest rebuild completed, so serialize repo-level verification after assertion fixes.
   - Useful context: the checked-in Redis integration target is `redis/redis-stack-server:7.4.0-v8`, so native `FT.HYBRID` is not available yet and multi-vector support needs to stay compatible with `FT.SEARCH`.
+---
+## 2026-04-13 12:46:57 EDT - US-017
+- Implemented strongly typed `VectorKnnRuntimeOptions` and `VectorRangeRuntimeOptions`, added query-time runtime tuning support to vector, hybrid, aggregate-hybrid, multi-vector, and vector-range queries, and wired command generation for `EF_RUNTIME` and `EPSILON`.
+- Files changed: `src/RedisVlDotNet/Queries/VectorRuntimeOptions.cs`, `src/RedisVlDotNet/Queries/VectorQuery.cs`, `src/RedisVlDotNet/Queries/HybridQuery.cs`, `src/RedisVlDotNet/Queries/AggregateHybridQuery.cs`, `src/RedisVlDotNet/Queries/MultiVectorQuery.cs`, `src/RedisVlDotNet/Queries/VectorRangeQuery.cs`, `src/RedisVlDotNet/Indexes/SearchQueryCommandBuilder.cs`, `tests/RedisVlDotNet.Tests/Indexes/SearchQueryCommandBuilderTests.cs`, `tests/RedisVlDotNet.Tests/Indexes/SearchIndexAsyncTests.cs`, `tests/RedisVlDotNet.Tests/Indexes/SearchIndexIntegrationTests.cs`, `examples/VectorSearchExample/Program.cs`, `prd.json`, `progress.txt`
+- Quality checks run and result: `dotnet build redis-vl-dotnet.sln --no-restore` passed. `dotnet test tests/RedisVlDotNet.Tests/RedisVlDotNet.Tests.csproj --filter "FullyQualifiedName~SearchQueryCommandBuilderTests|FullyQualifiedName~SearchIndexAsyncTests|FullyQualifiedName~SearchIndexIntegrationTests"` passed with Redis-backed integration tests skipped because `REDIS_VL_REDIS_URL` was not configured locally. `dotnet test redis-vl-dotnet.sln` passed with 30 Redis-backed integration tests skipped because `REDIS_VL_REDIS_URL` was not configured locally.
+- Learnings for future iterations:
+  - Patterns discovered: runtime vector options should be modeled as optional query objects instead of extra scalar constructor parameters so each vector-capable query can opt in without destabilizing the shared query surface.
+  - Gotchas encountered: runtime option validation must use the schema field algorithm, not just the presence of a vector clause, because the same query model can target both `HNSW` and `FLAT` indexes.
+  - Useful context: there are still no `AGENTS.md` files anywhere in this repository, so reusable implementation guidance remains centralized in `progress.txt`.
 ---

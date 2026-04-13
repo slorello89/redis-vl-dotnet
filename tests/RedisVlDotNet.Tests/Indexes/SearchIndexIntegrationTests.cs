@@ -1049,6 +1049,59 @@ public sealed class SearchIndexIntegrationTests
     }
 
     [RedisSearchIntegrationFact]
+    public async Task ExecutesHnswVectorQueriesWithRuntimeEfRuntimeParameter()
+    {
+        await using var connection = await RedisSearchTestEnvironment.ConnectAsync();
+        var database = connection.GetDatabase();
+
+        var token = Guid.NewGuid().ToString("N");
+        var schema = new SearchSchema(
+            new IndexDefinition($"vector-hnsw-idx-{token}", $"vector-hnsw:{token}:", StorageType.Hash),
+            [
+                new TagFieldDefinition("genre"),
+                new TextFieldDefinition("title"),
+                new VectorFieldDefinition(
+                    "embedding",
+                    new VectorFieldAttributes(
+                        VectorAlgorithm.Hnsw,
+                        VectorDataType.Float32,
+                        VectorDistanceMetric.Cosine,
+                        2,
+                        m: 16,
+                        efConstruction: 200))
+            ]);
+        var index = new SearchIndex(database, schema);
+
+        try
+        {
+            await index.CreateAsync();
+            await SeedHashDocumentsAsync(database, schema, SearchIndexSeedData.VectorMovies);
+            await RedisSearchTestEnvironment.WaitForIndexDocumentCountAsync(index, SearchIndexSeedData.VectorMovies.Count);
+
+            var query = VectorQuery.FromFloat32(
+                "embedding",
+                [1f, 0f],
+                2,
+                Filter.Tag("genre").Eq("crime"),
+                ["title"],
+                scoreAlias: "distance",
+                runtimeOptions: new VectorKnnRuntimeOptions(efRuntime: 150));
+
+            var results = await index.SearchAsync(query);
+
+            Assert.Equal(2, results.Documents.Count);
+            Assert.Equal("Heat", results.Documents[0].Values["title"]);
+        }
+        finally
+        {
+            if (await index.ExistsAsync())
+            {
+                await index.DropAsync(deleteDocuments: true);
+            }
+        }
+    }
+
+    [RedisSearchIntegrationFact]
     public async Task ExecutesHybridQueriesWithDeterministicRanking()
     {
         await using var connection = await RedisSearchTestEnvironment.ConnectAsync();
@@ -1150,6 +1203,60 @@ public sealed class SearchIndexIntegrationTests
             Assert.Equal("Thief", results.Documents[1].Values["title"]);
             Assert.True(double.Parse(results.Documents[0].Values["distance"]!, System.Globalization.CultureInfo.InvariantCulture) <
                         double.Parse(results.Documents[1].Values["distance"]!, System.Globalization.CultureInfo.InvariantCulture));
+        }
+        finally
+        {
+            if (await index.ExistsAsync())
+            {
+                await index.DropAsync(deleteDocuments: true);
+            }
+        }
+    }
+
+    [RedisSearchIntegrationFact]
+    public async Task ExecutesHnswVectorRangeQueriesWithRuntimeEpsilonParameter()
+    {
+        await using var connection = await RedisSearchTestEnvironment.ConnectAsync();
+        var database = connection.GetDatabase();
+
+        var token = Guid.NewGuid().ToString("N");
+        var schema = new SearchSchema(
+            new IndexDefinition($"vector-range-hnsw-idx-{token}", $"vrange-hnsw:{token}:", StorageType.Hash),
+            [
+                new TagFieldDefinition("genre"),
+                new TextFieldDefinition("title"),
+                new VectorFieldDefinition(
+                    "embedding",
+                    new VectorFieldAttributes(
+                        VectorAlgorithm.Hnsw,
+                        VectorDataType.Float32,
+                        VectorDistanceMetric.Cosine,
+                        2,
+                        m: 16,
+                        efConstruction: 200))
+            ]);
+        var index = new SearchIndex(database, schema);
+
+        try
+        {
+            await index.CreateAsync();
+            await SeedHashDocumentsAsync(database, schema, SearchIndexSeedData.VectorMovies);
+            await RedisSearchTestEnvironment.WaitForIndexDocumentCountAsync(index, SearchIndexSeedData.VectorMovies.Count);
+
+            var query = VectorRangeQuery.FromFloat32(
+                "embedding",
+                [1f, 0f],
+                0.3,
+                Filter.Tag("genre").Eq("crime"),
+                ["title"],
+                scoreAlias: "distance",
+                limit: 10,
+                runtimeOptions: new VectorRangeRuntimeOptions(epsilon: 0.05));
+
+            var results = await index.SearchAsync(query);
+
+            Assert.Equal(2, results.Documents.Count);
+            Assert.Equal("Heat", results.Documents[0].Values["title"]);
         }
         finally
         {

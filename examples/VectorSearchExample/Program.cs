@@ -21,17 +21,21 @@ var schema = new SearchSchema(
         new VectorFieldDefinition(
             "plot_embedding",
             new VectorFieldAttributes(
-                VectorAlgorithm.Flat,
+                VectorAlgorithm.Hnsw,
                 VectorDataType.Float32,
                 VectorDistanceMetric.Cosine,
-                dimensions: 2)),
+                dimensions: 2,
+                m: 16,
+                efConstruction: 200)),
         new VectorFieldDefinition(
             "poster_embedding",
             new VectorFieldAttributes(
-                VectorAlgorithm.Flat,
+                VectorAlgorithm.Hnsw,
                 VectorDataType.Float32,
                 VectorDistanceMetric.Cosine,
-                dimensions: 2))
+                dimensions: 2,
+                m: 16,
+                efConstruction: 200))
     ]);
 
 var index = new SearchIndex(database, schema);
@@ -58,7 +62,8 @@ try
         topK: 3,
         filter: Filter.Tag("genre").Eq("crime"),
         returnFields: ["title", "summary"],
-        scoreAlias: "distance");
+        scoreAlias: "distance",
+        runtimeOptions: new VectorKnnRuntimeOptions(efRuntime: 150));
     var multiVectorResults = await index.SearchAsync(
         new MultiVectorQuery(
             [
@@ -68,7 +73,8 @@ try
             topK: 3,
             filter: Filter.Tag("genre").Eq("crime"),
             returnFields: ["title"],
-            scoreAlias: "combined_distance"));
+            scoreAlias: "combined_distance",
+            runtimeOptions: new VectorKnnRuntimeOptions(efRuntime: 120)));
 
     var results = await index.SearchAsync(vectorQuery);
     var aggregateHybridResults = await index.AggregateAsync<GenreHybridSummary>(
@@ -87,10 +93,12 @@ try
                 [
                     new AggregationSortField("matchCount", descending: true),
                     new AggregationSortField("avgDistance")
-                ])));
+                ]),
+            runtimeOptions: new VectorKnnRuntimeOptions(efRuntime: 90)));
 
     Console.WriteLine($"Updated arrival hash fields: {updated} -> {updatedArrival?.Genre}");
     Console.WriteLine($"Query vector: [{string.Join(", ", queryVector.Select(static value => value.ToString("0.0", CultureInfo.InvariantCulture)))}]");
+    Console.WriteLine("Runtime tuning: plot_embedding EF_RUNTIME=150, multi-vector EF_RUNTIME=120, aggregate hybrid EF_RUNTIME=90");
     Console.WriteLine("Nearest neighbors within the crime genre:");
 
     foreach (var document in results.Documents)

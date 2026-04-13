@@ -12,7 +12,8 @@ public sealed class HybridQuery
         int topK,
         FilterExpression? filter = null,
         IEnumerable<string>? returnFields = null,
-        string scoreAlias = "vector_distance")
+        string scoreAlias = "vector_distance",
+        VectorKnnRuntimeOptions? runtimeOptions = null)
     {
         ArgumentNullException.ThrowIfNull(textFilter);
         ArgumentException.ThrowIfNullOrWhiteSpace(vectorFieldName);
@@ -41,6 +42,7 @@ public sealed class HybridQuery
         Filter = filter;
         ScoreAlias = FilterExpression.NormalizeFieldName(scoreAlias);
         ReturnFields = QueryReturnFieldHelper.NormalizeReturnFields(returnFields, ScoreAlias);
+        RuntimeOptions = runtimeOptions;
     }
 
     public FilterExpression TextFilter { get; }
@@ -57,6 +59,8 @@ public sealed class HybridQuery
 
     public IReadOnlyList<string> ReturnFields { get; }
 
+    public VectorKnnRuntimeOptions? RuntimeOptions { get; }
+
     internal FilterExpression CombinedFilter => Filter is null ? TextFilter : TextFilter & Filter;
 
     public static HybridQuery FromFloat32(
@@ -66,8 +70,9 @@ public sealed class HybridQuery
         int topK,
         FilterExpression? filter = null,
         IEnumerable<string>? returnFields = null,
-        string scoreAlias = "vector_distance") =>
-        new(textFilter, vectorFieldName, MemoryMarshal.AsBytes<float>(vector.AsSpan()).ToArray(), topK, filter, returnFields, scoreAlias);
+        string scoreAlias = "vector_distance",
+        VectorKnnRuntimeOptions? runtimeOptions = null) =>
+        new(textFilter, vectorFieldName, MemoryMarshal.AsBytes<float>(vector.AsSpan()).ToArray(), topK, filter, returnFields, scoreAlias, runtimeOptions);
 
     public static HybridQuery FromFloat64(
         FilterExpression textFilter,
@@ -76,6 +81,7 @@ public sealed class HybridQuery
         int topK,
         FilterExpression? filter = null,
         IEnumerable<string>? returnFields = null,
-        string scoreAlias = "vector_distance") =>
-        new(textFilter, vectorFieldName, MemoryMarshal.AsBytes<double>(vector.AsSpan()).ToArray(), topK, filter, returnFields, scoreAlias);
+        string scoreAlias = "vector_distance",
+        VectorKnnRuntimeOptions? runtimeOptions = null) =>
+        new(textFilter, vectorFieldName, MemoryMarshal.AsBytes<double>(vector.AsSpan()).ToArray(), topK, filter, returnFields, scoreAlias, runtimeOptions);
 }

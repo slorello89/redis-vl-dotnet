@@ -17,7 +17,8 @@ public sealed class AggregateHybridQuery
         AggregationSortBy? sortBy = null,
         int offset = 0,
         int limit = 10,
-        string scoreAlias = "vector_distance")
+        string scoreAlias = "vector_distance",
+        VectorKnnRuntimeOptions? runtimeOptions = null)
     {
         ArgumentNullException.ThrowIfNull(textFilter);
         ArgumentException.ThrowIfNullOrWhiteSpace(vectorFieldName);
@@ -61,6 +62,7 @@ public sealed class AggregateHybridQuery
         Offset = offset;
         Limit = limit;
         ScoreAlias = FilterExpression.NormalizeFieldName(scoreAlias);
+        RuntimeOptions = runtimeOptions;
     }
 
     public FilterExpression TextFilter { get; }
@@ -87,6 +89,8 @@ public sealed class AggregateHybridQuery
 
     public string ScoreAlias { get; }
 
+    public VectorKnnRuntimeOptions? RuntimeOptions { get; }
+
     internal FilterExpression CombinedFilter => Filter is null ? TextFilter : TextFilter & Filter;
 
     public static AggregateHybridQuery FromFloat32(
@@ -101,7 +105,8 @@ public sealed class AggregateHybridQuery
         AggregationSortBy? sortBy = null,
         int offset = 0,
         int limit = 10,
-        string scoreAlias = "vector_distance") =>
+        string scoreAlias = "vector_distance",
+        VectorKnnRuntimeOptions? runtimeOptions = null) =>
         new(
             textFilter,
             vectorFieldName,
@@ -114,7 +119,8 @@ public sealed class AggregateHybridQuery
             sortBy,
             offset,
             limit,
-            scoreAlias);
+            scoreAlias,
+            runtimeOptions);
 
     public static AggregateHybridQuery FromFloat64(
         FilterExpression textFilter,
@@ -128,7 +134,8 @@ public sealed class AggregateHybridQuery
         AggregationSortBy? sortBy = null,
         int offset = 0,
         int limit = 10,
-        string scoreAlias = "vector_distance") =>
+        string scoreAlias = "vector_distance",
+        VectorKnnRuntimeOptions? runtimeOptions = null) =>
         new(
             textFilter,
             vectorFieldName,
@@ -141,7 +148,8 @@ public sealed class AggregateHybridQuery
             sortBy,
             offset,
             limit,
-            scoreAlias);
+            scoreAlias,
+            runtimeOptions);
 
     private static IReadOnlyList<string> NormalizeFields(IEnumerable<string>? fields)
     {

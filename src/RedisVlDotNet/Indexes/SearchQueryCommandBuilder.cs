@@ -112,16 +112,14 @@ internal static class SearchQueryCommandBuilder
 
         var vectorField = ResolveVectorField(schema, query.VectorFieldName);
         ValidateVectorPayload(vectorField.Attributes, query.VectorFieldName, query.Vector);
+        ValidateRuntimeParameters(vectorField, query.VectorFieldName, query.RuntimeOptions);
 
         var arguments = new List<object>
         {
             schema.Index.Name,
-            BuildHybridAggregateQuery(schema, vectorField, query),
-            "PARAMS",
-            "2",
-            "vector",
-            query.Vector
+            BuildHybridAggregateQuery(schema, vectorField, query)
         };
+        arguments.AddRange(BuildVectorParams(query.Vector, ("ef_runtime", query.RuntimeOptions?.EfRuntime)));
 
         AppendAggregationPipeline(
             arguments,
@@ -205,21 +203,22 @@ internal static class SearchQueryCommandBuilder
 
         var vectorField = ResolveVectorField(schema, query.FieldName);
         ValidateVectorPayload(vectorField, query);
+        ValidateRuntimeParameters(vectorField, query.FieldName, query.RuntimeOptions);
 
         var arguments = new List<object>
         {
             schema.Index.Name,
-            BuildVectorSearchQuery(schema, vectorField, query),
-            "PARAMS",
-            "2",
-            "vector",
-            query.Vector,
+            BuildVectorSearchQuery(schema, vectorField, query)
+        };
+        arguments.AddRange(BuildVectorParams(query.Vector, ("ef_runtime", query.RuntimeOptions?.EfRuntime)));
+        arguments.AddRange(
+        [
             "SORTBY",
             query.ScoreAlias,
             "ASC",
             "RETURN",
             query.ReturnFields.Count.ToString(CultureInfo.InvariantCulture)
-        };
+        ]);
 
         arguments.AddRange(query.ReturnFields);
         arguments.Add("LIMIT");
@@ -249,7 +248,8 @@ internal static class SearchQueryCommandBuilder
                 query.TopK,
                 query.Filter,
                 query.ProjectedFields,
-                GetMultiVectorScoreAlias(index));
+                GetMultiVectorScoreAlias(index),
+                query.RuntimeOptions);
 
             arguments.Add(BuildVectorSearchArguments(schema, subQuery));
         }
@@ -264,21 +264,22 @@ internal static class SearchQueryCommandBuilder
 
         var vectorField = ResolveVectorField(schema, query.VectorFieldName);
         ValidateVectorPayload(vectorField.Attributes, query.VectorFieldName, query.Vector);
+        ValidateRuntimeParameters(vectorField, query.VectorFieldName, query.RuntimeOptions);
 
         var arguments = new List<object>
         {
             schema.Index.Name,
-            BuildHybridSearchQuery(schema, vectorField, query),
-            "PARAMS",
-            "2",
-            "vector",
-            query.Vector,
+            BuildHybridSearchQuery(schema, vectorField, query)
+        };
+        arguments.AddRange(BuildVectorParams(query.Vector, ("ef_runtime", query.RuntimeOptions?.EfRuntime)));
+        arguments.AddRange(
+        [
             "SORTBY",
             query.ScoreAlias,
             "ASC",
             "RETURN",
             query.ReturnFields.Count.ToString(CultureInfo.InvariantCulture)
-        };
+        ]);
 
         arguments.AddRange(query.ReturnFields);
         arguments.Add("LIMIT");
@@ -297,21 +298,22 @@ internal static class SearchQueryCommandBuilder
 
         var vectorField = ResolveVectorField(schema, query.FieldName);
         ValidateVectorPayload(vectorField.Attributes, query.FieldName, query.Vector);
+        ValidateRuntimeParameters(vectorField, query.FieldName, query.RuntimeOptions);
 
         var arguments = new List<object>
         {
             schema.Index.Name,
-            BuildVectorRangeSearchQuery(schema, vectorField, query),
-            "PARAMS",
-            "2",
-            "vector",
-            query.Vector,
+            BuildVectorRangeSearchQuery(schema, vectorField, query)
+        };
+        arguments.AddRange(BuildVectorParams(query.Vector, ("epsilon", query.RuntimeOptions?.Epsilon)));
+        arguments.AddRange(
+        [
             "SORTBY",
             query.ScoreAlias,
             "ASC",
             "RETURN",
             query.ReturnFields.Count.ToString(CultureInfo.InvariantCulture)
-        };
+        ]);
 
         arguments.AddRange(query.ReturnFields);
         arguments.Add("LIMIT");
@@ -326,25 +328,29 @@ internal static class SearchQueryCommandBuilder
     private static string BuildVectorSearchQuery(SearchSchema schema, VectorFieldDefinition field, VectorQuery query)
     {
         var filter = query.Filter?.ToQueryString() ?? "*";
-        return $"{filter}=>[KNN {query.TopK.ToString(CultureInfo.InvariantCulture)} @{GetQueryFieldName(schema, field)} $vector AS {query.ScoreAlias}]";
+        var runtimeClause = query.RuntimeOptions?.EfRuntime is int ? " EF_RUNTIME $ef_runtime" : string.Empty;
+        return $"{filter}=>[KNN {query.TopK.ToString(CultureInfo.InvariantCulture)} @{GetQueryFieldName(schema, field)} $vector{runtimeClause} AS {query.ScoreAlias}]";
     }
 
     private static string BuildHybridSearchQuery(SearchSchema schema, VectorFieldDefinition field, HybridQuery query)
     {
         var filter = query.CombinedFilter.ToQueryString();
-        return $"({filter})=>[KNN {query.TopK.ToString(CultureInfo.InvariantCulture)} @{GetQueryFieldName(schema, field)} $vector AS {query.ScoreAlias}]";
+        var runtimeClause = query.RuntimeOptions?.EfRuntime is int ? " EF_RUNTIME $ef_runtime" : string.Empty;
+        return $"({filter})=>[KNN {query.TopK.ToString(CultureInfo.InvariantCulture)} @{GetQueryFieldName(schema, field)} $vector{runtimeClause} AS {query.ScoreAlias}]";
     }
 
     private static string BuildHybridAggregateQuery(SearchSchema schema, VectorFieldDefinition field, AggregateHybridQuery query)
     {
         var filter = query.CombinedFilter.ToQueryString();
-        return $"({filter})=>[KNN {query.TopK.ToString(CultureInfo.InvariantCulture)} @{GetQueryFieldName(schema, field)} $vector AS {query.ScoreAlias}]";
+        var runtimeClause = query.RuntimeOptions?.EfRuntime is int ? " EF_RUNTIME $ef_runtime" : string.Empty;
+        return $"({filter})=>[KNN {query.TopK.ToString(CultureInfo.InvariantCulture)} @{GetQueryFieldName(schema, field)} $vector{runtimeClause} AS {query.ScoreAlias}]";
     }
 
     private static string BuildVectorRangeSearchQuery(SearchSchema schema, VectorFieldDefinition field, VectorRangeQuery query)
     {
+        var runtimeClause = query.RuntimeOptions?.Epsilon is double ? "; $EPSILON: $epsilon" : string.Empty;
         var vectorClause =
-            $"@{GetQueryFieldName(schema, field)}:[VECTOR_RANGE {query.DistanceThreshold.ToString("G", CultureInfo.InvariantCulture)} $vector]=>{{$YIELD_DISTANCE_AS: {query.ScoreAlias}}}";
+            $"@{GetQueryFieldName(schema, field)}:[VECTOR_RANGE {query.DistanceThreshold.ToString("G", CultureInfo.InvariantCulture)} $vector]=>{{$YIELD_DISTANCE_AS: {query.ScoreAlias}{runtimeClause}}}";
         var filter = query.Filter?.ToQueryString();
 
         return string.IsNullOrWhiteSpace(filter)
@@ -429,6 +435,40 @@ internal static class SearchQueryCommandBuilder
         ValidateVectorPayload(field.Attributes, query.FieldName, query.Vector);
     }
 
+    private static void ValidateRuntimeParameters(
+        VectorFieldDefinition field,
+        string fieldName,
+        VectorKnnRuntimeOptions? runtimeOptions)
+    {
+        if (runtimeOptions?.EfRuntime is null)
+        {
+            return;
+        }
+
+        if (field.Attributes.Algorithm != VectorAlgorithm.Hnsw)
+        {
+            throw new InvalidOperationException(
+                $"Field '{fieldName}' uses '{field.Attributes.Algorithm}' and does not support runtime parameter 'EF_RUNTIME'.");
+        }
+    }
+
+    private static void ValidateRuntimeParameters(
+        VectorFieldDefinition field,
+        string fieldName,
+        VectorRangeRuntimeOptions? runtimeOptions)
+    {
+        if (runtimeOptions?.Epsilon is null)
+        {
+            return;
+        }
+
+        if (field.Attributes.Algorithm != VectorAlgorithm.Hnsw)
+        {
+            throw new InvalidOperationException(
+                $"Field '{fieldName}' uses '{field.Attributes.Algorithm}' and does not support runtime parameter 'EPSILON'.");
+        }
+    }
+
     private static void ValidateCosineDistanceMetric(VectorFieldDefinition field, string fieldName)
     {
         if (field.Attributes.DistanceMetric != VectorDistanceMetric.Cosine)
@@ -454,6 +494,33 @@ internal static class SearchQueryCommandBuilder
                 $"Vector payload for field '{fieldName}' must contain exactly {expectedLength} bytes.",
                 nameof(vector));
         }
+    }
+
+    private static object[] BuildVectorParams(byte[] vector, params (string Name, object? Value)[] additionalParameters)
+    {
+        var parameters = new List<object> { "vector", vector };
+        foreach (var (name, value) in additionalParameters)
+        {
+            if (value is null)
+            {
+                continue;
+            }
+
+            parameters.Add(name);
+            parameters.Add(value switch
+            {
+                double number => number.ToString("G", CultureInfo.InvariantCulture),
+                float number => number.ToString("G", CultureInfo.InvariantCulture),
+                _ => value.ToString()!
+            });
+        }
+
+        return
+        [
+            "PARAMS",
+            parameters.Count.ToString(CultureInfo.InvariantCulture),
+            .. parameters
+        ];
     }
 
     internal static string GetMultiVectorScoreAlias(int index) =>

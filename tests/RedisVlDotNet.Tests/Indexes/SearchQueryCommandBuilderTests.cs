@@ -153,10 +153,12 @@ public sealed class SearchQueryCommandBuilderTests
                 new VectorFieldDefinition(
                     "embedding",
                     new VectorFieldAttributes(
-                        VectorAlgorithm.Flat,
+                        VectorAlgorithm.Hnsw,
                         VectorDataType.Float32,
                         VectorDistanceMetric.Cosine,
-                        2))
+                        2,
+                        m: 16,
+                        efConstruction: 200))
             ]);
         var query = AggregateHybridQuery.FromFloat32(
             Filter.Text("title").Prefix("He"),
@@ -175,7 +177,8 @@ public sealed class SearchQueryCommandBuilderTests
             sortBy: new AggregationSortBy([new AggregationSortField("avgDistance")]),
             offset: 1,
             limit: 2,
-            scoreAlias: "vector_distance");
+            scoreAlias: "vector_distance",
+            runtimeOptions: new VectorKnnRuntimeOptions(efRuntime: 150));
 
         var arguments = SearchQueryCommandBuilder.BuildAggregateHybridArguments(schema, query);
         var rendered = arguments.Select(RenderArgument).ToArray();
@@ -183,8 +186,8 @@ public sealed class SearchQueryCommandBuilderTests
         Assert.Equal(
             [
                 "movies-idx",
-                "(@title:He* @genre:{crime})=>[KNN 3 @embedding $vector AS vector_distance]",
-                "PARAMS", "2", "vector", "<binary>",
+                "(@title:He* @genre:{crime})=>[KNN 3 @embedding $vector EF_RUNTIME $ef_runtime AS vector_distance]",
+                "PARAMS", "4", "vector", "<binary>", "ef_runtime", "150",
                 "LOAD", "1", "@title",
                 "APPLY", "@year - (@year % 10)", "AS", "decade",
                 "GROUPBY", "2", "@genre", "@decade",
@@ -208,10 +211,12 @@ public sealed class SearchQueryCommandBuilderTests
                 new VectorFieldDefinition(
                     "embedding",
                     new VectorFieldAttributes(
-                        VectorAlgorithm.Flat,
+                        VectorAlgorithm.Hnsw,
                         VectorDataType.Float32,
                         VectorDistanceMetric.Cosine,
-                        2))
+                        2,
+                        m: 16,
+                        efConstruction: 200))
             ]);
         var query = VectorQuery.FromFloat32(
             "embedding",
@@ -219,16 +224,17 @@ public sealed class SearchQueryCommandBuilderTests
             3,
             Filter.Tag("genre").Eq("crime"),
             ["title"],
-            scoreAlias: "distance");
+            scoreAlias: "distance",
+            runtimeOptions: new VectorKnnRuntimeOptions(efRuntime: 125));
 
         var arguments = SearchQueryCommandBuilder.BuildVectorSearchArguments(schema, query);
         var rendered = arguments.Select(RenderArgument).ToArray();
 
         Assert.Equal("movies-idx", rendered[0]);
-        Assert.Equal("@genre:{crime}=>[KNN 3 @embedding $vector AS distance]", rendered[1]);
+        Assert.Equal("@genre:{crime}=>[KNN 3 @embedding $vector EF_RUNTIME $ef_runtime AS distance]", rendered[1]);
         Assert.Equal(
             [
-                "PARAMS", "2", "vector", "<binary>",
+                "PARAMS", "4", "vector", "<binary>", "ef_runtime", "125",
                 "SORTBY", "distance", "ASC",
                 "RETURN", "2", "title", "distance",
                 "LIMIT", "0", "3",
@@ -276,17 +282,21 @@ public sealed class SearchQueryCommandBuilderTests
                 new VectorFieldDefinition(
                     "text_embedding",
                     new VectorFieldAttributes(
-                        VectorAlgorithm.Flat,
+                        VectorAlgorithm.Hnsw,
                         VectorDataType.Float32,
                         VectorDistanceMetric.Cosine,
-                        2)),
+                        2,
+                        m: 16,
+                        efConstruction: 200)),
                 new VectorFieldDefinition(
                     "image_embedding",
                     new VectorFieldAttributes(
-                        VectorAlgorithm.Flat,
+                        VectorAlgorithm.Hnsw,
                         VectorDataType.Float32,
                         VectorDistanceMetric.Cosine,
-                        2))
+                        2,
+                        m: 16,
+                        efConstruction: 200))
             ]);
         var query = new MultiVectorQuery(
             [
@@ -295,7 +305,8 @@ public sealed class SearchQueryCommandBuilderTests
             ],
             topK: 3,
             filter: Filter.Tag("category").Eq("footwear"),
-            returnFields: ["title"]);
+            returnFields: ["title"],
+            runtimeOptions: new VectorKnnRuntimeOptions(efRuntime: 64));
 
         var arguments = SearchQueryCommandBuilder.BuildMultiVectorSearchArguments(schema, query);
 
@@ -303,8 +314,8 @@ public sealed class SearchQueryCommandBuilderTests
         Assert.Equal(
             [
                 "products-idx",
-                "@category:{footwear}=>[KNN 3 @text_embedding $vector AS __mv_score_0]",
-                "PARAMS", "2", "vector", "<binary>",
+                "@category:{footwear}=>[KNN 3 @text_embedding $vector EF_RUNTIME $ef_runtime AS __mv_score_0]",
+                "PARAMS", "4", "vector", "<binary>", "ef_runtime", "64",
                 "SORTBY", "__mv_score_0", "ASC",
                 "RETURN", "2", "title", "__mv_score_0",
                 "LIMIT", "0", "3",
@@ -314,8 +325,8 @@ public sealed class SearchQueryCommandBuilderTests
         Assert.Equal(
             [
                 "products-idx",
-                "@category:{footwear}=>[KNN 3 @image_embedding $vector AS __mv_score_1]",
-                "PARAMS", "2", "vector", "<binary>",
+                "@category:{footwear}=>[KNN 3 @image_embedding $vector EF_RUNTIME $ef_runtime AS __mv_score_1]",
+                "PARAMS", "4", "vector", "<binary>", "ef_runtime", "64",
                 "SORTBY", "__mv_score_1", "ASC",
                 "RETURN", "2", "title", "__mv_score_1",
                 "LIMIT", "0", "3",
@@ -335,10 +346,12 @@ public sealed class SearchQueryCommandBuilderTests
                 new VectorFieldDefinition(
                     "embedding",
                     new VectorFieldAttributes(
-                        VectorAlgorithm.Flat,
+                        VectorAlgorithm.Hnsw,
                         VectorDataType.Float32,
                         VectorDistanceMetric.Cosine,
-                        2))
+                        2,
+                        m: 16,
+                        efConstruction: 200))
             ]);
         var query = HybridQuery.FromFloat32(
             Filter.Text("title").Prefix("He"),
@@ -347,16 +360,17 @@ public sealed class SearchQueryCommandBuilderTests
             2,
             Filter.Tag("genre").Eq("crime"),
             ["title"],
-            scoreAlias: "distance");
+            scoreAlias: "distance",
+            runtimeOptions: new VectorKnnRuntimeOptions(efRuntime: 100));
 
         var arguments = SearchQueryCommandBuilder.BuildHybridSearchArguments(schema, query);
         var rendered = arguments.Select(RenderArgument).ToArray();
 
         Assert.Equal("movies-idx", rendered[0]);
-        Assert.Equal("(@title:He* @genre:{crime})=>[KNN 2 @embedding $vector AS distance]", rendered[1]);
+        Assert.Equal("(@title:He* @genre:{crime})=>[KNN 2 @embedding $vector EF_RUNTIME $ef_runtime AS distance]", rendered[1]);
         Assert.Equal(
             [
-                "PARAMS", "2", "vector", "<binary>",
+                "PARAMS", "4", "vector", "<binary>", "ef_runtime", "100",
                 "SORTBY", "distance", "ASC",
                 "RETURN", "2", "title", "distance",
                 "LIMIT", "0", "2",
@@ -376,10 +390,12 @@ public sealed class SearchQueryCommandBuilderTests
                 new VectorFieldDefinition(
                     "embedding",
                     new VectorFieldAttributes(
-                        VectorAlgorithm.Flat,
+                        VectorAlgorithm.Hnsw,
                         VectorDataType.Float32,
                         VectorDistanceMetric.Cosine,
-                        2))
+                        2,
+                        m: 16,
+                        efConstruction: 200))
             ]);
         var query = VectorRangeQuery.FromFloat32(
             "embedding",
@@ -389,16 +405,17 @@ public sealed class SearchQueryCommandBuilderTests
             ["title"],
             scoreAlias: "distance",
             offset: 1,
-            limit: 5);
+            limit: 5,
+            runtimeOptions: new VectorRangeRuntimeOptions(epsilon: 0.05));
 
         var arguments = SearchQueryCommandBuilder.BuildVectorRangeArguments(schema, query);
         var rendered = arguments.Select(RenderArgument).ToArray();
 
         Assert.Equal("movies-idx", rendered[0]);
-        Assert.Equal("@genre:{crime} @embedding:[VECTOR_RANGE 0.3 $vector]=>{$YIELD_DISTANCE_AS: distance}", rendered[1]);
+        Assert.Equal("@genre:{crime} @embedding:[VECTOR_RANGE 0.3 $vector]=>{$YIELD_DISTANCE_AS: distance; $EPSILON: $epsilon}", rendered[1]);
         Assert.Equal(
             [
-                "PARAMS", "2", "vector", "<binary>",
+                "PARAMS", "4", "vector", "<binary>", "epsilon", "0.05",
                 "SORTBY", "distance", "ASC",
                 "RETURN", "2", "title", "distance",
                 "LIMIT", "1", "5",
@@ -473,6 +490,48 @@ public sealed class SearchQueryCommandBuilderTests
         var exception = Assert.Throws<InvalidOperationException>(() => SearchQueryCommandBuilder.BuildMultiVectorSearchArguments(schema, query));
 
         Assert.Contains("cosine distance fields", exception.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void RejectsEfRuntimeForFlatVectorFields()
+    {
+        var schema = new SearchSchema(
+            new IndexDefinition("docs-idx", "doc:", StorageType.Hash),
+            [
+                new VectorFieldDefinition(
+                    "embedding",
+                    new VectorFieldAttributes(
+                        VectorAlgorithm.Flat,
+                        VectorDataType.Float32,
+                        VectorDistanceMetric.Cosine,
+                        2))
+            ]);
+        var query = VectorQuery.FromFloat32("embedding", [1f, 2f], 2, runtimeOptions: new VectorKnnRuntimeOptions(efRuntime: 50));
+
+        var exception = Assert.Throws<InvalidOperationException>(() => SearchQueryCommandBuilder.BuildVectorSearchArguments(schema, query));
+
+        Assert.Contains("EF_RUNTIME", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void RejectsEpsilonForFlatVectorFields()
+    {
+        var schema = new SearchSchema(
+            new IndexDefinition("docs-idx", "doc:", StorageType.Hash),
+            [
+                new VectorFieldDefinition(
+                    "embedding",
+                    new VectorFieldAttributes(
+                        VectorAlgorithm.Flat,
+                        VectorDataType.Float32,
+                        VectorDistanceMetric.Cosine,
+                        2))
+            ]);
+        var query = VectorRangeQuery.FromFloat32("embedding", [1f, 2f], 0.25, runtimeOptions: new VectorRangeRuntimeOptions(epsilon: 0.01));
+
+        var exception = Assert.Throws<InvalidOperationException>(() => SearchQueryCommandBuilder.BuildVectorRangeArguments(schema, query));
+
+        Assert.Contains("EPSILON", exception.Message, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -669,6 +728,13 @@ public sealed class SearchQueryCommandBuilderTests
         Assert.Equal(["title", "distance"], query.ReturnFields);
         Assert.Equal(2, query.Offset);
         Assert.Equal(5, query.Limit);
+    }
+
+    [Fact]
+    public void RejectsInvalidRuntimeOptions()
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() => new VectorKnnRuntimeOptions(efRuntime: 0));
+        Assert.Throws<ArgumentOutOfRangeException>(() => new VectorRangeRuntimeOptions(epsilon: -0.1));
     }
 
     [Fact]

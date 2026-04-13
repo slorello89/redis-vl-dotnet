@@ -10,7 +10,8 @@ public sealed class MultiVectorQuery
         int topK,
         FilterExpression? filter = null,
         IEnumerable<string>? returnFields = null,
-        string scoreAlias = "vector_distance")
+        string scoreAlias = "vector_distance",
+        VectorKnnRuntimeOptions? runtimeOptions = null)
     {
         ArgumentNullException.ThrowIfNull(vectors);
         ArgumentException.ThrowIfNullOrWhiteSpace(scoreAlias);
@@ -32,6 +33,7 @@ public sealed class MultiVectorQuery
         ScoreAlias = FilterExpression.NormalizeFieldName(scoreAlias);
         ProjectedFields = QueryFieldNormalizer.NormalizeReturnFields(returnFields);
         ReturnFields = QueryReturnFieldHelper.NormalizeReturnFields(returnFields, ScoreAlias);
+        RuntimeOptions = runtimeOptions;
     }
 
     public IReadOnlyList<MultiVectorInput> Vectors { get; }
@@ -43,6 +45,8 @@ public sealed class MultiVectorQuery
     public string ScoreAlias { get; }
 
     public IReadOnlyList<string> ReturnFields { get; }
+
+    public VectorKnnRuntimeOptions? RuntimeOptions { get; }
 
     internal IReadOnlyList<string> ProjectedFields { get; }
 }
