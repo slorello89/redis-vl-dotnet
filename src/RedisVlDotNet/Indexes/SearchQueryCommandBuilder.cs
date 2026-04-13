@@ -89,14 +89,74 @@ internal static class SearchQueryCommandBuilder
             query.QueryString
         };
 
-        if (query.LoadFields.Count > 0)
+        AppendAggregationPipeline(
+            arguments,
+            schema,
+            query.LoadFields,
+            query.ApplyClauses,
+            query.GroupBy,
+            query.SortBy,
+            query.Offset,
+            query.Limit);
+
+        arguments.Add("DIALECT");
+        arguments.Add("2");
+
+        return arguments.ToArray();
+    }
+
+    public static object[] BuildAggregateHybridArguments(SearchSchema schema, AggregateHybridQuery query)
+    {
+        ArgumentNullException.ThrowIfNull(schema);
+        ArgumentNullException.ThrowIfNull(query);
+
+        var vectorField = ResolveVectorField(schema, query.VectorFieldName);
+        ValidateVectorPayload(vectorField.Attributes, query.VectorFieldName, query.Vector);
+
+        var arguments = new List<object>
+        {
+            schema.Index.Name,
+            BuildHybridAggregateQuery(schema, vectorField, query),
+            "PARAMS",
+            "2",
+            "vector",
+            query.Vector
+        };
+
+        AppendAggregationPipeline(
+            arguments,
+            schema,
+            query.LoadFields,
+            query.ApplyClauses,
+            query.GroupBy,
+            query.SortBy,
+            query.Offset,
+            query.Limit);
+
+        arguments.Add("DIALECT");
+        arguments.Add("2");
+
+        return arguments.ToArray();
+    }
+
+    private static void AppendAggregationPipeline(
+        List<object> arguments,
+        SearchSchema schema,
+        IReadOnlyList<string> loadFields,
+        IReadOnlyList<AggregationApply> applyClauses,
+        AggregationGroupBy? groupBy,
+        AggregationSortBy? sortBy,
+        int offset,
+        int limit)
+    {
+        if (loadFields.Count > 0)
         {
             arguments.Add("LOAD");
-            arguments.Add(query.LoadFields.Count.ToString(CultureInfo.InvariantCulture));
-            arguments.AddRange(query.LoadFields.Select(field => (object)FormatAggregationPropertyReference(schema, field)));
+            arguments.Add(loadFields.Count.ToString(CultureInfo.InvariantCulture));
+            arguments.AddRange(loadFields.Select(field => (object)FormatAggregationPropertyReference(schema, field)));
         }
 
-        foreach (var apply in query.ApplyClauses)
+        foreach (var apply in applyClauses)
         {
             arguments.Add("APPLY");
             arguments.Add(apply.Expression);
@@ -104,13 +164,13 @@ internal static class SearchQueryCommandBuilder
             arguments.Add(apply.Alias);
         }
 
-        if (query.GroupBy is not null)
+        if (groupBy is not null)
         {
             arguments.Add("GROUPBY");
-            arguments.Add(query.GroupBy.Properties.Count.ToString(CultureInfo.InvariantCulture));
-            arguments.AddRange(query.GroupBy.Properties.Select(property => (object)FormatAggregationPropertyReference(schema, property)));
+            arguments.Add(groupBy.Properties.Count.ToString(CultureInfo.InvariantCulture));
+            arguments.AddRange(groupBy.Properties.Select(property => (object)FormatAggregationPropertyReference(schema, property)));
 
-            foreach (var reducer in query.GroupBy.Reducers)
+            foreach (var reducer in groupBy.Reducers)
             {
                 arguments.Add("REDUCE");
                 arguments.Add(reducer.FunctionName);
@@ -121,12 +181,12 @@ internal static class SearchQueryCommandBuilder
             }
         }
 
-        if (query.SortBy is not null)
+        if (sortBy is not null)
         {
             arguments.Add("SORTBY");
-            arguments.Add((query.SortBy.Fields.Count * 2).ToString(CultureInfo.InvariantCulture));
+            arguments.Add((sortBy.Fields.Count * 2).ToString(CultureInfo.InvariantCulture));
 
-            foreach (var field in query.SortBy.Fields)
+            foreach (var field in sortBy.Fields)
             {
                 arguments.Add(FormatAggregationPropertyReference(schema, field.Property));
                 arguments.Add(field.Descending ? "DESC" : "ASC");
@@ -134,12 +194,8 @@ internal static class SearchQueryCommandBuilder
         }
 
         arguments.Add("LIMIT");
-        arguments.Add(query.Offset.ToString(CultureInfo.InvariantCulture));
-        arguments.Add(query.Limit.ToString(CultureInfo.InvariantCulture));
-        arguments.Add("DIALECT");
-        arguments.Add("2");
-
-        return arguments.ToArray();
+        arguments.Add(offset.ToString(CultureInfo.InvariantCulture));
+        arguments.Add(limit.ToString(CultureInfo.InvariantCulture));
     }
 
     public static object[] BuildVectorSearchArguments(SearchSchema schema, VectorQuery query)
@@ -248,6 +304,12 @@ internal static class SearchQueryCommandBuilder
     }
 
     private static string BuildHybridSearchQuery(SearchSchema schema, VectorFieldDefinition field, HybridQuery query)
+    {
+        var filter = query.CombinedFilter.ToQueryString();
+        return $"({filter})=>[KNN {query.TopK.ToString(CultureInfo.InvariantCulture)} @{GetQueryFieldName(schema, field)} $vector AS {query.ScoreAlias}]";
+    }
+
+    private static string BuildHybridAggregateQuery(SearchSchema schema, VectorFieldDefinition field, AggregateHybridQuery query)
     {
         var filter = query.CombinedFilter.ToQueryString();
         return $"({filter})=>[KNN {query.TopK.ToString(CultureInfo.InvariantCulture)} @{GetQueryFieldName(schema, field)} $vector AS {query.ScoreAlias}]";

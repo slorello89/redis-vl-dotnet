@@ -34,7 +34,7 @@ try
     await index.CreateAsync(new CreateIndexOptions(overwrite: true, dropExistingDocuments: true));
 
     await SeedDocumentsAsync(database, schema);
-    await WaitForDocumentCountAsync(index, expectedCount: 3);
+    await WaitForDocumentCountAsync(index, expectedCount: 4);
 
     var updated = await index.UpdateHashByIdAsync(
         "arrival",
@@ -54,6 +54,23 @@ try
         scoreAlias: "distance");
 
     var results = await index.SearchAsync(vectorQuery);
+    var aggregateHybridResults = await index.AggregateAsync<GenreHybridSummary>(
+        AggregateHybridQuery.FromFloat32(
+            Filter.Text("title").Prefix("He") | Filter.Text("title").Prefix("Ar"),
+            "embedding",
+            queryVector,
+            topK: 3,
+            groupBy: new AggregationGroupBy(
+                ["genre"],
+                [
+                    AggregationReducer.Count("matchCount"),
+                    AggregationReducer.Average("vector_distance", "avgDistance")
+                ]),
+            sortBy: new AggregationSortBy(
+                [
+                    new AggregationSortField("matchCount", descending: true),
+                    new AggregationSortField("avgDistance")
+                ])));
 
     Console.WriteLine($"Updated arrival hash fields: {updated} -> {updatedArrival?.Genre}");
     Console.WriteLine($"Query vector: [{string.Join(", ", queryVector.Select(static value => value.ToString("0.0", CultureInfo.InvariantCulture)))}]");
@@ -67,6 +84,13 @@ try
 
         Console.WriteLine($"- {title} | distance={distance:F6}");
         Console.WriteLine($"  {summary}");
+    }
+
+    Console.WriteLine("Aggregate hybrid query results for titles starting with He or Ar:");
+
+    foreach (var row in aggregateHybridResults.Rows)
+    {
+        Console.WriteLine($"- {row.Genre}: matches={row.MatchCount}, average distance={row.AvgDistance:F6}");
     }
 }
 finally
@@ -132,6 +156,14 @@ static IReadOnlyList<HashSeedDocument> CreateSeedDocuments() =>
             new HashEntry("embedding", EncodeFloat32([0.8f, 0.2f]))
         ]),
     new(
+        "heatwave",
+        [
+            new HashEntry("title", "Heatwave"),
+            new HashEntry("genre", "crime"),
+            new HashEntry("summary", "A second crew surfaces as a citywide manhunt intensifies."),
+            new HashEntry("embedding", EncodeFloat32([0.9f, 0.1f]))
+        ]),
+    new(
         "arrival",
         [
             new HashEntry("title", "Arrival"),
@@ -150,3 +182,4 @@ static byte[] EncodeFloat32(float[] vector)
 
 internal sealed record HashSeedDocument(string Id, HashEntry[] Entries);
 internal sealed record HashMovie(string Id, string Title, string Genre, string Summary);
+internal sealed record GenreHybridSummary(string Genre, int MatchCount, double AvgDistance);

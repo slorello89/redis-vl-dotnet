@@ -142,6 +142,62 @@ public sealed class SearchQueryCommandBuilderTests
     }
 
     [Fact]
+    public void BuildsAggregateHybridArgumentsWithVectorParamsAndAggregationPipeline()
+    {
+        var schema = new SearchSchema(
+            new IndexDefinition("movies-idx", "movie:", StorageType.Hash),
+            [
+                new TextFieldDefinition("title"),
+                new TagFieldDefinition("genre"),
+                new NumericFieldDefinition("year"),
+                new VectorFieldDefinition(
+                    "embedding",
+                    new VectorFieldAttributes(
+                        VectorAlgorithm.Flat,
+                        VectorDataType.Float32,
+                        VectorDistanceMetric.Cosine,
+                        2))
+            ]);
+        var query = AggregateHybridQuery.FromFloat32(
+            Filter.Text("title").Prefix("He"),
+            "embedding",
+            [1f, 0f],
+            3,
+            Filter.Tag("genre").Eq("crime"),
+            loadFields: ["title", "@title"],
+            applyClauses: [new AggregationApply("@year - (@year % 10)", "decade")],
+            groupBy: new AggregationGroupBy(
+                ["genre", "decade"],
+                [
+                    AggregationReducer.Count("movieCount"),
+                    AggregationReducer.Average("vector_distance", "avgDistance")
+                ]),
+            sortBy: new AggregationSortBy([new AggregationSortField("avgDistance")]),
+            offset: 1,
+            limit: 2,
+            scoreAlias: "vector_distance");
+
+        var arguments = SearchQueryCommandBuilder.BuildAggregateHybridArguments(schema, query);
+        var rendered = arguments.Select(RenderArgument).ToArray();
+
+        Assert.Equal(
+            [
+                "movies-idx",
+                "(@title:He* @genre:{crime})=>[KNN 3 @embedding $vector AS vector_distance]",
+                "PARAMS", "2", "vector", "<binary>",
+                "LOAD", "1", "@title",
+                "APPLY", "@year - (@year % 10)", "AS", "decade",
+                "GROUPBY", "2", "@genre", "@decade",
+                "REDUCE", "COUNT", "0", "AS", "movieCount",
+                "REDUCE", "AVG", "1", "@vector_distance", "AS", "avgDistance",
+                "SORTBY", "2", "@avgDistance", "ASC",
+                "LIMIT", "1", "2",
+                "DIALECT", "2"
+            ],
+            rendered);
+    }
+
+    [Fact]
     public void BuildsVectorSearchArgumentsWithFilterProjectionAndAlias()
     {
         var schema = new SearchSchema(
@@ -423,6 +479,38 @@ public sealed class SearchQueryCommandBuilderTests
         Assert.Equal("embedding", query.VectorFieldName);
         Assert.Equal("distance", query.ScoreAlias);
         Assert.Equal(["title", "distance"], query.ReturnFields);
+    }
+
+    [Fact]
+    public void AggregateHybridQueryRequiresATextPredicate()
+    {
+        var exception = Assert.Throws<ArgumentException>(() => AggregateHybridQuery.FromFloat32(
+            Filter.Tag("genre").Eq("crime"),
+            "embedding",
+            [1f, 2f],
+            1));
+
+        Assert.Contains("text predicate", exception.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void AggregateHybridQueryNormalizesFieldsPagingAndScoreAlias()
+    {
+        var query = AggregateHybridQuery.FromFloat32(
+            Filter.Text("title").Prefix("He"),
+            "@embedding",
+            [1f, 2f],
+            2,
+            loadFields: ["@title", "title", "vector_distance"],
+            offset: 2,
+            limit: 5,
+            scoreAlias: "@distance");
+
+        Assert.Equal("embedding", query.VectorFieldName);
+        Assert.Equal(["@title", "vector_distance"], query.LoadFields);
+        Assert.Equal(2, query.Offset);
+        Assert.Equal(5, query.Limit);
+        Assert.Equal("distance", query.ScoreAlias);
     }
 
     [Fact]

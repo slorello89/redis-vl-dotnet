@@ -65,6 +65,25 @@ public sealed class SearchIndexAsyncTests
     }
 
     [Fact]
+    public async Task AggregateHybridAsync_WithCancelledToken_DoesNotExecuteRedisCommand()
+    {
+        var (database, recorder) = RecordingDatabaseProxy.CreatePair();
+        var index = new SearchIndex(database, CreateVectorSchema("cancel-aggregate-hybrid"));
+        var query = AggregateHybridQuery.FromFloat32(
+            Filter.Text("title").Prefix("He"),
+            "embedding",
+            [1f, 0f],
+            2,
+            groupBy: new AggregationGroupBy(reducers: [AggregationReducer.Count("total")]));
+
+        using var cancellationTokenSource = new CancellationTokenSource();
+        await cancellationTokenSource.CancelAsync();
+
+        await Assert.ThrowsAsync<OperationCanceledException>(() => index.AggregateAsync(query, cancellationToken: cancellationTokenSource.Token));
+        Assert.Equal(0, recorder.ExecuteAsyncCallCount);
+    }
+
+    [Fact]
     public async Task ClearAsync_WithCancelledToken_DoesNotExecuteRedisCommand()
     {
         var (database, recorder) = RecordingDatabaseProxy.CreatePair();
@@ -544,6 +563,94 @@ public sealed class SearchIndexAsyncTests
         Assert.Equal(1988d, row.AvgYear);
     }
 
+    [Fact]
+    public async Task AggregateHybridAsync_ExecutesFtAggregateWithHybridArguments()
+    {
+        var (database, recorder) = RecordingDatabaseProxy.CreatePair();
+        var index = new SearchIndex(database, CreateVectorSchema("aggregate-hybrid"));
+        recorder.ExecuteAsyncResponses.Enqueue(
+            RedisResult.Create(
+                [
+                    RedisResult.Create(1),
+                    RedisResult.Create(
+                        [
+                            RedisResult.Create((RedisValue)"genre"),
+                            RedisResult.Create((RedisValue)"crime"),
+                            RedisResult.Create((RedisValue)"matchCount"),
+                            RedisResult.Create((RedisValue)"2")
+                        ])
+                ]));
+
+        var result = await index.AggregateAsync(
+            AggregateHybridQuery.FromFloat32(
+                Filter.Text("title").Prefix("He"),
+                "embedding",
+                [1f, 0f],
+                2,
+                loadFields: ["title"],
+                groupBy: new AggregationGroupBy(
+                    ["genre"],
+                    [AggregationReducer.Count("matchCount")])));
+
+        Assert.Equal("FT.AGGREGATE", recorder.ExecuteAsyncCalls[0].Command);
+        Assert.Equal(
+            [
+                "vector-aggregate-hybrid",
+                "(@title:He*)=>[KNN 2 @embedding $vector AS vector_distance]",
+                "PARAMS", "2", "vector", "System.Byte[]",
+                "LOAD", "1", "@title",
+                "GROUPBY", "1", "@genre",
+                "REDUCE", "COUNT", "0", "AS", "matchCount",
+                "LIMIT", "0", "10",
+                "DIALECT", "2"
+            ],
+            recorder.ExecuteAsyncCalls[0].Arguments.Select(static argument => argument?.ToString() ?? string.Empty).ToArray());
+
+        Assert.Equal(1, result.TotalCount);
+        var row = Assert.Single(result.Rows);
+        Assert.Equal("crime", row.Values["genre"]);
+        Assert.Equal("2", row.Values["matchCount"]);
+    }
+
+    [Fact]
+    public async Task AggregateHybridAsync_TypedResults_MapReturnedRows()
+    {
+        var (database, recorder) = RecordingDatabaseProxy.CreatePair();
+        var index = new SearchIndex(database, CreateVectorSchema("typed-aggregate-hybrid"));
+        recorder.ExecuteAsyncResponses.Enqueue(
+            RedisResult.Create(
+                [
+                    RedisResult.Create(1),
+                    RedisResult.Create(
+                        [
+                            RedisResult.Create((RedisValue)"genre"),
+                            RedisResult.Create((RedisValue)"crime"),
+                            RedisResult.Create((RedisValue)"matchCount"),
+                            RedisResult.Create((RedisValue)"2"),
+                            RedisResult.Create((RedisValue)"avgDistance"),
+                            RedisResult.Create((RedisValue)"0.0125")
+                        ])
+                ]));
+
+        var results = await index.AggregateAsync<HybridAggregateRow>(
+            AggregateHybridQuery.FromFloat32(
+                Filter.Text("title").Prefix("He"),
+                "embedding",
+                [1f, 0f],
+                2,
+                groupBy: new AggregationGroupBy(
+                    ["genre"],
+                    [
+                        AggregationReducer.Count("matchCount"),
+                        AggregationReducer.Average("vector_distance", "avgDistance")
+                    ])));
+
+        var row = Assert.Single(results.Rows);
+        Assert.Equal("crime", row.Genre);
+        Assert.Equal(2, row.MatchCount);
+        Assert.Equal(0.0125d, row.AvgDistance);
+    }
+
     private static SearchSchema CreateHashSchema(string token) =>
         new(
             new IndexDefinition($"hash-{token}", $"movie:{token}:", StorageType.Hash),
@@ -693,6 +800,8 @@ public sealed class SearchIndexAsyncTests
     private sealed record HashMovieDocument(string Id, string Title, int Year, string Genre);
 
     private sealed record GenreAggregateRow(string Genre, int MovieCount, double AvgYear);
+
+    private sealed record HybridAggregateRow(string Genre, int MatchCount, double AvgDistance);
 
     private class RecordingDatabaseProxy : DispatchProxy
     {

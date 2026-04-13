@@ -17,6 +17,7 @@ Started: Mon Apr 13 10:35:34 EDT 2026
 - FT.AGGREGATE query builders should normalize schema-backed property references to the runtime query field name while still allowing APPLY and REDUCE aliases to flow through as plain `@alias` references in later pipeline stages.
 - Redis-backed query integration tests should seed tiny HASH datasets with intentionally different match strength, wait on `num_docs` before asserting, and verify projected-field omission explicitly when a query narrows `RETURN` fields.
 - Typed aggregation projections should use reducer aliases that match the serializer naming policy used by `SearchResultMapper` (for example `movieCount` instead of `movie_count`) unless the target properties add explicit `JsonPropertyName` attributes.
+- Aggregate hybrid support should reuse the plain aggregation pipeline model and treat the KNN score alias like any other aggregation property reference, so reducers and sort clauses can operate on `vector_distance` without a separate result-mapping path.
 
 ---
 
@@ -145,4 +146,13 @@ Started: Mon Apr 13 10:35:34 EDT 2026
   - Patterns discovered: aggregation result parsing can reuse the existing search-result materialization rules when rows are modeled as dictionaries of `RedisValue` keyed by reducer aliases and group-by field names.
   - Gotchas encountered: typed aggregation mapping follows the default web serializer naming policy, so snake_case reducer aliases need explicit `JsonPropertyName` attributes or camelCase aliases to map automatically.
   - Useful context: no `AGENTS.md` files exist under this repository, so reusable implementation guidance still belongs in `progress.txt`.
+---
+## 2026-04-13 12:33:09 EDT - US-015
+- Implemented `AggregateHybridQuery`, added `FT.AGGREGATE` command generation and `SearchIndex.AggregateAsync(...)` overloads for hybrid vector-plus-aggregation flows, and extended the vector example/docs to demonstrate grouped hybrid results.
+- Files changed: `src/RedisVlDotNet/Queries/AggregateHybridQuery.cs`, `src/RedisVlDotNet/Indexes/SearchQueryCommandBuilder.cs`, `src/RedisVlDotNet/Indexes/SearchIndex.cs`, `tests/RedisVlDotNet.Tests/Indexes/SearchQueryCommandBuilderTests.cs`, `tests/RedisVlDotNet.Tests/Indexes/SearchIndexAsyncTests.cs`, `tests/RedisVlDotNet.Tests/Indexes/SearchIndexIntegrationTests.cs`, `tests/RedisVlDotNet.Tests/Indexes/SearchIndexSeedData.cs`, `examples/VectorSearchExample/Program.cs`, `examples/VectorSearchExample/README.md`, `examples/README.md`, `docs/getting-started.md`, `prd.json`, `progress.txt`
+- Quality checks run and result: `dotnet build redis-vl-dotnet.sln --no-restore` passed. `dotnet test tests/RedisVlDotNet.Tests/RedisVlDotNet.Tests.csproj --no-build --filter "FullyQualifiedName~SearchQueryCommandBuilderTests|FullyQualifiedName~SearchIndexAsyncTests|FullyQualifiedName~SearchIndexIntegrationTests"` passed with Redis-backed integration tests skipped because `REDIS_VL_REDIS_URL` was not configured locally. `dotnet test redis-vl-dotnet.sln --no-build` passed with 27 Redis-backed integration tests skipped because `REDIS_VL_REDIS_URL` was not configured locally.
+- Learnings for future iterations:
+  - Patterns discovered: aggregate hybrid queries can stay API-consistent by reusing the existing aggregation stage objects and only adding the hybrid text/vector inputs plus KNN score alias.
+  - Gotchas encountered: running `dotnet build` and `dotnet test` in parallel against the same project can trigger ref-assembly file locks, so verification should serialize compile steps or reuse `--no-build`.
+  - Useful context: there are still no `AGENTS.md` files anywhere in this repository, so there was no area-local agent guidance to update for this iteration.
 ---

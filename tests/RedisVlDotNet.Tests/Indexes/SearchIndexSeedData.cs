@@ -132,6 +132,38 @@ internal static class SearchIndexSeedData
             ])
     ];
 
+    public static IReadOnlyList<HashSeedDocument> AggregateHybridMovies { get; } =
+    [
+        new(
+            "1",
+            [
+                new HashEntry("title", "Heat"),
+                new HashEntry("genre", "crime"),
+                new HashEntry("embedding", EncodeFloat32([1f, 0f]))
+            ]),
+        new(
+            "2",
+            [
+                new HashEntry("title", "Heatwave"),
+                new HashEntry("genre", "crime"),
+                new HashEntry("embedding", EncodeFloat32([0.8f, 0.2f]))
+            ]),
+        new(
+            "3",
+            [
+                new HashEntry("title", "Arrival"),
+                new HashEntry("genre", "science-fiction"),
+                new HashEntry("embedding", EncodeFloat32([0.3f, 0.7f]))
+            ]),
+        new(
+            "4",
+            [
+                new HashEntry("title", "Argo"),
+                new HashEntry("genre", "thriller"),
+                new HashEntry("embedding", EncodeFloat32([0.1f, 0.9f]))
+            ])
+    ];
+
     public sealed record HashSeedDocument(string Id, HashEntry[] Entries);
 
     private static byte[] EncodeFloat32(float[] vector)

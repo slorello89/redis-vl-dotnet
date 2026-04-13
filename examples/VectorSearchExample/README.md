@@ -6,6 +6,7 @@ This example is a runnable .NET 9 console app that demonstrates the smallest vec
 - seed deterministic sample documents with raw float32 embedding bytes
 - partially update top-level HASH fields with `UpdateHashByIdAsync(...)`
 - execute a nearest-neighbor query against the vector field
+- execute an aggregate hybrid query that combines text predicates, KNN retrieval, and aggregation reducers
 - inspect returned titles, summaries, and vector distances
 - drop the example index and documents
 

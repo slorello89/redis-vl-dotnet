@@ -915,6 +915,85 @@ public sealed class SearchIndexIntegrationTests
     }
 
     [RedisSearchIntegrationFact]
+    public async Task ExecutesAggregateHybridQueriesWithDeterministicGrouping()
+    {
+        await using var connection = await RedisSearchTestEnvironment.ConnectAsync();
+        var database = connection.GetDatabase();
+
+        var token = Guid.NewGuid().ToString("N");
+        var schema = new SearchSchema(
+            new IndexDefinition($"aggregate-hybrid-idx-{token}", $"aggregate-hybrid:{token}:", StorageType.Hash),
+            [
+                new TagFieldDefinition("genre"),
+                new TextFieldDefinition("title"),
+                new VectorFieldDefinition(
+                    "embedding",
+                    new VectorFieldAttributes(
+                        VectorAlgorithm.Flat,
+                        VectorDataType.Float32,
+                        VectorDistanceMetric.Cosine,
+                        2))
+            ]);
+        var index = new SearchIndex(database, schema);
+
+        try
+        {
+            await index.CreateAsync();
+            await SeedHashDocumentsAsync(database, schema, SearchIndexSeedData.AggregateHybridMovies);
+            await RedisSearchTestEnvironment.WaitForIndexDocumentCountAsync(index, SearchIndexSeedData.AggregateHybridMovies.Count);
+
+            var query = AggregateHybridQuery.FromFloat32(
+                Filter.Text("title").Prefix("He") | Filter.Text("title").Prefix("Ar"),
+                "embedding",
+                [1f, 0f],
+                3,
+                groupBy: new AggregationGroupBy(
+                    ["genre"],
+                    [
+                        AggregationReducer.Count("matchCount"),
+                        AggregationReducer.Average("vector_distance", "avgDistance")
+                    ]),
+                sortBy: new AggregationSortBy(
+                    [
+                        new AggregationSortField("matchCount", descending: true),
+                        new AggregationSortField("avgDistance")
+                    ]),
+                limit: 10);
+
+            var rawResults = await index.AggregateAsync(query);
+            var typedResults = await index.AggregateAsync<HybridAggregationRow>(query);
+
+            Assert.Equal(2, rawResults.TotalCount);
+            Assert.Equal(["crime", "science-fiction"], rawResults.Rows.Select(static row => row.Values["genre"].ToString()).ToArray());
+            Assert.Equal(["2", "1"], rawResults.Rows.Select(static row => row.Values["matchCount"].ToString()).ToArray());
+
+            Assert.Equal(2, typedResults.TotalCount);
+            Assert.Collection(
+                typedResults.Rows,
+                row =>
+                {
+                    Assert.Equal("crime", row.Genre);
+                    Assert.Equal(2, row.MatchCount);
+                    Assert.True(row.AvgDistance >= 0d);
+                },
+                row =>
+                {
+                    Assert.Equal("science-fiction", row.Genre);
+                    Assert.Equal(1, row.MatchCount);
+                    Assert.True(row.AvgDistance >= 0d);
+                });
+            Assert.True(typedResults.Rows[0].AvgDistance < typedResults.Rows[1].AvgDistance);
+        }
+        finally
+        {
+            if (await index.ExistsAsync())
+            {
+                await index.DropAsync(deleteDocuments: true);
+            }
+        }
+    }
+
+    [RedisSearchIntegrationFact]
     public async Task ExecutesVectorQueriesWithDeterministicRanking()
     {
         await using var connection = await RedisSearchTestEnvironment.ConnectAsync();
@@ -1094,6 +1173,8 @@ public sealed class SearchIndexIntegrationTests
     private sealed record HashMovieEnvelope(string ExternalId, string Title, int Year, string Genre);
 
     private sealed record GenreAggregationRow(string Genre, int MovieCount, double AverageYear);
+
+    private sealed record HybridAggregationRow(string Genre, int MatchCount, double AvgDistance);
 
     private static IReadOnlyDictionary<string, string> ToFlatStringDictionary(RedisResult result)
     {

@@ -178,6 +178,36 @@ var aggregationResults = await index.AggregateAsync<GenreSummary>(
 - reducer aliases such as `movieCount` and `averageYear` become the field names used for typed mapping
 - `AggregateAsync(...)` returns parsed `AggregationResults`, and `AggregateAsync<T>(...)` maps each row into your projection type
 
+## Run Aggregate Hybrid Queries
+
+Use `AggregateHybridQuery` on vector-enabled schemas when you want KNN retrieval and aggregation in the same `FT.AGGREGATE` pipeline:
+
+```csharp
+var hybridResults = await index.AggregateAsync<GenreHybridSummary>(
+    AggregateHybridQuery.FromFloat32(
+        Filter.Text("title").Prefix("He") | Filter.Text("title").Prefix("Ar"),
+        "embedding",
+        [1f, 0f],
+        topK: 3,
+        groupBy: new AggregationGroupBy(
+            ["genre"],
+            [
+                AggregationReducer.Count("matchCount"),
+                AggregationReducer.Average("vector_distance", "avgDistance")
+            ]),
+        sortBy: new AggregationSortBy(
+            [
+                new AggregationSortField("matchCount", descending: true),
+                new AggregationSortField("avgDistance")
+            ])));
+```
+
+`AggregateHybridQuery` keeps the aggregation-stage model from `AggregationQuery`, while adding the hybrid vector inputs:
+
+- `textFilter` must contain at least one text predicate so RediSearch can constrain the hybrid text side of the query
+- `vectorFieldName`, `vector`, `topK`, and `scoreAlias` define the KNN portion of the aggregate query
+- reducer aliases can reference the hybrid distance alias, for example `AggregationReducer.Average("vector_distance", "avgDistance")`
+
 ## Run the Flow Locally
 
 From the console app directory:

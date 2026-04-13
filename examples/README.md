@@ -51,7 +51,8 @@ Demonstrates the core vector workflow:
 - define a HASH-backed schema with a vector field
 - seed deterministic float32 embeddings
 - run a nearest-neighbor query
-- inspect returned distances
+- run an aggregate hybrid query over the vector candidates
+- inspect returned distances and grouped aggregates
 - drop the example index and documents
 
 Redis prerequisites:

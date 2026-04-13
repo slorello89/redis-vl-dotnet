@@ -394,6 +394,12 @@ public sealed class SearchIndex
     public AggregationResults<TDocument> Aggregate<TDocument>(AggregationQuery query, JsonSerializerOptions? serializerOptions = null) =>
         AggregateAsync<TDocument>(query, serializerOptions).GetAwaiter().GetResult();
 
+    public AggregationResults Aggregate(AggregateHybridQuery query) =>
+        AggregateAsync(query).GetAwaiter().GetResult();
+
+    public AggregationResults<TDocument> Aggregate<TDocument>(AggregateHybridQuery query, JsonSerializerOptions? serializerOptions = null) =>
+        AggregateAsync<TDocument>(query, serializerOptions).GetAwaiter().GetResult();
+
     public SearchResults Search(HybridQuery query) =>
         SearchAsync(query).GetAwaiter().GetResult();
 
@@ -510,6 +516,28 @@ public sealed class SearchIndex
 
     public async Task<AggregationResults<TDocument>> AggregateAsync<TDocument>(
         AggregationQuery query,
+        JsonSerializerOptions? serializerOptions = null,
+        CancellationToken cancellationToken = default)
+    {
+        var results = await AggregateAsync(query, cancellationToken).ConfigureAwait(false);
+        cancellationToken.ThrowIfCancellationRequested();
+        return results.Map<TDocument>(serializerOptions);
+    }
+
+    public async Task<AggregationResults> AggregateAsync(AggregateHybridQuery query, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(query);
+
+        var result = await ExecuteAsync(
+            "FT.AGGREGATE",
+            SearchQueryCommandBuilder.BuildAggregateHybridArguments(Schema, query),
+            cancellationToken).ConfigureAwait(false);
+
+        return AggregationResultsParser.Parse(result);
+    }
+
+    public async Task<AggregationResults<TDocument>> AggregateAsync<TDocument>(
+        AggregateHybridQuery query,
         JsonSerializerOptions? serializerOptions = null,
         CancellationToken cancellationToken = default)
     {
