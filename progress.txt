@@ -8,6 +8,8 @@ Started: Mon Apr 13 10:35:34 EDT 2026
 - Model optional FT.CREATE metadata as nullable index properties where `null` means Redis defaults and an empty collection means an explicit `0`-count clause, so default and disabled behaviors remain distinguishable in both code-first and YAML schema paths.
 - Emit RediSearch field modifiers in parser-safe order: `INDEXEMPTY`/`INDEXMISSING` before `SORTABLE`, `UNF` immediately after `SORTABLE`, and `NOINDEX` after sortable modifiers; vector `INDEXMISSING` belongs inside the vector attribute payload rather than after the field definition.
 - Keep YAML schema loading strict: accept either `index.prefix` or `index.prefixes` for namespace configuration, map upstream-style underscored option names through DTOs, and fail fast on unsupported keys instead of silently ignoring them.
+- Index maintenance helpers should operate on `Schema.Index.Prefixes` with batched Redis key scans and deletes so JSON and HASH storage share one implementation while the RediSearch index definition remains intact.
+- Database-wide RediSearch discovery helpers should stay static on `SearchIndex` and map Redis array replies into small named DTOs, which keeps environment inspection APIs available without requiring a schema-bound instance.
 
 ---
 
@@ -55,4 +57,22 @@ Started: Mon Apr 13 10:35:34 EDT 2026
   - Patterns discovered: checked-in YAML fixtures plus `CopyToOutputDirectory` are the cleanest way to validate `FromYamlFile(...)` behavior without temp-file setup in tests.
   - Gotchas encountered: changing shared parsing helpers like `ParseOptionalInt(...)` affects vector attribute parsing too, so schema test runs should happen before broader solution checks.
   - Useful context: the JSON storage sample can exercise YAML parity stories by loading `schema.yaml` from `AppContext.BaseDirectory`, which keeps the example runnable after `dotnet build` and `dotnet run`.
+---
+## 2026-04-13 10:56:00 EDT - US-006
+- Implemented `SearchIndex.Clear/ClearAsync` to scan each configured schema prefix, delete matching Redis keys in batches, and preserve the underlying RediSearch index definition for both JSON and HASH storage.
+- Files changed: `src/RedisVlDotNet/Indexes/SearchIndex.cs`, `tests/RedisVlDotNet.Tests/Indexes/SearchIndexAsyncTests.cs`, `tests/RedisVlDotNet.Tests/Indexes/SearchIndexIntegrationTests.cs`, `docs/getting-started.md`, `examples/JsonStorageExample/Program.cs`, `examples/JsonStorageExample/README.md`, `examples/README.md`, `prd.json`, `progress.txt`
+- Quality checks run and result: `dotnet test tests/RedisVlDotNet.Tests/RedisVlDotNet.Tests.csproj --filter "FullyQualifiedName~SearchIndexAsyncTests|FullyQualifiedName~SearchIndexIntegrationTests"` passed with Redis-backed integration tests skipped because `REDIS_VL_REDIS_URL` was not configured locally. `dotnet build redis-vl-dotnet.sln --no-restore` passed. `dotnet test redis-vl-dotnet.sln --no-restore` passed with 19 Redis-backed integration tests skipped because `REDIS_VL_REDIS_URL` was not configured locally.
+- Learnings for future iterations:
+  - Patterns discovered: index maintenance APIs can stay storage-agnostic when they operate on schema prefixes and Redis keys instead of branching on JSON versus HASH payload format.
+  - Gotchas encountered: broad workspace status may include unrelated untracked Ralph artifacts and user edits, so commit only the story-specific files instead of sweeping the full worktree.
+  - Useful context: `CountQuery` with no filter already maps to `*`, which is the simplest way to poll for an empty index after maintenance operations.
+---
+## 2026-04-13 11:53:29 EDT - US-007
+- Implemented database-level `SearchIndex.List/ListAsync` helpers backed by `FT._LIST`, plus a `SearchIndexListItem` parser that exposes each discovered index name.
+- Files changed: `src/RedisVlDotNet/Indexes/SearchIndex.cs`, `src/RedisVlDotNet/Indexes/SearchIndexListItem.cs`, `tests/RedisVlDotNet.Tests/Indexes/SearchIndexAsyncTests.cs`, `tests/RedisVlDotNet.Tests/Indexes/SearchIndexCommandBuilderTests.cs`, `tests/RedisVlDotNet.Tests/Indexes/SearchIndexIntegrationTests.cs`, `examples/JsonStorageExample/Program.cs`, `examples/JsonStorageExample/README.md`, `prd.json`, `progress.txt`
+- Quality checks run and result: `dotnet test tests/RedisVlDotNet.Tests/RedisVlDotNet.Tests.csproj --filter "FullyQualifiedName~SearchIndexAsyncTests|FullyQualifiedName~SearchIndexCommandBuilderTests|FullyQualifiedName~SearchIndexIntegrationTests"` passed with Redis-backed integration tests skipped because `REDIS_VL_REDIS_URL` was not configured locally. `dotnet build redis-vl-dotnet.sln --no-restore` passed.
+- Learnings for future iterations:
+  - Patterns discovered: database-wide index discovery belongs on static `SearchIndex` helpers because it does not depend on a schema instance.
+  - Gotchas encountered: `FT._LIST` returns a flat Redis array of names, so parsing should fail fast on blank entries instead of silently producing unusable results.
+  - Useful context: the existing JSON storage example is still the easiest place to demonstrate operational helpers like index listing without adding a new sample app.
 ---

@@ -37,6 +37,32 @@ public sealed class SearchIndexAsyncTests
     }
 
     [Fact]
+    public async Task ClearAsync_WithCancelledToken_DoesNotExecuteRedisCommand()
+    {
+        var (database, recorder) = RecordingDatabaseProxy.CreatePair();
+        var index = new SearchIndex(database, CreateHashSchema("cancel-clear"));
+
+        using var cancellationTokenSource = new CancellationTokenSource();
+        await cancellationTokenSource.CancelAsync();
+
+        await Assert.ThrowsAsync<OperationCanceledException>(() => index.ClearAsync(cancellationToken: cancellationTokenSource.Token));
+        Assert.Equal(0, recorder.ExecuteAsyncCallCount);
+        Assert.Equal(0, recorder.KeyDeleteAsyncCallCount);
+    }
+
+    [Fact]
+    public async Task ListAsync_WithCancelledToken_DoesNotExecuteRedisCommand()
+    {
+        var (database, recorder) = RecordingDatabaseProxy.CreatePair();
+
+        using var cancellationTokenSource = new CancellationTokenSource();
+        await cancellationTokenSource.CancelAsync();
+
+        await Assert.ThrowsAsync<OperationCanceledException>(() => SearchIndex.ListAsync(database, cancellationTokenSource.Token));
+        Assert.Equal(0, recorder.ExecuteAsyncCallCount);
+    }
+
+    [Fact]
     public async Task FetchHashByKeyAsync_WithCancelledToken_DoesNotReadFromRedis()
     {
         var (database, recorder) = RecordingDatabaseProxy.CreatePair();
@@ -72,6 +98,34 @@ public sealed class SearchIndexAsyncTests
         Assert.Equal(1, recorder.HashSetAsyncCallCount);
     }
 
+    [Fact]
+    public async Task ClearAsync_ScansAndDeletesAllMatchingPrefixKeys()
+    {
+        var (database, recorder) = RecordingDatabaseProxy.CreatePair();
+        var schema = new SearchSchema(
+            new IndexDefinition("clear-idx", ["movie:", "archive:"], StorageType.Hash),
+            [new TextFieldDefinition("title")]);
+        var index = new SearchIndex(database, schema);
+
+        recorder.ExecuteAsyncResponses.Enqueue(CreateScanResult(1, ["movie:1", "movie:2"]));
+        recorder.ExecuteAsyncResponses.Enqueue(CreateScanResult(0, ["movie:3"]));
+        recorder.ExecuteAsyncResponses.Enqueue(CreateScanResult(0, ["archive:1"]));
+
+        var deletedCount = await index.ClearAsync(batchSize: 2);
+
+        Assert.Equal(4, deletedCount);
+        Assert.Equal(3, recorder.ExecuteAsyncCallCount);
+        Assert.Equal(3, recorder.KeyDeleteAsyncCallCount);
+        Assert.Equal(
+            ["movie:*", "movie:*", "archive:*"],
+            recorder.ExecuteAsyncCalls.Select(static call => call.Pattern).ToArray());
+        Assert.Equal(
+            ["movie:1,movie:2", "movie:3", "archive:1"],
+            recorder.KeyDeleteBatches
+                .Select(static batch => string.Join(',', batch.Select(static key => key.ToString())))
+                .ToArray());
+    }
+
     private static SearchSchema CreateHashSchema(string token) =>
         new(
             new IndexDefinition($"hash-{token}", $"movie:{token}:", StorageType.Hash),
@@ -79,6 +133,13 @@ public sealed class SearchIndexAsyncTests
                 new TextFieldDefinition("title"),
                 new NumericFieldDefinition("year"),
                 new TagFieldDefinition("genre")
+            ]);
+
+    private static RedisResult CreateScanResult(long cursor, params string[] keys) =>
+        RedisResult.Create(
+            [
+                RedisResult.Create((RedisValue)cursor.ToString()),
+                RedisResult.Create(keys.Select(static key => RedisResult.Create((RedisValue)key)).ToArray())
             ]);
 
     private static SearchSchema CreateVectorSchema(string token) =>
@@ -105,7 +166,15 @@ public sealed class SearchIndexAsyncTests
 
         public int HashSetAsyncCallCount { get; private set; }
 
+        public int KeyDeleteAsyncCallCount { get; private set; }
+
         public Func<RedisKey, HashEntry[], Task<bool>>? OnHashSetAsync { get; set; }
+
+        public Queue<RedisResult> ExecuteAsyncResponses { get; } = new();
+
+        public List<(string Command, string Pattern)> ExecuteAsyncCalls { get; } = [];
+
+        public List<RedisKey[]> KeyDeleteBatches { get; } = [];
 
         public static (IDatabase Database, RecordingDatabaseProxy Recorder) CreatePair()
         {
@@ -123,6 +192,7 @@ public sealed class SearchIndexAsyncTests
                 nameof(IDatabase.ExecuteAsync) => HandleExecuteAsync(args),
                 nameof(IDatabase.HashGetAllAsync) => HandleHashGetAllAsync(),
                 nameof(IDatabase.HashSetAsync) => HandleHashSetAsync(args),
+                nameof(IDatabase.KeyDeleteAsync) => HandleKeyDeleteAsync(args),
                 nameof(IDatabase.Multiplexer) => throw new NotSupportedException(),
                 nameof(IDatabase.Database) => 0,
                 _ => throw new NotSupportedException($"Method '{targetMethod.Name}' is not configured for this test proxy.")
@@ -132,6 +202,18 @@ public sealed class SearchIndexAsyncTests
         private Task<RedisResult> HandleExecuteAsync(object?[]? args)
         {
             ExecuteAsyncCallCount++;
+            var command = (string)args![0]!;
+            var commandArgs = (object[]?)args[1] ?? [];
+            var pattern = command.Equals("SCAN", StringComparison.Ordinal)
+                ? commandArgs[2]?.ToString() ?? string.Empty
+                : string.Empty;
+            ExecuteAsyncCalls.Add((command, pattern));
+
+            if (ExecuteAsyncResponses.Count > 0)
+            {
+                return Task.FromResult(ExecuteAsyncResponses.Dequeue());
+            }
+
             return Task.FromResult(RedisResult.Create((RedisValue)"OK"));
         }
 
@@ -151,6 +233,14 @@ public sealed class SearchIndexAsyncTests
             }
 
             return Task.FromResult(true);
+        }
+
+        private Task<long> HandleKeyDeleteAsync(object?[]? args)
+        {
+            KeyDeleteAsyncCallCount++;
+            var keys = (RedisKey[])args![0]!;
+            KeyDeleteBatches.Add(keys);
+            return Task.FromResult((long)keys.Length);
         }
     }
 }

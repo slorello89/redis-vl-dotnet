@@ -4,10 +4,12 @@ This example is a runnable .NET 9 console app that demonstrates a JSON-backed `r
 
 - load a schema from YAML
 - create a JSON index
+- list existing search indexes
 - load sample documents
 - fetch one document by id
 - run a filter query and count query
-- drop the example index and documents
+- clear indexed documents while keeping the index
+- drop the example index
 
 ## Prerequisites
 

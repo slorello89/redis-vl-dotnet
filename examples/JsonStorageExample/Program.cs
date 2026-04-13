@@ -18,6 +18,7 @@ var schema = SearchSchema.FromYamlFile(schemaPath);
 var index = new SearchIndex(database, schema);
 
 await index.CreateAsync(new CreateIndexOptions(overwrite: true, dropExistingDocuments: true));
+var indexes = await SearchIndex.ListAsync(database);
 
 var movies = new[]
 {
@@ -38,10 +39,13 @@ var scienceFictionQuery = new FilterQuery(
 var searchResults = await index.SearchAsync<Movie>(scienceFictionQuery);
 var scienceFictionCount = await index.CountAsync(
     new CountQuery(Filter.Tag("genre").Eq("science-fiction")));
+var clearedCount = await index.ClearAsync();
 
 Console.WriteLine($"Loaded keys: {string.Join(", ", loadedKeys)}");
 Console.WriteLine($"Fetched by id: {fetchedMovie?.Title} ({fetchedMovie?.Year})");
+Console.WriteLine($"Available indexes: {string.Join(", ", indexes.Select(static item => item.Name))}");
 Console.WriteLine($"Science fiction count: {scienceFictionCount}");
+Console.WriteLine($"Cleared indexed documents without dropping the index: {clearedCount}");
 Console.WriteLine($"Index metadata: {schema.Index.Prefixes.Count} prefixes, separator '{schema.Index.KeySeparator}', stopwords {(schema.Index.Stopwords?.Count == 0 ? "disabled" : "configured")}.");
 Console.WriteLine("Query results:");
 
@@ -50,8 +54,8 @@ foreach (var movie in searchResults.Documents)
     Console.WriteLine($"- {movie.Title} ({movie.Year}) [{movie.Genre}]");
 }
 
-await index.DropAsync(deleteDocuments: true);
+await index.DropAsync();
 
-Console.WriteLine("Cleaned up example index and documents.");
+Console.WriteLine("Dropped the example index after clearing its documents.");
 
 public sealed record Movie(string Id, string Title, int Year, string Genre, string Summary);

@@ -49,6 +49,55 @@ public sealed class SearchIndexIntegrationTests
     }
 
     [RedisSearchIntegrationFact]
+    public async Task ListsCreatedIndexes()
+    {
+        await using var connection = await RedisSearchTestEnvironment.ConnectAsync();
+        var database = connection.GetDatabase();
+
+        var token = Guid.NewGuid().ToString("N");
+        var firstIndex = new SearchIndex(
+            database,
+            new SearchSchema(
+                new IndexDefinition($"movies-list-a-{token}", $"movie:list:a:{token}:", StorageType.Hash),
+                [
+                    new TextFieldDefinition("title"),
+                    new TagFieldDefinition("genre")
+                ]));
+        var secondIndex = new SearchIndex(
+            database,
+            new SearchSchema(
+                new IndexDefinition($"movies-list-b-{token}", $"movie:list:b:{token}:", StorageType.Hash),
+                [
+                    new TextFieldDefinition("title"),
+                    new TagFieldDefinition("genre")
+                ]));
+
+        try
+        {
+            await firstIndex.CreateAsync();
+            await secondIndex.CreateAsync();
+
+            var indexes = await SearchIndex.ListAsync(database);
+            var indexNames = indexes.Select(static item => item.Name).ToHashSet(StringComparer.Ordinal);
+
+            Assert.Contains(firstIndex.Schema.Index.Name, indexNames);
+            Assert.Contains(secondIndex.Schema.Index.Name, indexNames);
+        }
+        finally
+        {
+            if (await firstIndex.ExistsAsync())
+            {
+                await firstIndex.DropAsync();
+            }
+
+            if (await secondIndex.ExistsAsync())
+            {
+                await secondIndex.DropAsync();
+            }
+        }
+    }
+
+    [RedisSearchIntegrationFact]
     public async Task CreatesIndexWithMultiplePrefixes()
     {
         await using var connection = await RedisSearchTestEnvironment.ConnectAsync();
@@ -337,6 +386,51 @@ public sealed class SearchIndexIntegrationTests
     }
 
     [RedisSearchIntegrationFact]
+    public async Task ClearsJsonDocumentsWithoutDroppingIndex()
+    {
+        await using var connection = await RedisSearchTestEnvironment.ConnectAsync();
+        var database = connection.GetDatabase();
+
+        var token = Guid.NewGuid().ToString("N");
+        var schema = new SearchSchema(
+            new IndexDefinition($"json-clear-idx-{token}", $"jsonclear:{token}:", StorageType.Json),
+            [
+                new TextFieldDefinition("title"),
+                new NumericFieldDefinition("year"),
+                new TagFieldDefinition("genre")
+            ]);
+        var index = new SearchIndex(database, schema);
+
+        try
+        {
+            await index.CreateAsync();
+            await index.LoadJsonAsync(
+                [
+                    new JsonMovieDocument("movie-1", "Heat", 1995, "crime"),
+                    new JsonMovieDocument("movie-2", "Arrival", 2016, "science-fiction")
+                ]);
+            await RedisSearchTestEnvironment.WaitForIndexDocumentCountAsync(index, 2);
+
+            var deletedCount = await index.ClearAsync();
+
+            await RedisSearchTestEnvironment.WaitForAsync(async () => await index.CountAsync(new CountQuery()) == 0);
+
+            Assert.Equal(2, deletedCount);
+            Assert.True(await index.ExistsAsync());
+            Assert.Equal(schema.Index.Name, (await index.InfoAsync()).Name);
+            Assert.Null(await index.FetchJsonByIdAsync<JsonMovieDocument>("movie-1"));
+            Assert.Null(await index.FetchJsonByIdAsync<JsonMovieDocument>("movie-2"));
+        }
+        finally
+        {
+            if (await index.ExistsAsync())
+            {
+                await index.DropAsync(deleteDocuments: true);
+            }
+        }
+    }
+
+    [RedisSearchIntegrationFact]
     public async Task LoadsFetchesAndDeletesHashDocuments()
     {
         await using var connection = await RedisSearchTestEnvironment.ConnectAsync();
@@ -384,6 +478,51 @@ public sealed class SearchIndexIntegrationTests
             Assert.True(deletedById);
             Assert.True(deletedByKey);
             Assert.Null(missingAfterDelete);
+        }
+        finally
+        {
+            if (await index.ExistsAsync())
+            {
+                await index.DropAsync(deleteDocuments: true);
+            }
+        }
+    }
+
+    [RedisSearchIntegrationFact]
+    public async Task ClearsHashDocumentsWithoutDroppingIndex()
+    {
+        await using var connection = await RedisSearchTestEnvironment.ConnectAsync();
+        var database = connection.GetDatabase();
+
+        var token = Guid.NewGuid().ToString("N");
+        var schema = new SearchSchema(
+            new IndexDefinition($"hash-clear-idx-{token}", $"hashclear:{token}:", StorageType.Hash),
+            [
+                new TextFieldDefinition("title"),
+                new NumericFieldDefinition("year"),
+                new TagFieldDefinition("genre")
+            ]);
+        var index = new SearchIndex(database, schema);
+
+        try
+        {
+            await index.CreateAsync();
+            await index.LoadHashAsync(
+                [
+                    new HashMovieDocument("movie-1", "Heat", 1995, "crime"),
+                    new HashMovieDocument("movie-2", "Arrival", 2016, "science-fiction")
+                ]);
+            await RedisSearchTestEnvironment.WaitForIndexDocumentCountAsync(index, 2);
+
+            var deletedCount = await index.ClearAsync();
+
+            await RedisSearchTestEnvironment.WaitForAsync(async () => await index.CountAsync(new CountQuery()) == 0);
+
+            Assert.Equal(2, deletedCount);
+            Assert.True(await index.ExistsAsync());
+            Assert.Equal(schema.Index.Name, (await index.InfoAsync()).Name);
+            Assert.Null(await index.FetchHashByIdAsync<HashMovieDocument>("movie-1"));
+            Assert.Null(await index.FetchHashByIdAsync<HashMovieDocument>("movie-2"));
         }
         finally
         {

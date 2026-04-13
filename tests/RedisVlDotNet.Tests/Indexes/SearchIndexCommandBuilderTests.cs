@@ -242,4 +242,18 @@ public sealed class SearchIndexCommandBuilderTests
         Assert.Equal("docs-idx", info.Name);
         Assert.True(info.TryGetValue("index_definition", out _));
     }
+
+    [Fact]
+    public void ParsesSearchIndexListItemsFromRedisResult()
+    {
+        var rawEntries = RedisResult.Create(
+            [
+                RedisResult.Create((RedisValue)"docs-idx"),
+                RedisResult.Create((RedisValue)"movies-idx")
+            ]);
+
+        var items = SearchIndexListItem.FromRedisResult(rawEntries);
+
+        Assert.Equal(["docs-idx", "movies-idx"], items.Select(static item => item.Name).ToArray());
+    }
 }

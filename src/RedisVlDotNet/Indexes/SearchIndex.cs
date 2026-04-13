@@ -1,6 +1,7 @@
 using RedisVlDotNet.Schema;
 using RedisVlDotNet.Queries;
 using StackExchange.Redis;
+using System.Globalization;
 using System.Text.Json;
 
 namespace RedisVlDotNet.Indexes;
@@ -9,6 +10,7 @@ public sealed class SearchIndex
 {
     private readonly IDatabase _database;
     private readonly JsonSerializerOptions _serializerOptions;
+    private const string ListIndexesCommand = "FT._LIST";
 
     public SearchIndex(IDatabase database, SearchSchema schema)
     {
@@ -21,6 +23,20 @@ public sealed class SearchIndex
     }
 
     public SearchSchema Schema { get; }
+
+    public static IReadOnlyList<SearchIndexListItem> List(IDatabase database) =>
+        ListAsync(database).GetAwaiter().GetResult();
+
+    public static async Task<IReadOnlyList<SearchIndexListItem>> ListAsync(
+        IDatabase database,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(database);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        var result = await database.ExecuteAsync(ListIndexesCommand, []).WaitAsync(cancellationToken).ConfigureAwait(false);
+        return SearchIndexListItem.FromRedisResult(result);
+    }
 
     public bool Create(CreateIndexOptions? options = null) =>
         CreateAsync(options).GetAwaiter().GetResult();
@@ -77,6 +93,22 @@ public sealed class SearchIndex
     {
         await ExecuteAsync("FT.DROPINDEX", SearchIndexCommandBuilder.BuildDropArguments(Schema, deleteDocuments), cancellationToken)
             .ConfigureAwait(false);
+    }
+
+    public long Clear(int batchSize = 1000) =>
+        ClearAsync(batchSize).GetAwaiter().GetResult();
+
+    public async Task<long> ClearAsync(int batchSize = 1000, CancellationToken cancellationToken = default)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(batchSize);
+
+        var deletedCount = 0L;
+        foreach (var prefix in Schema.Index.Prefixes)
+        {
+            deletedCount += await DeleteDocumentsByPrefixAsync(prefix, batchSize, cancellationToken).ConfigureAwait(false);
+        }
+
+        return deletedCount;
     }
 
     public string LoadJson<TDocument>(TDocument document, string? key = null, string? id = null) =>
@@ -409,6 +441,54 @@ public sealed class SearchIndex
         cancellationToken.ThrowIfCancellationRequested();
         var entries = HashDocumentMapper.ToHashEntries(document, _serializerOptions);
         await _database.HashSetAsync(key, entries).WaitAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task<long> DeleteDocumentsByPrefixAsync(string prefix, int batchSize, CancellationToken cancellationToken)
+    {
+        var deletedCount = 0L;
+        var cursor = 0L;
+        var pattern = $"{prefix}*";
+
+        do
+        {
+            var (nextCursor, keys) = await ScanKeysAsync(cursor, pattern, batchSize, cancellationToken).ConfigureAwait(false);
+            if (keys.Length > 0)
+            {
+                deletedCount += await _database.KeyDeleteAsync(keys).WaitAsync(cancellationToken).ConfigureAwait(false);
+            }
+
+            cursor = nextCursor;
+        }
+        while (cursor != 0);
+
+        return deletedCount;
+    }
+
+    private async Task<(long Cursor, RedisKey[] Keys)> ScanKeysAsync(
+        long cursor,
+        string pattern,
+        int batchSize,
+        CancellationToken cancellationToken)
+    {
+        var result = await ExecuteAsync("SCAN", [cursor, "MATCH", pattern, "COUNT", batchSize], cancellationToken).ConfigureAwait(false);
+        var parts = (RedisResult[])result!;
+        if (parts.Length != 2)
+        {
+            throw new InvalidOperationException("Redis SCAN response must contain a cursor and key list.");
+        }
+
+        if (!long.TryParse(parts[0].ToString(), NumberStyles.None, CultureInfo.InvariantCulture, out var nextCursor))
+        {
+            throw new InvalidOperationException("Redis SCAN response cursor was not a valid integer.");
+        }
+
+        var keys = ((RedisResult[])parts[1]!)
+            .Select(static entry => entry.ToString())
+            .Where(static entry => !string.IsNullOrWhiteSpace(entry))
+            .Select(static entry => (RedisKey)entry!)
+            .ToArray();
+
+        return (nextCursor, keys);
     }
 
     private static bool IsUnknownIndexException(RedisServerException exception) =>
