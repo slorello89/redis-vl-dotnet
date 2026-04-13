@@ -7,6 +7,7 @@ The active implementation roadmap is defined in [docs/parity-roadmap.md](/Users/
 Start with [docs/getting-started.md](/Users/steve.lorello/projects/redis/redis-vl-dotnet/docs/getting-started.md) for the core install, connection, schema, index, document, and query flow.
 Browse [examples/README.md](/Users/steve.lorello/projects/redis/redis-vl-dotnet/examples/README.md) for the runnable sample index, Redis prerequisites, and links to each example's local run instructions.
 Read [docs/extensions.md](/Users/steve.lorello/projects/redis/redis-vl-dotnet/docs/extensions.md) for the vectorizer abstractions package split and provider-extension layout.
+See [examples/OpenAiVectorizerExample/README.md](/Users/steve.lorello/projects/redis/redis-vl-dotnet/examples/OpenAiVectorizerExample/README.md) for a provider-backed OpenAI embedding flow with `SemanticCache`.
 
 ## Current Workspace
 
@@ -17,6 +18,7 @@ Read [docs/extensions.md](/Users/steve.lorello/projects/redis/redis-vl-dotnet/do
 - `examples/README.md`: examples index with prerequisites and workflow summaries
 - `examples/JsonStorageExample`: runnable console app for JSON-backed schema, load, fetch, and query flows
 - `examples/VectorSearchExample`: runnable console app for vector-field schema, deterministic seed data, and nearest-neighbor search
+- `examples/OpenAiVectorizerExample`: runnable console app for OpenAI-backed vectorization with `SemanticCache`
 - `redis-vl-dotnet.sln`: minimal solution scaffold so `dotnet build` is a valid repository quality gate from the first iteration
 - `prd.json`: Ralph execution plan
 - `progress.txt`: iteration log and reusable codebase patterns

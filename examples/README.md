@@ -105,6 +105,30 @@ Run it from the repository root:
 dotnet run --project examples/SemanticCacheExample/SemanticCacheExample.csproj
 ```
 
+### [OpenAiVectorizerExample](/Users/steve.lorello/projects/redis/redis-vl-dotnet/examples/OpenAiVectorizerExample/README.md)
+
+Demonstrates provider-backed vectorization with `SemanticCache`:
+
+- create a HASH-backed semantic cache sized for the configured OpenAI embedding dimensions
+- generate seed embeddings through the OpenAI extension package in one batch request
+- store a semantic cache entry with the generated embedding
+- retrieve a semantically similar cache hit by vectorizing a new prompt through OpenAI
+- drop the example index and documents
+
+Redis prerequisites:
+
+- RediSearch with vector similarity support
+
+Additional prerequisites:
+
+- `OPENAI_API_KEY`
+
+Run it from the repository root:
+
+```bash
+dotnet run --project examples/OpenAiVectorizerExample/OpenAiVectorizerExample.csproj
+```
+
 ## Related Docs
 
 - [Getting started guide](/Users/steve.lorello/projects/redis/redis-vl-dotnet/docs/getting-started.md)

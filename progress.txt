@@ -26,6 +26,7 @@ Started: Mon Apr 13 10:35:34 EDT 2026
 - Semantic workflow retrieval should keep session scoping in the RediSearch filter and express similarity as a `VectorRangeQuery` distance threshold, which lets role filters compose cleanly while preserving deterministic recency metadata on the stored HASH documents.
 - Semantic cache filter variants should declare explicit HASH-backed TAG/TEXT/NUMERIC fields in the cache options, validate supplied filter values against that schema before writes, and fold the normalized filter payload into the cache key so prompt variants can coexist without collisions.
 - Provider-backed embedding integrations should live in a separate abstractions package plus optional provider packages; keep the core library consuming the shared vectorizer interfaces and retain any legacy core-owned embedding interfaces only as migration shims.
+- Provider extension packages should accept the vendor SDK client as an injectable dependency for unit tests, keep any live provider coverage behind env-gated smoke tests, and avoid exposing SDK members marked as evaluation-only on the public wrapper surface.
 
 ---
 ## 2026-04-13 14:06:56 EDT - US-021
@@ -35,6 +36,15 @@ Started: Mon Apr 13 10:35:34 EDT 2026
 - Learnings for future iterations:
   - Patterns discovered: semantic workflows fit the existing API cleanly when they reuse HASH storage plus monotonic sequence fields for recency and add one vector field queried through `VectorRangeQuery` with session filters.
   - Gotchas encountered: vector range command assertions need to account for the inserted `PARAMS` clause before `SORTBY`, even when only the query vector is supplied.
+  - Useful context: there are still no `AGENTS.md` files anywhere in this repository, so reusable implementation guidance remains centralized in `progress.txt`.
+---
+## 2026-04-13 13:34:42 EDT - US-024
+- Implemented a real `RedisVlDotNet.Vectorizers.OpenAI` package with `OpenAiTextVectorizer` and `OpenAiVectorizerOptions`, supporting single-text and batch embedding requests through the official OpenAI `EmbeddingClient` while keeping the core library vendor-agnostic.
+- Files changed: `src/RedisVlDotNet.Vectorizers.OpenAI/RedisVlDotNet.Vectorizers.OpenAI.csproj`, `src/RedisVlDotNet.Vectorizers.OpenAI/OpenAiTextVectorizer.cs`, `src/RedisVlDotNet.Vectorizers.OpenAI/OpenAiVectorizerOptions.cs`, `tests/RedisVlDotNet.Tests/RedisVlDotNet.Tests.csproj`, `tests/RedisVlDotNet.Tests/Vectorizers/OpenAiIntegrationFactAttribute.cs`, `tests/RedisVlDotNet.Tests/Vectorizers/OpenAiTestEnvironment.cs`, `tests/RedisVlDotNet.Tests/Vectorizers/OpenAiTextVectorizerTests.cs`, `tests/RedisVlDotNet.Tests/Vectorizers/OpenAiTextVectorizerSmokeTests.cs`, `examples/OpenAiVectorizerExample/OpenAiVectorizerExample.csproj`, `examples/OpenAiVectorizerExample/Program.cs`, `examples/OpenAiVectorizerExample/README.md`, `examples/README.md`, `docs/extensions.md`, `README.md`, `redis-vl-dotnet.sln`, `prd.json`, `progress.txt`
+- Quality checks run and result: `dotnet restore redis-vl-dotnet.sln` passed. `dotnet test tests/RedisVlDotNet.Tests/RedisVlDotNet.Tests.csproj --no-restore --filter "FullyQualifiedName~OpenAiTextVectorizerTests|FullyQualifiedName~OpenAiTextVectorizerSmokeTests"` passed with the live OpenAI smoke test skipped because `OPENAI_API_KEY` was not configured locally. `dotnet build examples/OpenAiVectorizerExample/OpenAiVectorizerExample.csproj --no-restore` passed. `dotnet build redis-vl-dotnet.sln --no-restore -m:1` passed. `dotnet test redis-vl-dotnet.sln --no-restore -m:1` passed with 40 Redis-backed integration tests skipped because `REDIS_VL_REDIS_URL` was not configured locally and 1 live OpenAI smoke test skipped because `OPENAI_API_KEY` was not configured locally.
+- Learnings for future iterations:
+  - Patterns discovered: provider extension packages stay testable when they accept the vendor SDK client in the public constructor and keep per-request provider options in a small immutable wrapper instead of sharing mutable SDK request objects across calls.
+  - Gotchas encountered: the OpenAI .NET SDK marks some convenience members like `EmbeddingClient.Model` and `EmbeddingClient.Endpoint` as evaluation-only, so wrapper packages should avoid surfacing those members unless they intentionally suppress the SDK diagnostic.
   - Useful context: there are still no `AGENTS.md` files anywhere in this repository, so reusable implementation guidance remains centralized in `progress.txt`.
 ---
 
