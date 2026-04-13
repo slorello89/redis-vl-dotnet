@@ -75,7 +75,12 @@ public sealed record SearchSchema
             }
 
             return new SearchSchema(
-                new IndexDefinition(Index.Name!, Index.Prefix!, ParseEnum<StorageType>(Index.StorageType, "index.storage_type")),
+                new IndexDefinition(
+                    Index.Name!,
+                    Index.Prefix!,
+                    ParseEnum<StorageType>(Index.StorageType, "index.storage_type"),
+                    ParseKeySeparator(Index.KeySeparator),
+                    ParseStopwords(Index.Stopwords)),
                 Fields.Select(MapField));
         }
 
@@ -175,6 +180,33 @@ public sealed record SearchSchema
                 : throw new ArgumentException("Tag field separator must be a single character.", nameof(rawValue));
         }
 
+        private static char ParseKeySeparator(string? rawValue)
+        {
+            var normalized = NormalizeOptional(rawValue);
+            if (string.IsNullOrEmpty(normalized))
+            {
+                return ':';
+            }
+
+            return normalized.Length == 1 && !char.IsWhiteSpace(normalized[0])
+                ? normalized[0]
+                : throw new ArgumentException("Index key separator must be a single non-whitespace character.", nameof(rawValue));
+        }
+
+        private static IReadOnlyList<string>? ParseStopwords(List<string>? values)
+        {
+            if (values is null)
+            {
+                return null;
+            }
+
+            return values
+                .Select(static stopword => string.IsNullOrWhiteSpace(stopword)
+                    ? throw new ArgumentException("Index stopwords cannot contain blank values.", nameof(values))
+                    : stopword.Trim())
+                .ToArray();
+        }
+
         private static string NormalizeRequired(string? value, string paramName)
         {
             if (string.IsNullOrWhiteSpace(value))
@@ -195,7 +227,11 @@ public sealed record SearchSchema
 
         public string? Prefix { get; init; }
 
+        public string? KeySeparator { get; init; }
+
         public string? StorageType { get; init; }
+
+        public List<string>? Stopwords { get; init; }
     }
 
     private sealed class YamlFieldDefinition

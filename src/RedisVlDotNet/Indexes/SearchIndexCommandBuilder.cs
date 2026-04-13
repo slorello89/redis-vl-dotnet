@@ -18,6 +18,15 @@ internal static class SearchIndexCommandBuilder
             schema.Index.Prefixes.Count.ToString(CultureInfo.InvariantCulture)
         };
         arguments.AddRange(schema.Index.Prefixes);
+        arguments.Add("SEPARATOR");
+        arguments.Add(schema.Index.KeySeparator.ToString());
+        if (schema.Index.Stopwords is not null)
+        {
+            arguments.Add("STOPWORDS");
+            arguments.Add(schema.Index.Stopwords.Count.ToString(CultureInfo.InvariantCulture));
+            arguments.AddRange(schema.Index.Stopwords);
+        }
+
         arguments.Add("SCHEMA");
 
         foreach (var field in schema.Fields)

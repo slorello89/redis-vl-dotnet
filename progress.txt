@@ -5,6 +5,7 @@ Started: Mon Apr 13 10:35:34 EDT 2026
 - Keep the active roadmap contract in a dedicated doc and link it from `README.md` and `docs/getting-started.md` so implementation work and user-facing navigation stay aligned.
 - When parity decisions depend on Java and Python comparisons, record intentional .NET-native differences explicitly so later feature work targets capabilities rather than cross-language API cloning.
 - For index metadata extensions, preserve `IndexDefinition.Prefix` as the primary write-path namespace and add new FT.CREATE metadata via separate strongly typed properties so document loading APIs stay backward compatible.
+- Model optional FT.CREATE metadata as nullable index properties where `null` means Redis defaults and an empty collection means an explicit `0`-count clause, so default and disabled behaviors remain distinguishable in both code-first and YAML schema paths.
 
 ---
 
@@ -25,4 +26,13 @@ Started: Mon Apr 13 10:35:34 EDT 2026
   - Patterns discovered: new schema metadata should be modeled in a way that leaves document load/fetch helpers compatible with existing prefix-based key generation unless the story explicitly changes write semantics.
   - Gotchas encountered: `SearchIndexInfo` currently exposes FT.INFO as a generic attribute bag, so integration assertions should prefer existing search/count helpers unless a story specifically adds typed info parsing.
   - Useful context: the JSON example is the current runnable example surface for schema metadata, so parity-facing index option examples can usually be extended there without creating a new sample app.
+---
+## 2026-04-13 10:43:26 EDT - US-003
+- Implemented index-level `KeySeparator` and `Stopwords` metadata on `IndexDefinition`, added YAML parsing for `key_separator` and `stopwords`, and emitted the corresponding `SEPARATOR` and `STOPWORDS` clauses from `FT.CREATE`.
+- Files changed: `src/RedisVlDotNet/Schema/IndexDefinition.cs`, `src/RedisVlDotNet/Schema/SearchSchema.cs`, `src/RedisVlDotNet/Indexes/SearchIndexCommandBuilder.cs`, `tests/RedisVlDotNet.Tests/Schema/SearchSchemaTests.cs`, `tests/RedisVlDotNet.Tests/Indexes/SearchIndexCommandBuilderTests.cs`, `tests/RedisVlDotNet.Tests/Indexes/SearchIndexIntegrationTests.cs`, `examples/JsonStorageExample/Program.cs`, `prd.json`, `progress.txt`
+- Quality checks run and result: `dotnet build redis-vl-dotnet.sln --no-restore` passed. `dotnet test tests/RedisVlDotNet.Tests/RedisVlDotNet.Tests.csproj --no-build --filter "FullyQualifiedName~SearchSchemaTests|FullyQualifiedName~SearchIndexCommandBuilderTests|FullyQualifiedName~SearchIndexIntegrationTests"` passed with Redis-backed integration tests skipped because the Redis search test environment was not configured locally.
+- Learnings for future iterations:
+  - Patterns discovered: index-level schema options fit best on `IndexDefinition`, while YAML keeps upstream-compatible names like `key_separator` and `stopwords`.
+  - Gotchas encountered: Redis default stopwords are represented by omitting the `STOPWORDS` clause entirely, so the model needs `null` for default behavior and an empty collection for `STOPWORDS 0`.
+  - Useful context: `SearchIndexInfo` can still validate FT.INFO metadata for integration tests by inspecting the raw `index_definition` and `stopwords_list` bags even before typed parsing exists.
 ---

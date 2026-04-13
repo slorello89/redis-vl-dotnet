@@ -90,6 +90,50 @@ public sealed class SearchIndexIntegrationTests
     }
 
     [RedisSearchIntegrationFact]
+    public async Task CreatesIndexWithKeySeparatorAndStopwords()
+    {
+        await using var connection = await RedisSearchTestEnvironment.ConnectAsync();
+        var database = connection.GetDatabase();
+
+        var token = Guid.NewGuid().ToString("N");
+        var schema = new SearchSchema(
+            new IndexDefinition(
+                $"movies-stopwords-idx-{token}",
+                $"movie:{token}:",
+                StorageType.Hash,
+                keySeparator: '|',
+                stopwords: ["the", "a", "an"]),
+            [
+                new TextFieldDefinition("title", sortable: true),
+                new TagFieldDefinition("genre")
+            ]);
+        var index = new SearchIndex(database, schema);
+
+        try
+        {
+            await index.CreateAsync();
+
+            var info = await index.InfoAsync();
+
+            Assert.True(info.TryGetValue("index_definition", out var definitionValue));
+            Assert.True(info.TryGetValue("stopwords_list", out var stopwordsValue));
+
+            var definition = ToFlatStringDictionary(definitionValue);
+            var stopwords = ((RedisResult[])stopwordsValue!).Select(static entry => entry.ToString()!).ToArray();
+
+            Assert.Equal("|", definition["separator"]);
+            Assert.Equal(["the", "a", "an"], stopwords);
+        }
+        finally
+        {
+            if (await index.ExistsAsync())
+            {
+                await index.DropAsync(deleteDocuments: true);
+            }
+        }
+    }
+
+    [RedisSearchIntegrationFact]
     public async Task ExecutesAsyncIndexAndTypedQueryFlowWithCancellationToken()
     {
         await using var connection = await RedisSearchTestEnvironment.ConnectAsync();
@@ -497,6 +541,19 @@ public sealed class SearchIndexIntegrationTests
     private sealed record HashMovieDocument(string Id, string Title, int Year, string Genre);
 
     private sealed record HashMovieEnvelope(string ExternalId, string Title, int Year, string Genre);
+
+    private static IReadOnlyDictionary<string, string> ToFlatStringDictionary(RedisResult result)
+    {
+        var entries = (RedisResult[])result!;
+        var dictionary = new Dictionary<string, string>(StringComparer.Ordinal);
+
+        for (var index = 0; index < entries.Length; index += 2)
+        {
+            dictionary[entries[index].ToString()!] = entries[index + 1].ToString()!;
+        }
+
+        return dictionary;
+    }
 
     private static async Task SeedHashDocumentsAsync(
         IDatabase database,

@@ -11,7 +11,12 @@ public sealed class SearchSchemaTests
             index:
               name: docs-idx
               prefix: "docs:"
+              key_separator: "|"
               storage_type: json
+              stopwords:
+                - the
+                - a
+                - an
             fields:
               - name: title
                 type: text
@@ -45,7 +50,9 @@ public sealed class SearchSchemaTests
 
         Assert.Equal("docs-idx", schema.Index.Name);
         Assert.Equal("docs:", schema.Index.Prefix);
+        Assert.Equal('|', schema.Index.KeySeparator);
         Assert.Equal(StorageType.Json, schema.Index.StorageType);
+        Assert.Equal(["the", "a", "an"], schema.Index.Stopwords);
 
         Assert.Collection(
             schema.Fields,
@@ -194,6 +201,8 @@ public sealed class SearchSchemaTests
         Assert.Equal("docs-idx", schema.Index.Name);
         Assert.Equal("docs:", schema.Index.Prefix);
         Assert.Equal(["docs:"], schema.Index.Prefixes);
+        Assert.Equal(':', schema.Index.KeySeparator);
+        Assert.Null(schema.Index.Stopwords);
         Assert.Equal(StorageType.Json, schema.Index.StorageType);
         Assert.Empty(schema.Fields);
     }
@@ -208,7 +217,21 @@ public sealed class SearchSchemaTests
         Assert.Equal("docs-idx", schema.Index.Name);
         Assert.Equal("docs:", schema.Index.Prefix);
         Assert.Equal(["docs:", "archive:"], schema.Index.Prefixes);
+        Assert.Equal(':', schema.Index.KeySeparator);
+        Assert.Null(schema.Index.Stopwords);
         Assert.Equal(StorageType.Json, schema.Index.StorageType);
+    }
+
+    [Fact]
+    public void CreatesSchemaWithKeySeparatorAndDisabledStopwords()
+    {
+        var schema = new SearchSchema(
+            new IndexDefinition("docs-idx", "docs:", StorageType.Json, keySeparator: '|', stopwords: []),
+            Array.Empty<FieldDefinition>());
+
+        Assert.Equal('|', schema.Index.KeySeparator);
+        Assert.NotNull(schema.Index.Stopwords);
+        Assert.Empty(schema.Index.Stopwords!);
     }
 
     [Fact]
@@ -288,7 +311,29 @@ public sealed class SearchSchemaTests
         Assert.Throws<ArgumentException>(() => new IndexDefinition("", "docs:", StorageType.Json));
         Assert.Throws<ArgumentException>(() => new IndexDefinition("docs-idx", Array.Empty<string>(), StorageType.Json));
         Assert.Throws<ArgumentException>(() => new IndexDefinition("docs-idx", ["docs:", " "], StorageType.Json));
+        Assert.Throws<ArgumentException>(() => new IndexDefinition("docs-idx", "docs:", StorageType.Json, keySeparator: ' '));
+        Assert.Throws<ArgumentException>(() => new IndexDefinition("docs-idx", "docs:", StorageType.Json, stopwords: ["the", " "]));
         Assert.Throws<ArgumentException>(() => new TextFieldDefinition(" "));
+    }
+
+    [Fact]
+    public void RejectsYamlWithInvalidIndexMetadata()
+    {
+        const string yaml = """
+            index:
+              name: docs-idx
+              prefix: "docs:"
+              key_separator: "::"
+              storage_type: json
+              stopwords:
+                - the
+                - " "
+            fields:
+              - name: title
+                type: text
+            """;
+
+        Assert.Throws<ArgumentException>(() => SearchSchema.FromYaml(yaml));
     }
 
     [Fact]

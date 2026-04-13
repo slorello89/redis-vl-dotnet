@@ -12,7 +12,12 @@ using var redis = await ConnectionMultiplexer.ConnectAsync(redisUrl);
 var database = redis.GetDatabase();
 
 var schema = new SearchSchema(
-    new IndexDefinition("json-storage-example-idx", ["json-example:", "json-example-archive:"], StorageType.Json),
+    new IndexDefinition(
+        "json-storage-example-idx",
+        ["json-example:", "json-example-archive:"],
+        StorageType.Json,
+        keySeparator: '|',
+        stopwords: []),
     [
         new TextFieldDefinition("title"),
         new NumericFieldDefinition("year"),
@@ -47,6 +52,7 @@ var scienceFictionCount = await index.CountAsync(
 Console.WriteLine($"Loaded keys: {string.Join(", ", loadedKeys)}");
 Console.WriteLine($"Fetched by id: {fetchedMovie?.Title} ({fetchedMovie?.Year})");
 Console.WriteLine($"Science fiction count: {scienceFictionCount}");
+Console.WriteLine($"Index metadata: separator '{schema.Index.KeySeparator}', stopwords disabled.");
 Console.WriteLine("Query results:");
 
 foreach (var movie in searchResults.Documents)

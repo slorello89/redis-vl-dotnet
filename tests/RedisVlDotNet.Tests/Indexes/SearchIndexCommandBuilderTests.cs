@@ -33,7 +33,7 @@ public sealed class SearchIndexCommandBuilderTests
 
         Assert.Equal(
             [
-                "movies-idx", "ON", "HASH", "PREFIX", "1", "movie:", "SCHEMA",
+                "movies-idx", "ON", "HASH", "PREFIX", "1", "movie:", "SEPARATOR", ":", "SCHEMA",
                 "title", "TEXT", "SORTABLE", "NOSTEM", "PHONETIC", "dm:en",
                 "genre", "TAG", "SEPARATOR", ";", "CASESENSITIVE",
                 "rating", "NUMERIC", "SORTABLE",
@@ -67,7 +67,7 @@ public sealed class SearchIndexCommandBuilderTests
 
         Assert.Equal(
             [
-                "docs-idx", "ON", "JSON", "PREFIX", "1", "docs:", "SCHEMA",
+                "docs-idx", "ON", "JSON", "PREFIX", "1", "docs:", "SEPARATOR", ":", "SCHEMA",
                 "$.title", "AS", "title", "TEXT",
                 "$.rating", "AS", "score", "NUMERIC",
                 "$.embedding", "AS", "embedding", "VECTOR", "FLAT", "8",
@@ -89,7 +89,45 @@ public sealed class SearchIndexCommandBuilderTests
 
         Assert.Equal(
             [
-                "docs-idx", "ON", "HASH", "PREFIX", "2", "docs:", "archive:", "SCHEMA",
+                "docs-idx", "ON", "HASH", "PREFIX", "2", "docs:", "archive:", "SEPARATOR", ":", "SCHEMA",
+                "title", "TEXT"
+            ],
+            arguments.Select(static argument => argument.ToString()!).ToArray());
+    }
+
+    [Fact]
+    public void BuildsCreateArgumentsWithKeySeparatorAndDisabledStopwords()
+    {
+        var schema = new SearchSchema(
+            new IndexDefinition("docs-idx", "docs:", StorageType.Hash, keySeparator: '|', stopwords: []),
+            [
+                new TextFieldDefinition("title")
+            ]);
+
+        var arguments = SearchIndexCommandBuilder.BuildCreateArguments(schema);
+
+        Assert.Equal(
+            [
+                "docs-idx", "ON", "HASH", "PREFIX", "1", "docs:", "SEPARATOR", "|", "STOPWORDS", "0", "SCHEMA",
+                "title", "TEXT"
+            ],
+            arguments.Select(static argument => argument.ToString()!).ToArray());
+    }
+
+    [Fact]
+    public void BuildsCreateArgumentsWithCustomStopwords()
+    {
+        var schema = new SearchSchema(
+            new IndexDefinition("docs-idx", "docs:", StorageType.Hash, stopwords: ["the", "a", "an"]),
+            [
+                new TextFieldDefinition("title")
+            ]);
+
+        var arguments = SearchIndexCommandBuilder.BuildCreateArguments(schema);
+
+        Assert.Equal(
+            [
+                "docs-idx", "ON", "HASH", "PREFIX", "1", "docs:", "SEPARATOR", ":", "STOPWORDS", "3", "the", "a", "an", "SCHEMA",
                 "title", "TEXT"
             ],
             arguments.Select(static argument => argument.ToString()!).ToArray());
