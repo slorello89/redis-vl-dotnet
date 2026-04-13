@@ -600,6 +600,59 @@ public sealed class SearchIndexIntegrationTests
     }
 
     [RedisSearchIntegrationFact]
+    public async Task PartiallyUpdatesHashDocumentsByIdAndByKey()
+    {
+        await using var connection = await RedisSearchTestEnvironment.ConnectAsync();
+        var database = connection.GetDatabase();
+
+        var token = Guid.NewGuid().ToString("N");
+        var schema = new SearchSchema(
+            new IndexDefinition($"hash-update-idx-{token}", $"hashupdate:{token}:", StorageType.Hash),
+            [
+                new TextFieldDefinition("title"),
+                new NumericFieldDefinition("year"),
+                new TagFieldDefinition("genre")
+            ]);
+        var index = new SearchIndex(database, schema);
+
+        try
+        {
+            await index.CreateAsync();
+
+            var key = await index.LoadHashAsync(new HashMovieDocument("movie-1", "Heat", 1995, "crime"));
+            await RedisSearchTestEnvironment.WaitForIndexDocumentCountAsync(index, 1);
+
+            var updatedById = await index.UpdateHashByIdAsync(
+                "movie-1",
+                [
+                    new HashPartialUpdate("title", "Heat: Director's Cut"),
+                    new HashPartialUpdate("year", 1996)
+                ]);
+            var updatedByKey = await index.UpdateHashByKeyAsync(
+                key,
+                [new HashPartialUpdate("genre", "neo-noir")]);
+            var updated = await index.FetchHashByIdAsync<HashMovieDocument>("movie-1");
+            var results = await index.SearchAsync<HashMovieDocument>(
+                new FilterQuery(Filter.Tag("genre").Eq("neo-noir"), ["title", "year", "genre"]));
+
+            Assert.True(updatedById);
+            Assert.True(updatedByKey);
+            Assert.Equal("Heat: Director's Cut", updated!.Title);
+            Assert.Equal(1996, updated.Year);
+            Assert.Equal("neo-noir", updated.Genre);
+            Assert.Single(results.Documents);
+            Assert.Equal("Heat: Director's Cut", results.Documents[0].Title);
+        }
+        finally
+        {
+            if (await index.ExistsAsync())
+            {
+                await index.DropAsync(deleteDocuments: true);
+            }
+        }
+    }
+
+    [RedisSearchIntegrationFact]
     public async Task ClearsHashDocumentsWithoutDroppingIndex()
     {
         await using var connection = await RedisSearchTestEnvironment.ConnectAsync();

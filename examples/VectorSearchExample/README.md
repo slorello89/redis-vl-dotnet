@@ -4,9 +4,16 @@ This example is a runnable .NET 9 console app that demonstrates the smallest vec
 
 - define a HASH-backed schema with a vector field
 - seed deterministic sample documents with raw float32 embedding bytes
+- partially update top-level HASH fields with `UpdateHashByIdAsync(...)`
 - execute a nearest-neighbor query against the vector field
 - inspect returned titles, summaries, and vector distances
 - drop the example index and documents
+
+HASH partial updates in this example use Redis `HSET` semantics:
+
+- update targets are plain top-level field names such as `summary` and `genre`
+- fields omitted from the update stay unchanged in the stored HASH
+- `null` values are not supported by the helper because HASH writes in this library treat nulls as missing fields, not deletions
 
 ## Prerequisites
 

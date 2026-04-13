@@ -104,6 +104,23 @@ public sealed class SearchIndexAsyncTests
     }
 
     [Fact]
+    public async Task UpdateHashByKeyAsync_WithCancelledToken_DoesNotWriteToRedis()
+    {
+        var (database, recorder) = RecordingDatabaseProxy.CreatePair();
+        var index = new SearchIndex(database, CreateHashSchema("cancel-hash-update"));
+
+        using var cancellationTokenSource = new CancellationTokenSource();
+        await cancellationTokenSource.CancelAsync();
+
+        await Assert.ThrowsAsync<OperationCanceledException>(() => index.UpdateHashByKeyAsync(
+            "movie:1",
+            [new HashPartialUpdate("title", "Updated")],
+            cancellationTokenSource.Token));
+        Assert.Equal(0, recorder.HashGetAllAsyncCallCount);
+        Assert.Equal(0, recorder.HashSetAsyncCallCount);
+    }
+
+    [Fact]
     public async Task LoadHashAsync_CancelsBetweenBatchDocuments()
     {
         var (database, recorder) = RecordingDatabaseProxy.CreatePair();
@@ -216,6 +233,67 @@ public sealed class SearchIndexAsyncTests
             [new JsonPartialUpdate("$.title", "a"), new JsonPartialUpdate(" $.title ", "b")]));
 
         Assert.Equal(0, recorder.ExecuteAsyncCallCount);
+    }
+
+    [Fact]
+    public async Task UpdateHashByKeyAsync_ValidatesAndExecutesSingleHashSet()
+    {
+        var (database, recorder) = RecordingDatabaseProxy.CreatePair();
+        var index = new SearchIndex(database, CreateHashSchema("hash-update"));
+        recorder.HashGetAllResponses.Enqueue([new HashEntry("title", "Heat")]);
+
+        var updated = await index.UpdateHashByKeyAsync(
+            " movie:1 ",
+            [
+                new HashPartialUpdate(" title ", "Updated title"),
+                new HashPartialUpdate("year", 1996),
+                new HashPartialUpdate("genre", new[] { "crime", "drama" })
+            ]);
+
+        Assert.True(updated);
+        Assert.Equal(1, recorder.HashGetAllAsyncCallCount);
+        Assert.Equal(1, recorder.HashSetAsyncCallCount);
+        Assert.Equal("movie:1", recorder.HashGetAllKeys[0].ToString());
+        Assert.Equal("movie:1", recorder.HashSetCalls[0].Key.ToString());
+        Assert.Equal(
+            ["title", "year", "genre"],
+            recorder.HashSetCalls[0].Entries.Select(static entry => entry.Name.ToString()).ToArray());
+        Assert.Equal("Updated title", recorder.HashSetCalls[0].Entries[0].Value.ToString());
+        Assert.Equal("1996", recorder.HashSetCalls[0].Entries[1].Value.ToString());
+        Assert.Equal("[\"crime\",\"drama\"]", recorder.HashSetCalls[0].Entries[2].Value.ToString());
+    }
+
+    [Fact]
+    public async Task UpdateHashByIdAsync_ReturnsFalseWhenDocumentIsMissing()
+    {
+        var (database, recorder) = RecordingDatabaseProxy.CreatePair();
+        var index = new SearchIndex(database, CreateHashSchema("missing-hash-doc"));
+
+        var updated = await index.UpdateHashByIdAsync(
+            "movie-1",
+            [new HashPartialUpdate("title", "Updated title")]);
+
+        Assert.False(updated);
+        Assert.Equal(1, recorder.HashGetAllAsyncCallCount);
+        Assert.Equal(0, recorder.HashSetAsyncCallCount);
+        Assert.Equal($"{index.Schema.Index.Prefix}movie-1", recorder.HashGetAllKeys[0].ToString());
+    }
+
+    [Fact]
+    public async Task UpdateHashByKeyAsync_RejectsInvalidUpdateRequests()
+    {
+        var (database, recorder) = RecordingDatabaseProxy.CreatePair();
+        var index = new SearchIndex(database, CreateHashSchema("invalid-hash-update"));
+
+        await Assert.ThrowsAsync<ArgumentException>(() => index.UpdateHashByKeyAsync("movie:1", Array.Empty<HashPartialUpdate>()));
+        await Assert.ThrowsAsync<ArgumentException>(() => index.UpdateHashByKeyAsync("movie:1", [new HashPartialUpdate("", "invalid")]));
+        await Assert.ThrowsAsync<ArgumentException>(() => index.UpdateHashByKeyAsync("movie:1", [new HashPartialUpdate("title", null)]));
+        await Assert.ThrowsAsync<ArgumentException>(() => index.UpdateHashByKeyAsync(
+            "movie:1",
+            [new HashPartialUpdate("title", "a"), new HashPartialUpdate(" title ", "b")]));
+
+        Assert.Equal(0, recorder.HashGetAllAsyncCallCount);
+        Assert.Equal(0, recorder.HashSetAsyncCallCount);
     }
 
     [Fact]
@@ -459,6 +537,8 @@ public sealed class SearchIndexAsyncTests
 
         public int HashSetAsyncCallCount { get; private set; }
 
+        public Queue<HashEntry[]> HashGetAllResponses { get; } = new();
+
         public int KeyDeleteAsyncCallCount { get; private set; }
 
         public Func<string, object[], Task<RedisResult>>? OnExecuteAsync { get; set; }
@@ -468,6 +548,10 @@ public sealed class SearchIndexAsyncTests
         public Queue<RedisResult> ExecuteAsyncResponses { get; } = new();
 
         public List<(string Command, string Pattern, object[] Arguments)> ExecuteAsyncCalls { get; } = [];
+
+        public List<RedisKey> HashGetAllKeys { get; } = [];
+
+        public List<(RedisKey Key, HashEntry[] Entries)> HashSetCalls { get; } = [];
 
         public List<RedisKey[]> KeyDeleteBatches { get; } = [];
 
@@ -485,7 +569,7 @@ public sealed class SearchIndexAsyncTests
             return targetMethod.Name switch
             {
                 nameof(IDatabase.ExecuteAsync) => HandleExecuteAsync(args),
-                nameof(IDatabase.HashGetAllAsync) => HandleHashGetAllAsync(),
+                nameof(IDatabase.HashGetAllAsync) => HandleHashGetAllAsync(args),
                 nameof(IDatabase.HashSetAsync) => HandleHashSetAsync(args),
                 nameof(IDatabase.KeyDeleteAsync) => HandleKeyDeleteAsync(args),
                 nameof(IDatabase.Multiplexer) => throw new NotSupportedException(),
@@ -517,15 +601,23 @@ public sealed class SearchIndexAsyncTests
             return Task.FromResult(RedisResult.Create((RedisValue)"OK"));
         }
 
-        private Task<HashEntry[]> HandleHashGetAllAsync()
+        private Task<HashEntry[]> HandleHashGetAllAsync(object?[]? args)
         {
             HashGetAllAsyncCallCount++;
+            HashGetAllKeys.Add((RedisKey)args![0]!);
+
+            if (HashGetAllResponses.Count > 0)
+            {
+                return Task.FromResult(HashGetAllResponses.Dequeue());
+            }
+
             return Task.FromResult(Array.Empty<HashEntry>());
         }
 
         private Task<bool> HandleHashSetAsync(object?[]? args)
         {
             HashSetAsyncCallCount++;
+            HashSetCalls.Add(((RedisKey)args![0]!, (HashEntry[])args[1]!));
 
             if (OnHashSetAsync is not null)
             {

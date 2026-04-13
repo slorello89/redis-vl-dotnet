@@ -36,6 +36,14 @@ try
     await SeedDocumentsAsync(database, schema);
     await WaitForDocumentCountAsync(index, expectedCount: 3);
 
+    var updated = await index.UpdateHashByIdAsync(
+        "arrival",
+        [
+            new HashPartialUpdate("summary", "A linguist decodes messages from alien visitors."),
+            new HashPartialUpdate("genre", "sci-fi")
+        ]);
+    var updatedArrival = await index.FetchHashByIdAsync<HashMovie>("arrival");
+
     var queryVector = new[] { 1f, 0f };
     var vectorQuery = VectorQuery.FromFloat32(
         fieldName: "embedding",
@@ -47,6 +55,7 @@ try
 
     var results = await index.SearchAsync(vectorQuery);
 
+    Console.WriteLine($"Updated arrival hash fields: {updated} -> {updatedArrival?.Genre}");
     Console.WriteLine($"Query vector: [{string.Join(", ", queryVector.Select(static value => value.ToString("0.0", CultureInfo.InvariantCulture)))}]");
     Console.WriteLine("Nearest neighbors within the crime genre:");
 
@@ -140,3 +149,4 @@ static byte[] EncodeFloat32(float[] vector)
 }
 
 internal sealed record HashSeedDocument(string Id, HashEntry[] Entries);
+internal sealed record HashMovie(string Id, string Title, string Genre, string Summary);

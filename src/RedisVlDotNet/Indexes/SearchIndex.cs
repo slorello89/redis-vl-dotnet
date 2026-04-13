@@ -335,6 +335,41 @@ public sealed class SearchIndex
     public Task<bool> DeleteHashByIdAsync(string id, CancellationToken cancellationToken = default) =>
         DeleteHashByKeyAsync(DocumentKeyResolver.ResolveKeyFromId(Schema, id), cancellationToken);
 
+    public bool UpdateHashByKey(string key, params HashPartialUpdate[] updates) =>
+        UpdateHashByKeyAsync(key, updates).GetAwaiter().GetResult();
+
+    public async Task<bool> UpdateHashByKeyAsync(
+        string key,
+        IEnumerable<HashPartialUpdate> updates,
+        CancellationToken cancellationToken = default)
+    {
+        EnsureHashStorage();
+        ArgumentException.ThrowIfNullOrWhiteSpace(key);
+
+        var normalizedKey = key.Trim();
+        var normalizedUpdates = NormalizeHashPartialUpdates(updates);
+        if (!await HashDocumentExistsAsync(normalizedKey, cancellationToken).ConfigureAwait(false))
+        {
+            return false;
+        }
+
+        var entries = normalizedUpdates
+            .Select(update => HashDocumentMapper.ToHashEntry(update.Field, update.Value, _serializerOptions))
+            .ToArray();
+
+        await _database.HashSetAsync(normalizedKey, entries).WaitAsync(cancellationToken).ConfigureAwait(false);
+        return true;
+    }
+
+    public bool UpdateHashById(string id, params HashPartialUpdate[] updates) =>
+        UpdateHashByIdAsync(id, updates).GetAwaiter().GetResult();
+
+    public Task<bool> UpdateHashByIdAsync(
+        string id,
+        IEnumerable<HashPartialUpdate> updates,
+        CancellationToken cancellationToken = default) =>
+        UpdateHashByKeyAsync(DocumentKeyResolver.ResolveKeyFromId(Schema, id), updates, cancellationToken);
+
     public SearchResults Search(VectorQuery query) =>
         SearchAsync(query).GetAwaiter().GetResult();
 
@@ -566,6 +601,13 @@ public sealed class SearchIndex
         return result is not null && !result.IsNull;
     }
 
+    private async Task<bool> HashDocumentExistsAsync(string key, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var entries = await _database.HashGetAllAsync(key).WaitAsync(cancellationToken).ConfigureAwait(false);
+        return entries.Length > 0;
+    }
+
     private static IReadOnlyList<JsonPartialUpdate> NormalizeJsonPartialUpdates(IEnumerable<JsonPartialUpdate> updates)
     {
         ArgumentNullException.ThrowIfNull(updates);
@@ -606,5 +648,43 @@ public sealed class SearchIndex
         }
 
         return normalizedPath;
+    }
+
+    private static IReadOnlyList<HashPartialUpdate> NormalizeHashPartialUpdates(IEnumerable<HashPartialUpdate> updates)
+    {
+        ArgumentNullException.ThrowIfNull(updates);
+
+        var normalizedUpdates = new List<HashPartialUpdate>();
+        var uniqueFields = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var update in updates)
+        {
+            var normalizedField = NormalizeHashField(update.Field);
+            if (!uniqueFields.Add(normalizedField))
+            {
+                throw new ArgumentException($"Duplicate hash update field '{normalizedField}' is not allowed.", nameof(updates));
+            }
+
+            if (update.Value is null)
+            {
+                throw new ArgumentException(
+                    $"Hash partial update field '{normalizedField}' cannot be null. HASH updates only support setting concrete top-level values.",
+                    nameof(updates));
+            }
+
+            normalizedUpdates.Add(update with { Field = normalizedField });
+        }
+
+        if (normalizedUpdates.Count == 0)
+        {
+            throw new ArgumentException("At least one hash partial update is required.", nameof(updates));
+        }
+
+        return normalizedUpdates;
+    }
+
+    private static string NormalizeHashField(string field)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(field);
+        return field.Trim();
     }
 }

@@ -71,6 +71,20 @@ internal static class HashDocumentMapper
         return JsonSerializer.Deserialize<TDocument>(stream.ToArray(), serializerOptions);
     }
 
+    public static HashEntry ToHashEntry(string field, object? value, JsonSerializerOptions serializerOptions)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(field);
+        ArgumentNullException.ThrowIfNull(serializerOptions);
+
+        if (value is null)
+        {
+            throw new ArgumentException("Hash partial update values cannot be null.", nameof(value));
+        }
+
+        var element = JsonSerializer.SerializeToElement(value, serializerOptions);
+        return new HashEntry(field.Trim(), ToRedisValue(element));
+    }
+
     private static RedisValue ToRedisValue(JsonElement element) =>
         element.ValueKind switch
         {
