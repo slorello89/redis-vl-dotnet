@@ -28,6 +28,7 @@ Started: Mon Apr 13 10:35:34 EDT 2026
 - Provider-backed embedding integrations should live in a separate abstractions package plus optional provider packages; keep the core library consuming the shared vectorizer interfaces and retain any legacy core-owned embedding interfaces only as migration shims.
 - Provider extension packages should accept the vendor SDK client as an injectable dependency for unit tests, keep any live provider coverage behind env-gated smoke tests, and avoid exposing SDK members marked as evaluation-only on the public wrapper surface.
 - HTTP-based provider vectorizers should model the provider's published JSON payload directly, omit unset optional fields from serialized requests, and allow an endpoint override so shared tests can assert request shape without depending on one hosted route.
+- AI extension seams stay easier to evolve when the abstractions assembly owns immutable request/result DTOs and convenience extensions, while future provider packages enter the solution first as marker scaffolds that reference only the shared abstractions package.
 
 ---
 ## 2026-04-13 13:41:07 EDT - US-025
@@ -37,6 +38,15 @@ Started: Mon Apr 13 10:35:34 EDT 2026
 - Learnings for future iterations:
   - Patterns discovered: HTTP-backed provider packages stay predictable when they serialize only the documented request fields, preserve single-string versus string-array input shapes, and expose endpoint overrides so tests and dedicated endpoints reuse the same vectorizer type.
   - Gotchas encountered: serializing nullable request options with the default web serializer emits explicit `null` properties unless each optional payload member is marked to ignore nulls, which can break request-shape assertions and may violate provider expectations.
+  - Useful context: there are still no `AGENTS.md` files anywhere in this repository, so reusable implementation guidance remains centralized in `progress.txt`.
+---
+## 2026-04-13 13:45:03 EDT - US-026
+- Implemented a new `RedisVlDotNet.Rerankers.Abstractions` package with `ITextReranker`, shared `RerankRequest`/`RerankDocument`/`RerankResult` DTOs, and `TextRerankerExtensions` convenience overloads for reranking plain string candidates without adding provider code to the core assembly.
+- Files changed: `src/RedisVlDotNet.Rerankers.Abstractions/RedisVlDotNet.Rerankers.Abstractions.csproj`, `src/RedisVlDotNet.Rerankers.Abstractions/ITextReranker.cs`, `src/RedisVlDotNet.Rerankers.Abstractions/RerankRequest.cs`, `src/RedisVlDotNet.Rerankers.Abstractions/RerankDocument.cs`, `src/RedisVlDotNet.Rerankers.Abstractions/RerankResult.cs`, `src/RedisVlDotNet.Rerankers.Abstractions/TextRerankerExtensions.cs`, `src/RedisVlDotNet.Rerankers.Cohere/RedisVlDotNet.Rerankers.Cohere.csproj`, `src/RedisVlDotNet.Rerankers.Cohere/CohereRerankerPackage.cs`, `tests/RedisVlDotNet.Tests/RedisVlDotNet.Tests.csproj`, `tests/RedisVlDotNet.Tests/Rerankers/TextRerankerExtensionsTests.cs`, `docs/extensions.md`, `README.md`, `redis-vl-dotnet.sln`, `prd.json`, `progress.txt`
+- Quality checks run and result: `dotnet test tests/RedisVlDotNet.Tests/RedisVlDotNet.Tests.csproj --filter FullyQualifiedName~TextRerankerExtensionsTests` passed. `dotnet restore redis-vl-dotnet.sln` passed. `dotnet build redis-vl-dotnet.sln --no-restore -m:1` passed. `dotnet test redis-vl-dotnet.sln --no-restore -m:1` passed with 42 tests skipped because `REDIS_VL_REDIS_URL`, `OPENAI_API_KEY`, and `HF_TOKEN` were not configured locally for Redis-backed and live-provider coverage.
+- Learnings for future iterations:
+  - Patterns discovered: keep provider-agnostic reranking models in a dedicated abstractions assembly and expose one convenience overload that maps plain string candidates into the shared DTOs, so later provider packages and examples do not need to hand-roll request plumbing.
+  - Gotchas encountered: adding a new project directly into the solution requires a matching `dotnet restore` before any `--no-restore` repo-wide build, otherwise the new project fails on a missing `project.assets.json`.
   - Useful context: there are still no `AGENTS.md` files anywhere in this repository, so reusable implementation guidance remains centralized in `progress.txt`.
 ---
 ## 2026-04-13 14:06:56 EDT - US-021
