@@ -10,6 +10,7 @@ Started: Mon Apr 13 10:35:34 EDT 2026
 - Keep YAML schema loading strict: accept either `index.prefix` or `index.prefixes` for namespace configuration, map upstream-style underscored option names through DTOs, and fail fast on unsupported keys instead of silently ignoring them.
 - Index maintenance helpers should operate on `Schema.Index.Prefixes` with batched Redis key scans and deletes so JSON and HASH storage share one implementation while the RediSearch index definition remains intact.
 - Database-wide RediSearch discovery helpers should stay static on `SearchIndex` and map Redis array replies into small named DTOs, which keeps environment inspection APIs available without requiring a schema-bound instance.
+- When rebuilding `SearchSchema` from `FT.INFO`, collapse JSON fields back to alias-less definitions only when the Redis `attribute` matches the default alias for the JSON path; otherwise preserve the raw identifier path plus explicit alias so recreated schemas round-trip cleanly.
 
 ---
 
@@ -75,4 +76,13 @@ Started: Mon Apr 13 10:35:34 EDT 2026
   - Patterns discovered: database-wide index discovery belongs on static `SearchIndex` helpers because it does not depend on a schema instance.
   - Gotchas encountered: `FT._LIST` returns a flat Redis array of names, so parsing should fail fast on blank entries instead of silently producing unusable results.
   - Useful context: the existing JSON storage example is still the easiest place to demonstrate operational helpers like index listing without adding a new sample app.
+---
+## 2026-04-13 11:59:47 EDT - US-008
+- Implemented `SearchIndex.FromExisting/FromExistingAsync`, added FT.INFO-to-schema reconstruction for supported index metadata and field definitions, and reused the rediscovered index in the JSON sample.
+- Files changed: `src/RedisVlDotNet/Indexes/SearchIndex.cs`, `src/RedisVlDotNet/Indexes/SearchIndexSchemaBuilder.cs`, `tests/RedisVlDotNet.Tests/Indexes/SearchIndexAsyncTests.cs`, `tests/RedisVlDotNet.Tests/Indexes/SearchIndexIntegrationTests.cs`, `examples/JsonStorageExample/Program.cs`, `examples/JsonStorageExample/README.md`, `prd.json`, `progress.txt`
+- Quality checks run and result: `dotnet test tests/RedisVlDotNet.Tests/RedisVlDotNet.Tests.csproj --filter "FullyQualifiedName~SearchIndexAsyncTests|FullyQualifiedName~SearchIndexIntegrationTests"` passed with Redis-backed integration tests skipped because `REDIS_VL_REDIS_URL` was not configured locally. `dotnet build redis-vl-dotnet.sln --no-restore` passed. `dotnet test redis-vl-dotnet.sln --no-restore` passed with 21 Redis-backed integration tests skipped because `REDIS_VL_REDIS_URL` was not configured locally.
+- Learnings for future iterations:
+  - Patterns discovered: FT.INFO schema reconstruction fits best as an internal mapper that normalizes Redis metadata back into the existing strongly typed schema records, keeping the public API surface small.
+  - Gotchas encountered: JSON FT.INFO rows expose both `identifier` and `attribute`, and only the default alias case should collapse back to a short field name; custom JSON aliases need the raw path preserved.
+  - Useful context: no `AGENTS.md` files were present under the edited paths, so there was no area-local agent guidance to update for this iteration.
 ---

@@ -19,6 +19,7 @@ var index = new SearchIndex(database, schema);
 
 await index.CreateAsync(new CreateIndexOptions(overwrite: true, dropExistingDocuments: true));
 var indexes = await SearchIndex.ListAsync(database);
+var rediscoveredIndex = await SearchIndex.FromExistingAsync(database, schema.Index.Name);
 
 var movies = new[]
 {
@@ -36,14 +37,17 @@ var scienceFictionQuery = new FilterQuery(
         Filter.Numeric("year").GreaterThan(1980)),
     returnFields: ["title", "year", "genre"]);
 
-var searchResults = await index.SearchAsync<Movie>(scienceFictionQuery);
-var scienceFictionCount = await index.CountAsync(
+var searchResults = await rediscoveredIndex.SearchAsync<Movie>(scienceFictionQuery);
+var scienceFictionCount = await rediscoveredIndex.CountAsync(
     new CountQuery(Filter.Tag("genre").Eq("science-fiction")));
-var clearedCount = await index.ClearAsync();
+var rediscoveredMovie = await rediscoveredIndex.FetchJsonByIdAsync<Movie>("movie-3");
+var clearedCount = await rediscoveredIndex.ClearAsync();
 
 Console.WriteLine($"Loaded keys: {string.Join(", ", loadedKeys)}");
 Console.WriteLine($"Fetched by id: {fetchedMovie?.Title} ({fetchedMovie?.Year})");
 Console.WriteLine($"Available indexes: {string.Join(", ", indexes.Select(static item => item.Name))}");
+Console.WriteLine($"Rediscovered index '{rediscoveredIndex.Schema.Index.Name}' with prefixes: {string.Join(", ", rediscoveredIndex.Schema.Index.Prefixes)}");
+Console.WriteLine($"Fetched via rediscovered index: {rediscoveredMovie?.Title} ({rediscoveredMovie?.Year})");
 Console.WriteLine($"Science fiction count: {scienceFictionCount}");
 Console.WriteLine($"Cleared indexed documents without dropping the index: {clearedCount}");
 Console.WriteLine($"Index metadata: {schema.Index.Prefixes.Count} prefixes, separator '{schema.Index.KeySeparator}', stopwords {(schema.Index.Stopwords?.Count == 0 ? "disabled" : "configured")}.");

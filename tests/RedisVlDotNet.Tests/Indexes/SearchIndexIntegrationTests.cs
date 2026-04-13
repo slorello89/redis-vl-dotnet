@@ -98,6 +98,64 @@ public sealed class SearchIndexIntegrationTests
     }
 
     [RedisSearchIntegrationFact]
+    public async Task ReconnectsToExistingIndexAndReusesSchemaForQueries()
+    {
+        await using var connection = await RedisSearchTestEnvironment.ConnectAsync();
+        var database = connection.GetDatabase();
+
+        var token = Guid.NewGuid().ToString("N");
+        var schema = new SearchSchema(
+            new IndexDefinition(
+                $"movies-reconnect-idx-{token}",
+                [$"movie:{token}:", $"archive:{token}:"],
+                StorageType.Hash,
+                keySeparator: '|',
+                stopwords: ["the", "a"],
+                maxTextFields: true,
+                noOffsets: true),
+            [
+                new TextFieldDefinition("title", sortable: true),
+                new NumericFieldDefinition("year"),
+                new TagFieldDefinition("genre")
+            ]);
+        var originalIndex = new SearchIndex(database, schema);
+
+        try
+        {
+            await originalIndex.CreateAsync();
+            await originalIndex.LoadHashAsync(
+                [
+                    new HashMovieDocument("movie-1", "Heat", 1995, "crime"),
+                    new HashMovieDocument("movie-2", "Arrival", 2016, "science-fiction")
+                ]);
+            await RedisSearchTestEnvironment.WaitForIndexDocumentCountAsync(originalIndex, 2);
+
+            var reconnectedIndex = await SearchIndex.FromExistingAsync(database, schema.Index.Name);
+            var results = await reconnectedIndex.SearchAsync<HashMovieDocument>(
+                new FilterQuery(Filter.Tag("genre").Eq("crime"), ["title", "year", "genre"]));
+            var fetched = await reconnectedIndex.FetchHashByIdAsync<HashMovieDocument>("movie-1");
+
+            Assert.Equal(schema.Index.Name, reconnectedIndex.Schema.Index.Name);
+            Assert.Equal(schema.Index.Prefixes, reconnectedIndex.Schema.Index.Prefixes);
+            Assert.Equal(schema.Index.KeySeparator, reconnectedIndex.Schema.Index.KeySeparator);
+            Assert.Equal(schema.Index.StorageType, reconnectedIndex.Schema.Index.StorageType);
+            Assert.True(reconnectedIndex.Schema.Index.MaxTextFields);
+            Assert.True(reconnectedIndex.Schema.Index.NoOffsets);
+            Assert.Equal(["title", "year", "genre"], reconnectedIndex.Schema.Fields.Select(static field => field.Name).ToArray());
+            Assert.Single(results.Documents);
+            Assert.Equal("Heat", results.Documents[0].Title);
+            Assert.Equal("Heat", fetched!.Title);
+        }
+        finally
+        {
+            if (await originalIndex.ExistsAsync())
+            {
+                await originalIndex.DropAsync(deleteDocuments: true);
+            }
+        }
+    }
+
+    [RedisSearchIntegrationFact]
     public async Task CreatesIndexWithMultiplePrefixes()
     {
         await using var connection = await RedisSearchTestEnvironment.ConnectAsync();

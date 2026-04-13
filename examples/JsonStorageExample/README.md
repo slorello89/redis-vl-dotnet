@@ -4,6 +4,7 @@ This example is a runnable .NET 9 console app that demonstrates a JSON-backed `r
 
 - load a schema from YAML
 - create a JSON index
+- reconnect to the existing index from Redis metadata
 - list existing search indexes
 - load sample documents
 - fetch one document by id

@@ -11,6 +11,7 @@ public sealed class SearchIndex
     private readonly IDatabase _database;
     private readonly JsonSerializerOptions _serializerOptions;
     private const string ListIndexesCommand = "FT._LIST";
+    private const string InfoCommand = "FT.INFO";
 
     public SearchIndex(IDatabase database, SearchSchema schema)
     {
@@ -26,6 +27,21 @@ public sealed class SearchIndex
 
     public static IReadOnlyList<SearchIndexListItem> List(IDatabase database) =>
         ListAsync(database).GetAwaiter().GetResult();
+
+    public static SearchIndex FromExisting(IDatabase database, string indexName) =>
+        FromExistingAsync(database, indexName).GetAwaiter().GetResult();
+
+    public static async Task<SearchIndex> FromExistingAsync(
+        IDatabase database,
+        string indexName,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(database);
+        ArgumentException.ThrowIfNullOrWhiteSpace(indexName);
+
+        var info = await LoadInfoAsync(database, indexName.Trim(), cancellationToken).ConfigureAwait(false);
+        return new SearchIndex(database, SearchIndexSchemaBuilder.FromInfo(info));
+    }
 
     public static async Task<IReadOnlyList<SearchIndexListItem>> ListAsync(
         IDatabase database,
@@ -82,8 +98,7 @@ public sealed class SearchIndex
 
     public async Task<SearchIndexInfo> InfoAsync(CancellationToken cancellationToken = default)
     {
-        var result = await ExecuteAsync("FT.INFO", [Schema.Index.Name], cancellationToken).ConfigureAwait(false);
-        return SearchIndexInfo.FromRedisResult(result);
+        return await LoadInfoAsync(_database, Schema.Index.Name, cancellationToken).ConfigureAwait(false);
     }
 
     public void Drop(bool deleteDocuments = false) =>
@@ -411,6 +426,16 @@ public sealed class SearchIndex
     {
         cancellationToken.ThrowIfCancellationRequested();
         return await _database.ExecuteAsync(command, arguments).WaitAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    private static async Task<SearchIndexInfo> LoadInfoAsync(
+        IDatabase database,
+        string indexName,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var result = await database.ExecuteAsync(InfoCommand, [indexName]).WaitAsync(cancellationToken).ConfigureAwait(false);
+        return SearchIndexInfo.FromRedisResult(result);
     }
 
     private void EnsureJsonStorage()
