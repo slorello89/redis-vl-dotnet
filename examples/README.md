@@ -129,6 +129,30 @@ Run it from the repository root:
 dotnet run --project examples/OpenAiVectorizerExample/OpenAiVectorizerExample.csproj
 ```
 
+### [HuggingFaceVectorizerExample](/Users/steve.lorello/projects/redis/redis-vl-dotnet/examples/HuggingFaceVectorizerExample/README.md)
+
+Demonstrates provider-backed vectorization with `SemanticCache`:
+
+- create a HASH-backed semantic cache sized from a live Hugging Face embedding response
+- generate seed embeddings through the Hugging Face extension package in one batch request
+- store a semantic cache entry with the generated embedding
+- retrieve a semantically similar cache hit by vectorizing a new prompt through Hugging Face
+- drop the example index and documents
+
+Redis prerequisites:
+
+- RediSearch with vector similarity support
+
+Additional prerequisites:
+
+- `HF_TOKEN`
+
+Run it from the repository root:
+
+```bash
+dotnet run --project examples/HuggingFaceVectorizerExample/HuggingFaceVectorizerExample.csproj
+```
+
 ## Related Docs
 
 - [Getting started guide](/Users/steve.lorello/projects/redis/redis-vl-dotnet/docs/getting-started.md)

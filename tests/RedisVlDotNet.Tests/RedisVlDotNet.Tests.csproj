@@ -22,6 +22,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\RedisVlDotNet\RedisVlDotNet.csproj" />
     <ProjectReference Include="..\..\src\RedisVlDotNet.Vectorizers.Abstractions\RedisVlDotNet.Vectorizers.Abstractions.csproj" />
+    <ProjectReference Include="..\..\src\RedisVlDotNet.Vectorizers.HuggingFace\RedisVlDotNet.Vectorizers.HuggingFace.csproj" />
     <ProjectReference Include="..\..\src\RedisVlDotNet.Vectorizers.OpenAI\RedisVlDotNet.Vectorizers.OpenAI.csproj" />
   </ItemGroup>
 
