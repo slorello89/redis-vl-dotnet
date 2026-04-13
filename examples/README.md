@@ -65,6 +65,26 @@ Run it from the repository root:
 dotnet run --project examples/VectorSearchExample/VectorSearchExample.csproj
 ```
 
+### [MessageHistoryExample](/Users/steve.lorello/projects/redis/redis-vl-dotnet/examples/MessageHistoryExample/README.md)
+
+Demonstrates the base message history workflow:
+
+- create a HASH-backed message history index
+- append session messages with role and metadata
+- retrieve the most recent messages for one session
+- filter recent messages by role
+- drop the example index and documents
+
+Redis prerequisites:
+
+- RediSearch
+
+Run it from the repository root:
+
+```bash
+dotnet run --project examples/MessageHistoryExample/MessageHistoryExample.csproj
+```
+
 ## Related Docs
 
 - [Getting started guide](/Users/steve.lorello/projects/redis/redis-vl-dotnet/docs/getting-started.md)

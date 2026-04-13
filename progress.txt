@@ -22,7 +22,17 @@ Started: Mon Apr 13 10:35:34 EDT 2026
 - Runtime vector tuning should stay query-local and flow through the shared vector command builder so composed queries reuse one `PARAMS` serializer while schema-based algorithm checks reject HNSW-only options on `FLAT` fields before Redis execution.
 - Shared query paging should flow through `QueryPagination`; vector-style queries keep `topK` as the retrieval window and must reject `offset + limit` values that would page past that window.
 - Batch query iterators should reuse the existing query execution paths by cloning the original query with a new `QueryPagination` each round; vector-style batches must clamp the final page to the remaining `topK` window instead of widening it.
+- Recency-based workflow storage should use Redis-side monotonic sequence counters per logical scope (for example, per session) and sort on that sequence, which avoids nondeterministic ordering when caller-supplied timestamps collide.
 
+---
+## 2026-04-13 13:08:26 EDT - US-020
+- Implemented a new `MessageHistory` workflow with append-only HASH storage for session id, role, content, metadata JSON, timestamp, and a per-session Redis sequence that powers deterministic recent-message retrieval with optional role filtering.
+- Files changed: `src/RedisVlDotNet/Workflows/MessageHistory.cs`, `src/RedisVlDotNet/Workflows/MessageHistoryOptions.cs`, `src/RedisVlDotNet/Workflows/MessageHistoryMessage.cs`, `tests/RedisVlDotNet.Tests/Workflows/MessageHistoryTests.cs`, `tests/RedisVlDotNet.Tests/Workflows/MessageHistoryIntegrationTests.cs`, `examples/MessageHistoryExample/MessageHistoryExample.csproj`, `examples/MessageHistoryExample/Program.cs`, `examples/MessageHistoryExample/README.md`, `examples/README.md`, `prd.json`, `progress.txt`
+- Quality checks run and result: `dotnet test tests/RedisVlDotNet.Tests/RedisVlDotNet.Tests.csproj --filter "FullyQualifiedName~MessageHistoryTests|FullyQualifiedName~MessageHistoryIntegrationTests"` passed with the Redis-backed integration test skipped because `REDIS_VL_REDIS_URL` was not configured locally. `dotnet build redis-vl-dotnet.sln --no-restore` passed. `dotnet test redis-vl-dotnet.sln --no-restore` passed with 36 Redis-backed integration tests skipped because `REDIS_VL_REDIS_URL` was not configured locally. `dotnet build examples/MessageHistoryExample/MessageHistoryExample.csproj` passed.
+- Learnings for future iterations:
+  - Patterns discovered: recency workflows should sort on a Redis-managed monotonic sequence instead of raw timestamps so retrieval order stays deterministic even when callers supply identical timestamps.
+  - Gotchas encountered: `FT.CREATE` emits explicit tag-field separator tokens and the index key separator for HASH schemas, so schema command assertions need to account for those extra arguments.
+  - Useful context: the new workflow stores metadata as serialized JSON text and scopes retrieval with a `TAG` filter on `sessionId` plus an optional `role` filter, which is the likely extension point for semantic history in the next story.
 ---
 
 ## 2026-04-13 10:36:39 EDT - US-001
