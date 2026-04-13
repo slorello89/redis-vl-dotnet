@@ -382,6 +382,12 @@ public sealed class SearchIndex
     public SearchResults<TDocument> Search<TDocument>(FilterQuery query, JsonSerializerOptions? serializerOptions = null) =>
         SearchAsync<TDocument>(query, serializerOptions).GetAwaiter().GetResult();
 
+    public SearchResults Search(TextQuery query) =>
+        SearchAsync(query).GetAwaiter().GetResult();
+
+    public SearchResults<TDocument> Search<TDocument>(TextQuery query, JsonSerializerOptions? serializerOptions = null) =>
+        SearchAsync<TDocument>(query, serializerOptions).GetAwaiter().GetResult();
+
     public SearchResults Search(HybridQuery query) =>
         SearchAsync(query).GetAwaiter().GetResult();
 
@@ -472,8 +478,30 @@ public sealed class SearchIndex
         return SearchResultsParser.Parse(result);
     }
 
+    public async Task<SearchResults> SearchAsync(TextQuery query, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(query);
+
+        var result = await ExecuteAsync(
+            "FT.SEARCH",
+            SearchQueryCommandBuilder.BuildTextSearchArguments(Schema, query),
+            cancellationToken).ConfigureAwait(false);
+
+        return SearchResultsParser.Parse(result);
+    }
+
     public async Task<SearchResults<TDocument>> SearchAsync<TDocument>(
         FilterQuery query,
+        JsonSerializerOptions? serializerOptions = null,
+        CancellationToken cancellationToken = default)
+    {
+        var results = await SearchAsync(query, cancellationToken).ConfigureAwait(false);
+        cancellationToken.ThrowIfCancellationRequested();
+        return results.Map<TDocument>(serializerOptions);
+    }
+
+    public async Task<SearchResults<TDocument>> SearchAsync<TDocument>(
+        TextQuery query,
         JsonSerializerOptions? serializerOptions = null,
         CancellationToken cancellationToken = default)
     {

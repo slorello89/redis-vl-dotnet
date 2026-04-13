@@ -37,6 +37,20 @@ public sealed class SearchIndexAsyncTests
     }
 
     [Fact]
+    public async Task TextSearchAsync_WithCancelledToken_DoesNotExecuteRedisCommand()
+    {
+        var (database, recorder) = RecordingDatabaseProxy.CreatePair();
+        var index = new SearchIndex(database, CreateHashSchema("cancel-text-search"));
+        var query = new TextQuery("hello world");
+
+        using var cancellationTokenSource = new CancellationTokenSource();
+        await cancellationTokenSource.CancelAsync();
+
+        await Assert.ThrowsAsync<OperationCanceledException>(() => index.SearchAsync(query, cancellationToken: cancellationTokenSource.Token));
+        Assert.Equal(0, recorder.ExecuteAsyncCallCount);
+    }
+
+    [Fact]
     public async Task ClearAsync_WithCancelledToken_DoesNotExecuteRedisCommand()
     {
         var (database, recorder) = RecordingDatabaseProxy.CreatePair();
@@ -379,6 +393,62 @@ public sealed class SearchIndexAsyncTests
                 Assert.Equal(200, vectorField.Attributes.EfConstruction);
                 Assert.Equal(10, vectorField.Attributes.EfRuntime);
             });
+    }
+
+    [Fact]
+    public async Task TextSearchAsync_ExecutesFtSearchWithTextQueryArguments()
+    {
+        var (database, recorder) = RecordingDatabaseProxy.CreatePair();
+        var index = new SearchIndex(database, CreateHashSchema("text-search"));
+        recorder.ExecuteAsyncResponses.Enqueue(
+            RedisResult.Create(
+                [
+                    RedisResult.Create(1),
+                    RedisResult.Create((RedisValue)"movie:1"),
+                    RedisResult.Create(
+                        [
+                            RedisResult.Create((RedisValue)"title"),
+                            RedisResult.Create((RedisValue)"Heat")
+                        ])
+                ]));
+
+        var results = await index.SearchAsync(new TextQuery("heat", ["title"], offset: 1, limit: 2));
+
+        Assert.Equal(1, results.TotalCount);
+        Assert.Equal(1, recorder.ExecuteAsyncCallCount);
+        Assert.Equal("FT.SEARCH", recorder.ExecuteAsyncCalls[0].Command);
+        Assert.Equal(
+            ["hash-text-search", "heat", "RETURN", "1", "title", "LIMIT", "1", "2", "DIALECT", "2"],
+            recorder.ExecuteAsyncCalls[0].Arguments.Select(static argument => argument?.ToString() ?? string.Empty).ToArray());
+    }
+
+    [Fact]
+    public async Task TextSearchAsync_TypedResults_MapReturnedDocuments()
+    {
+        var (database, recorder) = RecordingDatabaseProxy.CreatePair();
+        var index = new SearchIndex(database, CreateHashSchema("typed-text-search"));
+        recorder.ExecuteAsyncResponses.Enqueue(
+            RedisResult.Create(
+                [
+                    RedisResult.Create(1),
+                    RedisResult.Create((RedisValue)"movie:1"),
+                    RedisResult.Create(
+                        [
+                            RedisResult.Create((RedisValue)"title"),
+                            RedisResult.Create((RedisValue)"Heat"),
+                            RedisResult.Create((RedisValue)"year"),
+                            RedisResult.Create((RedisValue)"1995"),
+                            RedisResult.Create((RedisValue)"genre"),
+                            RedisResult.Create((RedisValue)"crime")
+                        ])
+                ]));
+
+        var results = await index.SearchAsync<HashMovieDocument>(new TextQuery("heat", ["title", "year", "genre"]));
+
+        var document = Assert.Single(results.Documents);
+        Assert.Equal("Heat", document.Title);
+        Assert.Equal(1995, document.Year);
+        Assert.Equal("crime", document.Genre);
     }
 
     private static SearchSchema CreateHashSchema(string token) =>

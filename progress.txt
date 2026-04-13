@@ -13,6 +13,7 @@ Started: Mon Apr 13 10:35:34 EDT 2026
 - When rebuilding `SearchSchema` from `FT.INFO`, collapse JSON fields back to alias-less definitions only when the Redis `attribute` matches the default alias for the JSON path; otherwise preserve the raw identifier path plus explicit alias so recreated schemas round-trip cleanly.
 - JSON partial update helpers should accept only absolute JSONPath expressions like `$.field` or `$[0]`, trim and deduplicate paths before issuing Redis commands, and treat missing root documents as a `false` return instead of implicitly creating new JSON keys.
 - HASH partial update helpers should reuse a hash-exists probe plus a single `HSET` batch, accept only trimmed top-level field names, and reject `null` values because HASH writes preserve omitted fields rather than expressing field deletion.
+- New FT.SEARCH query types should reuse the shared return-field normalization and the standard `RETURN`/`LIMIT`/`DIALECT 2` argument layout, which keeps query-specific additions isolated to the search string or extra clauses.
 
 ---
 
@@ -105,4 +106,13 @@ Started: Mon Apr 13 10:35:34 EDT 2026
   - Patterns discovered: HASH partial update APIs fit the existing `SearchIndex` lifecycle when they mirror the JSON by-key and by-id entry points but translate updates into one `HSET` batch after validating trimmed, unique field names.
   - Gotchas encountered: HASH updates cannot express deletion with the current mapper, so `null` needs to fail fast instead of silently dropping fields from the update payload.
   - Useful context: there are still no `AGENTS.md` files under the edited paths, so reusable area guidance belongs in the progress log until local agent docs are introduced.
+---
+## 2026-04-13 12:11:56 EDT - US-011
+- Implemented a first-class `TextQuery` model with explicit text input, normalized return fields, and pagination; added `FT.SEARCH` argument generation plus raw and typed `SearchIndex` execution overloads.
+- Files changed: `src/RedisVlDotNet/Queries/TextQuery.cs`, `src/RedisVlDotNet/Indexes/SearchQueryCommandBuilder.cs`, `src/RedisVlDotNet/Indexes/SearchIndex.cs`, `tests/RedisVlDotNet.Tests/Indexes/SearchQueryCommandBuilderTests.cs`, `tests/RedisVlDotNet.Tests/Indexes/SearchIndexAsyncTests.cs`, `prd.json`, `progress.txt`
+- Quality checks run and result: `dotnet test tests/RedisVlDotNet.Tests/RedisVlDotNet.Tests.csproj --filter "FullyQualifiedName~SearchQueryCommandBuilderTests|FullyQualifiedName~SearchIndexAsyncTests"` passed. `dotnet build redis-vl-dotnet.sln --no-restore` passed. `dotnet test redis-vl-dotnet.sln --no-restore` passed with 23 Redis-backed integration tests skipped because `REDIS_VL_REDIS_URL` was not configured locally.
+- Learnings for future iterations:
+  - Patterns discovered: new FT.SEARCH query models can stay small when they reuse the common return-field and paging conventions already established by `FilterQuery` and related builders.
+  - Gotchas encountered: the async `SearchIndex` recorder tests surface nullable assertion warnings if command arguments are rendered with raw `ToString()` calls, so test assertions should normalize possible nulls explicitly.
+  - Useful context: there are still no `AGENTS.md` files under the edited paths, so there was no area-local agent guidance to update for this iteration.
 ---

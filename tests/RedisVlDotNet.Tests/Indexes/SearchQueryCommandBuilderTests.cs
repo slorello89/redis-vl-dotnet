@@ -9,6 +9,27 @@ namespace RedisVlDotNet.Tests.Indexes;
 public sealed class SearchQueryCommandBuilderTests
 {
     [Fact]
+    public void BuildsTextSearchArgumentsWithProjectionAndPaging()
+    {
+        var schema = new SearchSchema(
+            new IndexDefinition("movies-idx", "movie:", StorageType.Hash),
+            [
+                new TextFieldDefinition("title"),
+                new NumericFieldDefinition("year")
+            ]);
+        var query = new TextQuery("hel* world", ["title", "@year", "title"], offset: 5, limit: 10);
+
+        var arguments = SearchQueryCommandBuilder.BuildTextSearchArguments(schema, query);
+        var rendered = arguments.Select(RenderArgument).ToArray();
+
+        Assert.Equal("movies-idx", rendered[0]);
+        Assert.Equal("hel* world", rendered[1]);
+        Assert.Equal(
+            ["RETURN", "2", "title", "year", "LIMIT", "5", "10", "DIALECT", "2"],
+            rendered[2..]);
+    }
+
+    [Fact]
     public void BuildsFilterSearchArgumentsWithProjectionAndPaging()
     {
         var schema = new SearchSchema(
@@ -345,6 +366,27 @@ public sealed class SearchQueryCommandBuilderTests
         Assert.Equal(["title", "year"], query.ReturnFields);
         Assert.Equal(2, query.Offset);
         Assert.Equal(5, query.Limit);
+    }
+
+    [Fact]
+    public void TextQueryNormalizesTextReturnFieldsAndPaging()
+    {
+        var query = new TextQuery(
+            "  hello world  ",
+            returnFields: ["@title", "title", "year"],
+            offset: 2,
+            limit: 5);
+
+        Assert.Equal("hello world", query.Text);
+        Assert.Equal(["title", "year"], query.ReturnFields);
+        Assert.Equal(2, query.Offset);
+        Assert.Equal(5, query.Limit);
+    }
+
+    [Fact]
+    public void TextQueryRejectsBlankText()
+    {
+        Assert.Throws<ArgumentException>(() => new TextQuery(" "));
     }
 
     [Fact]

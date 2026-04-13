@@ -6,6 +6,33 @@ namespace RedisVlDotNet.Indexes;
 
 internal static class SearchQueryCommandBuilder
 {
+    public static object[] BuildTextSearchArguments(SearchSchema schema, TextQuery query)
+    {
+        ArgumentNullException.ThrowIfNull(schema);
+        ArgumentNullException.ThrowIfNull(query);
+
+        var arguments = new List<object>
+        {
+            schema.Index.Name,
+            query.Text
+        };
+
+        if (query.ReturnFields.Count > 0)
+        {
+            arguments.Add("RETURN");
+            arguments.Add(query.ReturnFields.Count.ToString(CultureInfo.InvariantCulture));
+            arguments.AddRange(query.ReturnFields);
+        }
+
+        arguments.Add("LIMIT");
+        arguments.Add(query.Offset.ToString(CultureInfo.InvariantCulture));
+        arguments.Add(query.Limit.ToString(CultureInfo.InvariantCulture));
+        arguments.Add("DIALECT");
+        arguments.Add("2");
+
+        return arguments.ToArray();
+    }
+
     public static object[] BuildFilterSearchArguments(SearchSchema schema, FilterQuery query)
     {
         ArgumentNullException.ThrowIfNull(schema);
