@@ -15,4 +15,10 @@
     <ProjectReference Include="..\..\src\RedisVlDotNet\RedisVlDotNet.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Content Include="schema.yaml">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
 </Project>

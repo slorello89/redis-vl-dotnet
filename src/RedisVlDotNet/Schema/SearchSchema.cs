@@ -27,7 +27,6 @@ public sealed record SearchSchema
 
         var deserializer = new DeserializerBuilder()
             .WithNamingConvention(UnderscoredNamingConvention.Instance)
-            .IgnoreUnmatchedProperties()
             .Build();
 
         YamlSchemaDocument? document;
@@ -77,10 +76,17 @@ public sealed record SearchSchema
             return new SearchSchema(
                 new IndexDefinition(
                     Index.Name!,
-                    Index.Prefix!,
+                    ParsePrefixes(Index),
                     ParseEnum<StorageType>(Index.StorageType, "index.storage_type"),
                     ParseKeySeparator(Index.KeySeparator),
-                    ParseStopwords(Index.Stopwords)),
+                    ParseStopwords(Index.Stopwords),
+                    Index.MaxTextFields,
+                    ParseOptionalInt(Index.Temporary, "index.temporary"),
+                    Index.NoOffsets,
+                    Index.NoHighlight,
+                    Index.NoFields,
+                    Index.NoFrequencies,
+                    Index.SkipInitialScan),
                 Fields.Select(MapField));
         }
 
@@ -99,21 +105,67 @@ public sealed record SearchSchema
                     alias: alias,
                     sortable: field.Sortable,
                     noStem: field.NoStem,
-                    phoneticMatch: field.PhoneticMatch),
+                    phoneticMatch: field.PhoneticMatch,
+                    weight: ParseOptionalDouble(field.Weight, "fields.weight", 1d),
+                    withSuffixTrie: field.WithSuffixTrie,
+                    indexMissing: field.IndexMissing,
+                    indexEmpty: field.IndexEmpty,
+                    noIndex: field.NoIndex,
+                    unNormalizedForm: field.Unf),
                 "tag" => new TagFieldDefinition(
                     name,
                     alias: alias,
                     sortable: field.Sortable,
                     separator: ParseSeparator(field.Separator),
-                    caseSensitive: field.CaseSensitive),
-                "numeric" => new NumericFieldDefinition(name, alias: alias, sortable: field.Sortable),
-                "geo" => new GeoFieldDefinition(name, alias: alias, sortable: field.Sortable),
+                    caseSensitive: field.CaseSensitive,
+                    withSuffixTrie: field.WithSuffixTrie,
+                    indexMissing: field.IndexMissing,
+                    indexEmpty: field.IndexEmpty,
+                    noIndex: field.NoIndex),
+                "numeric" => new NumericFieldDefinition(
+                    name,
+                    alias: alias,
+                    sortable: field.Sortable,
+                    indexMissing: field.IndexMissing,
+                    noIndex: field.NoIndex,
+                    unNormalizedForm: field.Unf),
+                "geo" => new GeoFieldDefinition(
+                    name,
+                    alias: alias,
+                    sortable: field.Sortable,
+                    indexMissing: field.IndexMissing,
+                    noIndex: field.NoIndex),
                 "vector" => new VectorFieldDefinition(
                     name,
                     MapVectorAttributes(field.Attributes),
-                    alias: alias),
+                    alias: alias,
+                    indexMissing: field.IndexMissing),
                 _ => throw new ArgumentException($"Unsupported schema field type '{field.Type}'.", nameof(field.Type))
             };
+        }
+
+        private static IReadOnlyList<string> ParsePrefixes(YamlIndexDefinition index)
+        {
+            ArgumentNullException.ThrowIfNull(index);
+
+            var hasPrefix = !string.IsNullOrWhiteSpace(index.Prefix);
+            var hasPrefixes = index.Prefixes is { Count: > 0 };
+
+            if (hasPrefix && hasPrefixes)
+            {
+                throw new ArgumentException("Schema YAML must define either index.prefix or index.prefixes, not both.", nameof(index));
+            }
+
+            if (hasPrefixes)
+            {
+                return index.Prefixes!
+                    .Select(static prefix => string.IsNullOrWhiteSpace(prefix)
+                        ? throw new ArgumentException("Index prefixes cannot contain blank values.", nameof(index))
+                        : prefix.Trim())
+                    .ToArray();
+            }
+
+            return [NormalizeRequired(index.Prefix, "index.prefix")];
         }
 
         private static VectorFieldAttributes MapVectorAttributes(YamlVectorAttributes? attributes)
@@ -128,11 +180,11 @@ public sealed record SearchSchema
                 ParseEnum<VectorDataType>(attributes.DataType, "fields.attrs.datatype"),
                 ParseEnum<VectorDistanceMetric>(attributes.DistanceMetric, "fields.attrs.distance_metric"),
                 ParseRequiredInt(attributes.Dimensions, "fields.attrs.dims"),
-                initialCapacity: ParseOptionalInt(attributes.InitialCapacity),
-                blockSize: ParseOptionalInt(attributes.BlockSize),
-                m: ParseOptionalInt(attributes.M),
-                efConstruction: ParseOptionalInt(attributes.EfConstruction),
-                efRuntime: ParseOptionalInt(attributes.EfRuntime));
+                initialCapacity: ParseOptionalInt(attributes.InitialCapacity, "fields.attrs.initial_capacity"),
+                blockSize: ParseOptionalInt(attributes.BlockSize, "fields.attrs.block_size"),
+                m: ParseOptionalInt(attributes.M, "fields.attrs.m"),
+                efConstruction: ParseOptionalInt(attributes.EfConstruction, "fields.attrs.ef_construction"),
+                efRuntime: ParseOptionalInt(attributes.EfRuntime, "fields.attrs.ef_runtime"));
         }
 
         private static TEnum ParseEnum<TEnum>(string? rawValue, string paramName)
@@ -157,7 +209,7 @@ public sealed record SearchSchema
             throw new ArgumentException($"Value '{rawValue}' for {paramName} must be an integer.", paramName);
         }
 
-        private static int ParseOptionalInt(string? rawValue)
+        private static int ParseOptionalInt(string? rawValue, string paramName)
         {
             if (string.IsNullOrWhiteSpace(rawValue))
             {
@@ -169,7 +221,22 @@ public sealed record SearchSchema
                 return parsed;
             }
 
-            throw new ArgumentException($"Value '{rawValue}' must be an integer.", nameof(rawValue));
+            throw new ArgumentException($"Value '{rawValue}' for {paramName} must be an integer.", paramName);
+        }
+
+        private static double ParseOptionalDouble(string? rawValue, string paramName, double defaultValue)
+        {
+            if (string.IsNullOrWhiteSpace(rawValue))
+            {
+                return defaultValue;
+            }
+
+            if (double.TryParse(rawValue, NumberStyles.Float | NumberStyles.AllowThousands, CultureInfo.InvariantCulture, out var parsed))
+            {
+                return parsed;
+            }
+
+            throw new ArgumentException($"Value '{rawValue}' for {paramName} must be numeric.", paramName);
         }
 
         private static char ParseSeparator(string? rawValue)
@@ -227,11 +294,27 @@ public sealed record SearchSchema
 
         public string? Prefix { get; init; }
 
+        public List<string>? Prefixes { get; init; }
+
         public string? KeySeparator { get; init; }
 
         public string? StorageType { get; init; }
 
         public List<string>? Stopwords { get; init; }
+
+        public bool MaxTextFields { get; init; }
+
+        public string? Temporary { get; init; }
+
+        public bool NoOffsets { get; init; }
+
+        public bool NoHighlight { get; init; }
+
+        public bool NoFields { get; init; }
+
+        public bool NoFrequencies { get; init; }
+
+        public bool SkipInitialScan { get; init; }
     }
 
     private sealed class YamlFieldDefinition
@@ -248,9 +331,22 @@ public sealed record SearchSchema
 
         public bool PhoneticMatch { get; init; }
 
+        public string? Weight { get; init; }
+
         public string? Separator { get; init; }
 
         public bool CaseSensitive { get; init; }
+
+        public bool WithSuffixTrie { get; init; }
+
+        public bool IndexMissing { get; init; }
+
+        public bool IndexEmpty { get; init; }
+
+        public bool NoIndex { get; init; }
+
+        [YamlMember(Alias = "unf")]
+        public bool Unf { get; init; }
 
         [YamlMember(Alias = "attrs")]
         public YamlVectorAttributes? Attributes { get; init; }

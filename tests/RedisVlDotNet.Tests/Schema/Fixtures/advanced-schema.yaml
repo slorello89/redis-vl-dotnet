@@ -1,0 +1,58 @@
+index:
+  name: advanced-docs-idx
+  prefixes:
+    - "docs:"
+    - "archive:"
+  key_separator: "|"
+  storage_type: json
+  stopwords: []
+  max_text_fields: true
+  temporary: 900
+  no_offsets: true
+  no_highlight: true
+  no_fields: true
+  no_frequencies: true
+  skip_initial_scan: true
+fields:
+  - name: title
+    type: text
+    sortable: true
+    no_stem: true
+    phonetic_match: true
+    weight: 2.5
+    with_suffix_trie: true
+    index_missing: true
+    index_empty: true
+    unf: true
+  - name: genre
+    type: tag
+    sortable: true
+    separator: ;
+    case_sensitive: true
+    with_suffix_trie: true
+    index_missing: true
+    index_empty: true
+    no_index: true
+  - name: rating
+    type: numeric
+    sortable: true
+    index_missing: true
+    no_index: true
+    unf: true
+  - name: location
+    type: geo
+    sortable: true
+    index_missing: true
+    no_index: true
+  - name: embedding
+    type: vector
+    index_missing: true
+    attrs:
+      algorithm: hnsw
+      datatype: float32
+      dims: 384
+      distance_metric: cosine
+      initial_capacity: 500
+      m: 32
+      ef_construction: 200
+      ef_runtime: 24

@@ -1,0 +1,8 @@
+index:
+  name: unsupported-docs-idx
+  prefix: "docs:"
+  storage_type: json
+  unsupported_option: true
+fields:
+  - name: title
+    type: text

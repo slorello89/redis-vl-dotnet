@@ -5,36 +5,15 @@ using RedisVlDotNet.Schema;
 using StackExchange.Redis;
 
 var redisUrl = Environment.GetEnvironmentVariable("REDIS_VL_REDIS_URL") ?? "localhost:6379";
+var schemaPath = Path.Combine(AppContext.BaseDirectory, "schema.yaml");
 
 Console.WriteLine($"Connecting to Redis at {redisUrl}...");
+Console.WriteLine($"Loading schema from {schemaPath}...");
 
 using var redis = await ConnectionMultiplexer.ConnectAsync(redisUrl);
 var database = redis.GetDatabase();
 
-var schema = new SearchSchema(
-    new IndexDefinition(
-        "json-storage-example-idx",
-        ["json-example:", "json-example-archive:"],
-        StorageType.Json,
-        keySeparator: '|',
-        stopwords: [],
-        maxTextFields: true,
-        noOffsets: true,
-        noHighlight: true,
-        skipInitialScan: true),
-    [
-        new TextFieldDefinition(
-            "title",
-            sortable: true,
-            weight: 2.0,
-            withSuffixTrie: true,
-            indexMissing: true,
-            indexEmpty: true,
-            unNormalizedForm: true),
-        new NumericFieldDefinition("year", sortable: true, indexMissing: true, unNormalizedForm: true),
-        new TagFieldDefinition("genre", sortable: true, withSuffixTrie: true, indexMissing: true, indexEmpty: true),
-        new TextFieldDefinition("summary", sortable: true, noIndex: true)
-    ]);
+var schema = SearchSchema.FromYamlFile(schemaPath);
 
 var index = new SearchIndex(database, schema);
 
@@ -63,7 +42,7 @@ var scienceFictionCount = await index.CountAsync(
 Console.WriteLine($"Loaded keys: {string.Join(", ", loadedKeys)}");
 Console.WriteLine($"Fetched by id: {fetchedMovie?.Title} ({fetchedMovie?.Year})");
 Console.WriteLine($"Science fiction count: {scienceFictionCount}");
-Console.WriteLine($"Index metadata: separator '{schema.Index.KeySeparator}', stopwords disabled, advanced FT.CREATE options enabled.");
+Console.WriteLine($"Index metadata: {schema.Index.Prefixes.Count} prefixes, separator '{schema.Index.KeySeparator}', stopwords {(schema.Index.Stopwords?.Count == 0 ? "disabled" : "configured")}.");
 Console.WriteLine("Query results:");
 
 foreach (var movie in searchResults.Documents)

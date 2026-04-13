@@ -1,0 +1,36 @@
+index:
+  name: json-storage-example-idx
+  prefixes:
+    - "json-example:"
+    - "json-example-archive:"
+  key_separator: "|"
+  storage_type: json
+  stopwords: []
+  max_text_fields: true
+  no_offsets: true
+  no_highlight: true
+  skip_initial_scan: true
+fields:
+  - name: title
+    type: text
+    sortable: true
+    weight: 2.0
+    with_suffix_trie: true
+    index_missing: true
+    index_empty: true
+    unf: true
+  - name: year
+    type: numeric
+    sortable: true
+    index_missing: true
+    unf: true
+  - name: genre
+    type: tag
+    sortable: true
+    with_suffix_trie: true
+    index_missing: true
+    index_empty: true
+  - name: summary
+    type: text
+    sortable: true
+    no_index: true

@@ -1,8 +1,8 @@
 # JSON Storage Example
 
-This example is a runnable .NET 9 console app that demonstrates the smallest JSON-backed `redis-vl-dotnet` flow:
+This example is a runnable .NET 9 console app that demonstrates a JSON-backed `redis-vl-dotnet` flow with an advanced schema loaded from `schema.yaml` on disk:
 
-- define a schema
+- load a schema from YAML
 - create a JSON index
 - load sample documents
 - fetch one document by id

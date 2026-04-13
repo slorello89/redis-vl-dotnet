@@ -7,6 +7,7 @@ Started: Mon Apr 13 10:35:34 EDT 2026
 - For index metadata extensions, preserve `IndexDefinition.Prefix` as the primary write-path namespace and add new FT.CREATE metadata via separate strongly typed properties so document loading APIs stay backward compatible.
 - Model optional FT.CREATE metadata as nullable index properties where `null` means Redis defaults and an empty collection means an explicit `0`-count clause, so default and disabled behaviors remain distinguishable in both code-first and YAML schema paths.
 - Emit RediSearch field modifiers in parser-safe order: `INDEXEMPTY`/`INDEXMISSING` before `SORTABLE`, `UNF` immediately after `SORTABLE`, and `NOINDEX` after sortable modifiers; vector `INDEXMISSING` belongs inside the vector attribute payload rather than after the field definition.
+- Keep YAML schema loading strict: accept either `index.prefix` or `index.prefixes` for namespace configuration, map upstream-style underscored option names through DTOs, and fail fast on unsupported keys instead of silently ignoring them.
 
 ---
 
@@ -45,4 +46,13 @@ Started: Mon Apr 13 10:35:34 EDT 2026
   - Patterns discovered: RediSearch field modifier ordering is parser-sensitive, so `SearchIndexCommandBuilder` should keep advanced field options emitted in a canonical order instead of appending flags ad hoc.
   - Gotchas encountered: `dotnet test --no-build` can reuse a stale test assembly after assertion-only edits, so rerun without `--no-build` if failure output disagrees with the current source.
   - Useful context: `FT.INFO` exposes advanced index flags in `index_options` and field modifiers in the nested `attributes` array, which is enough for broad integration assertions before adding typed info models.
+---
+## 2026-04-13 10:52:27 EDT - US-005
+- Implemented advanced YAML schema loading for multi-prefix index metadata, advanced index flags, and advanced text/tag/numeric/geo/vector field options, while tightening the loader to reject unsupported keys and ambiguous prefix declarations.
+- Files changed: `src/RedisVlDotNet/Schema/SearchSchema.cs`, `tests/RedisVlDotNet.Tests/Schema/SearchSchemaTests.cs`, `tests/RedisVlDotNet.Tests/RedisVlDotNet.Tests.csproj`, `tests/RedisVlDotNet.Tests/Schema/Fixtures/basic-schema.yaml`, `tests/RedisVlDotNet.Tests/Schema/Fixtures/advanced-schema.yaml`, `tests/RedisVlDotNet.Tests/Schema/Fixtures/unsupported-schema.yaml`, `examples/JsonStorageExample/Program.cs`, `examples/JsonStorageExample/JsonStorageExample.csproj`, `examples/JsonStorageExample/schema.yaml`, `examples/JsonStorageExample/README.md`, `prd.json`, `progress.txt`
+- Quality checks run and result: `dotnet test tests/RedisVlDotNet.Tests/RedisVlDotNet.Tests.csproj --filter FullyQualifiedName~SearchSchemaTests` passed. `dotnet test redis-vl-dotnet.sln` passed with 17 Redis-backed integration tests skipped because `REDIS_VL_REDIS_URL` was not configured locally. `dotnet build redis-vl-dotnet.sln --no-restore` passed.
+- Learnings for future iterations:
+  - Patterns discovered: checked-in YAML fixtures plus `CopyToOutputDirectory` are the cleanest way to validate `FromYamlFile(...)` behavior without temp-file setup in tests.
+  - Gotchas encountered: changing shared parsing helpers like `ParseOptionalInt(...)` affects vector attribute parsing too, so schema test runs should happen before broader solution checks.
+  - Useful context: the JSON storage sample can exercise YAML parity stories by loading `schema.yaml` from `AppContext.BaseDirectory`, which keeps the example runnable after `dotnet build` and `dotnet run`.
 ---

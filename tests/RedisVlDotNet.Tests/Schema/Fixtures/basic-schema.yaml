@@ -1,0 +1,7 @@
+index:
+  name: media-idx
+  prefix: "media:"
+  storage_type: hash
+fields:
+  - name: title
+    type: text

@@ -4,6 +4,8 @@ namespace RedisVlDotNet.Tests.Schema;
 
 public sealed class SearchSchemaTests
 {
+    private static readonly string FixtureDirectory = Path.Combine(AppContext.BaseDirectory, "Schema", "Fixtures");
+
     [Fact]
     public void LoadsSchemaFromYaml()
     {
@@ -102,34 +104,76 @@ public sealed class SearchSchemaTests
     [Fact]
     public void LoadsSchemaFromYamlFile()
     {
-        var path = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.schema.yaml");
+        var schema = SearchSchema.FromYamlFile(Path.Combine(FixtureDirectory, "basic-schema.yaml"));
 
-        try
-        {
-            File.WriteAllText(path, """
-                index:
-                  name: media-idx
-                  prefix: "media:"
-                  storage_type: hash
-                fields:
-                  - name: title
-                    type: text
-                """);
+        Assert.Equal("media-idx", schema.Index.Name);
+        Assert.Equal(StorageType.Hash, schema.Index.StorageType);
+        Assert.Single(schema.Fields);
+        Assert.IsType<TextFieldDefinition>(schema.Fields[0]);
+    }
 
-            var schema = SearchSchema.FromYamlFile(path);
+    [Fact]
+    public void LoadsAdvancedSchemaFromYamlFile()
+    {
+        var schema = SearchSchema.FromYamlFile(Path.Combine(FixtureDirectory, "advanced-schema.yaml"));
 
-            Assert.Equal("media-idx", schema.Index.Name);
-            Assert.Equal(StorageType.Hash, schema.Index.StorageType);
-            Assert.Single(schema.Fields);
-            Assert.IsType<TextFieldDefinition>(schema.Fields[0]);
-        }
-        finally
-        {
-            if (File.Exists(path))
+        Assert.Equal("advanced-docs-idx", schema.Index.Name);
+        Assert.Equal("docs:", schema.Index.Prefix);
+        Assert.Equal(["docs:", "archive:"], schema.Index.Prefixes);
+        Assert.Equal('|', schema.Index.KeySeparator);
+        Assert.Equal(StorageType.Json, schema.Index.StorageType);
+        Assert.Empty(schema.Index.Stopwords!);
+        Assert.True(schema.Index.MaxTextFields);
+        Assert.Equal(900, schema.Index.TemporarySeconds);
+        Assert.True(schema.Index.NoOffsets);
+        Assert.True(schema.Index.NoHighlight);
+        Assert.True(schema.Index.NoFields);
+        Assert.True(schema.Index.NoFrequencies);
+        Assert.True(schema.Index.SkipInitialScan);
+
+        Assert.Collection(
+            schema.Fields,
+            field =>
             {
-                File.Delete(path);
-            }
-        }
+                var textField = Assert.IsType<TextFieldDefinition>(field);
+                Assert.Equal(2.5, textField.Weight);
+                Assert.True(textField.WithSuffixTrie);
+                Assert.True(textField.IndexMissing);
+                Assert.True(textField.IndexEmpty);
+                Assert.True(textField.UnNormalizedForm);
+            },
+            field =>
+            {
+                var tagField = Assert.IsType<TagFieldDefinition>(field);
+                Assert.Equal(';', tagField.Separator);
+                Assert.True(tagField.CaseSensitive);
+                Assert.True(tagField.WithSuffixTrie);
+                Assert.True(tagField.IndexMissing);
+                Assert.True(tagField.IndexEmpty);
+                Assert.True(tagField.NoIndex);
+            },
+            field =>
+            {
+                var numericField = Assert.IsType<NumericFieldDefinition>(field);
+                Assert.True(numericField.IndexMissing);
+                Assert.True(numericField.NoIndex);
+                Assert.True(numericField.UnNormalizedForm);
+            },
+            field =>
+            {
+                var geoField = Assert.IsType<GeoFieldDefinition>(field);
+                Assert.True(geoField.IndexMissing);
+                Assert.True(geoField.NoIndex);
+            },
+            field =>
+            {
+                var vectorField = Assert.IsType<VectorFieldDefinition>(field);
+                Assert.True(vectorField.IndexMissing);
+                Assert.Equal(384, vectorField.Attributes.Dimensions);
+                Assert.Equal(32, vectorField.Attributes.M);
+                Assert.Equal(200, vectorField.Attributes.EfConstruction);
+                Assert.Equal(24, vectorField.Attributes.EfRuntime);
+            });
     }
 
     [Fact]
@@ -436,6 +480,39 @@ public sealed class SearchSchemaTests
             """;
 
         Assert.Throws<ArgumentException>(() => SearchSchema.FromYaml(yaml));
+    }
+
+    [Fact]
+    public void RejectsYamlWithUnsupportedProperties()
+    {
+        var path = Path.Combine(FixtureDirectory, "unsupported-schema.yaml");
+
+        var exception = Assert.Throws<ArgumentException>(() => SearchSchema.FromYamlFile(path));
+
+        Assert.Contains("could not be parsed", exception.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.NotNull(exception.InnerException);
+    }
+
+    [Fact]
+    public void RejectsYamlWithAmbiguousPrefixConfiguration()
+    {
+        const string yaml = """
+            index:
+              name: docs-idx
+              prefix: "docs:"
+              prefixes:
+                - "docs:"
+                - "archive:"
+              storage_type: json
+            fields:
+              - name: title
+                type: text
+            """;
+
+        var exception = Assert.Throws<ArgumentException>(() => SearchSchema.FromYaml(yaml));
+
+        Assert.Equal("index", exception.ParamName);
+        Assert.Contains("either index.prefix or index.prefixes", exception.Message, StringComparison.Ordinal);
     }
 
     [Fact]
