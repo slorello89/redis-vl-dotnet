@@ -24,6 +24,7 @@ Started: Mon Apr 13 10:35:34 EDT 2026
 - Batch query iterators should reuse the existing query execution paths by cloning the original query with a new `QueryPagination` each round; vector-style batches must clamp the final page to the remaining `topK` window instead of widening it.
 - Recency-based workflow storage should use Redis-side monotonic sequence counters per logical scope (for example, per session) and sort on that sequence, which avoids nondeterministic ordering when caller-supplied timestamps collide.
 - Semantic workflow retrieval should keep session scoping in the RediSearch filter and express similarity as a `VectorRangeQuery` distance threshold, which lets role filters compose cleanly while preserving deterministic recency metadata on the stored HASH documents.
+- Semantic cache filter variants should declare explicit HASH-backed TAG/TEXT/NUMERIC fields in the cache options, validate supplied filter values against that schema before writes, and fold the normalized filter payload into the cache key so prompt variants can coexist without collisions.
 
 ---
 ## 2026-04-13 14:06:56 EDT - US-021
@@ -216,4 +217,13 @@ Started: Mon Apr 13 10:35:34 EDT 2026
   - Patterns discovered: batch helpers are easiest to keep consistent when they call the existing `SearchAsync` and `AggregateAsync` paths and only swap in a new pagination object for each iteration.
   - Gotchas encountered: vector-style batch helpers need to shrink the last page to the remaining `topK` window or they will trip the existing pagination validation before the iterator can terminate cleanly.
   - Useful context: no `AGENTS.md` files exist under the edited paths, and there are unrelated workspace changes outside this story, so commit only the story files when closing the iteration.
+---
+## 2026-04-13 13:20:50 EDT - US-022
+- Implemented richer semantic cache records with JSON metadata payloads, explicit filterable schema fields, filtered semantic retrieval, deterministic prompt-plus-filter cache keys, and skip-if-exists schema compatibility validation against an existing Redis index.
+- Files changed: `src/RedisVlDotNet/Caches/SemanticCache.cs`, `src/RedisVlDotNet/Caches/SemanticCacheOptions.cs`, `tests/RedisVlDotNet.Tests/Caches/SemanticCacheTests.cs`, `tests/RedisVlDotNet.Tests/Caches/SemanticCacheIntegrationTests.cs`, `examples/SemanticCacheExample/SemanticCacheExample.csproj`, `examples/SemanticCacheExample/Program.cs`, `examples/SemanticCacheExample/README.md`, `examples/README.md`, `redis-vl-dotnet.sln`, `prd.json`, `progress.txt`
+- Quality checks run and result: `dotnet test tests/RedisVlDotNet.Tests/RedisVlDotNet.Tests.csproj --filter "FullyQualifiedName~SemanticCacheTests|FullyQualifiedName~SemanticCacheIntegrationTests"` passed with 6 Redis-backed semantic cache integration tests skipped because `REDIS_VL_REDIS_URL` was not configured locally. `dotnet build examples/SemanticCacheExample/SemanticCacheExample.csproj` passed. `dotnet build redis-vl-dotnet.sln --no-restore` passed. `dotnet test redis-vl-dotnet.sln --no-restore` passed with 40 Redis-backed integration tests skipped because `REDIS_VL_REDIS_URL` was not configured locally.
+- Learnings for future iterations:
+  - Patterns discovered: semantic cache entries stay reusable when metadata remains a JSON payload but tenant/model-style retrieval constraints become first-class schema fields that reuse the existing `FilterExpression` API.
+  - Gotchas encountered: semantic cache keys must incorporate normalized filter values once filtered variants are supported, otherwise prompt collisions overwrite each other and make filter-specific retrieval nondeterministic.
+  - Useful context: there are still no `AGENTS.md` files anywhere in this repository, so reusable implementation guidance remains centralized in `progress.txt`.
 ---

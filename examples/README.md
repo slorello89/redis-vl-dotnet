@@ -85,6 +85,26 @@ Run it from the repository root:
 dotnet run --project examples/MessageHistoryExample/MessageHistoryExample.csproj
 ```
 
+### [SemanticCacheExample](/Users/steve.lorello/projects/redis/redis-vl-dotnet/examples/SemanticCacheExample/README.md)
+
+Demonstrates enriched semantic cache retrieval:
+
+- create a HASH-backed semantic cache with filterable fields
+- store semantic cache entries with metadata payloads
+- keep tenant-specific prompt variants in the same cache
+- retrieve a filtered semantic cache hit
+- drop the example index and documents
+
+Redis prerequisites:
+
+- RediSearch with vector similarity support
+
+Run it from the repository root:
+
+```bash
+dotnet run --project examples/SemanticCacheExample/SemanticCacheExample.csproj
+```
+
 ## Related Docs
 
 - [Getting started guide](/Users/steve.lorello/projects/redis/redis-vl-dotnet/docs/getting-started.md)
