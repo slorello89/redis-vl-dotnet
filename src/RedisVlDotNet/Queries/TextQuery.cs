@@ -6,23 +6,15 @@ public sealed class TextQuery
         string text,
         IEnumerable<string>? returnFields = null,
         int offset = 0,
-        int limit = 10)
+        int limit = 10,
+        QueryPagination? pagination = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(text);
 
-        if (offset < 0)
-        {
-            throw new ArgumentOutOfRangeException(nameof(offset), offset, "Offset cannot be negative.");
-        }
-
-        if (limit < 0)
-        {
-            throw new ArgumentOutOfRangeException(nameof(limit), limit, "Limit cannot be negative.");
-        }
-
         Text = text.Trim();
-        Offset = offset;
-        Limit = limit;
+        Pagination = pagination ?? new QueryPagination(offset, limit);
+        Offset = Pagination.Offset;
+        Limit = Pagination.Limit;
         ReturnFields = QueryFieldNormalizer.NormalizeReturnFields(returnFields);
     }
 
@@ -31,6 +23,8 @@ public sealed class TextQuery
     public int Offset { get; }
 
     public int Limit { get; }
+
+    public QueryPagination Pagination { get; }
 
     public IReadOnlyList<string> ReturnFields { get; }
 }

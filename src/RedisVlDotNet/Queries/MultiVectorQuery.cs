@@ -11,7 +11,8 @@ public sealed class MultiVectorQuery
         FilterExpression? filter = null,
         IEnumerable<string>? returnFields = null,
         string scoreAlias = "vector_distance",
-        VectorKnnRuntimeOptions? runtimeOptions = null)
+        VectorKnnRuntimeOptions? runtimeOptions = null,
+        QueryPagination? pagination = null)
     {
         ArgumentNullException.ThrowIfNull(vectors);
         ArgumentException.ThrowIfNullOrWhiteSpace(scoreAlias);
@@ -34,11 +35,19 @@ public sealed class MultiVectorQuery
         ProjectedFields = QueryFieldNormalizer.NormalizeReturnFields(returnFields);
         ReturnFields = QueryReturnFieldHelper.NormalizeReturnFields(returnFields, ScoreAlias);
         RuntimeOptions = runtimeOptions;
+        Pagination = pagination ?? new QueryPagination(limit: topK);
+        Offset = Pagination.Offset;
+        Limit = Pagination.Limit;
+        ValidatePaginationWindow(TopK, Pagination, nameof(topK));
     }
 
     public IReadOnlyList<MultiVectorInput> Vectors { get; }
 
     public int TopK { get; }
+
+    public int Offset { get; }
+
+    public int Limit { get; }
 
     public FilterExpression? Filter { get; }
 
@@ -48,7 +57,19 @@ public sealed class MultiVectorQuery
 
     public VectorKnnRuntimeOptions? RuntimeOptions { get; }
 
+    public QueryPagination Pagination { get; }
+
     internal IReadOnlyList<string> ProjectedFields { get; }
+
+    private static void ValidatePaginationWindow(int topK, QueryPagination pagination, string parameterName)
+    {
+        if (pagination.Offset + pagination.Limit > topK)
+        {
+            throw new ArgumentException(
+                "Offset plus limit cannot exceed the vector retrieval window defined by topK.",
+                parameterName);
+        }
+    }
 }
 
 public sealed class MultiVectorInput

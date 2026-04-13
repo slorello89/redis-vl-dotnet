@@ -225,7 +225,8 @@ public sealed class SearchQueryCommandBuilderTests
             Filter.Tag("genre").Eq("crime"),
             ["title"],
             scoreAlias: "distance",
-            runtimeOptions: new VectorKnnRuntimeOptions(efRuntime: 125));
+            runtimeOptions: new VectorKnnRuntimeOptions(efRuntime: 125),
+            pagination: new QueryPagination(offset: 1, limit: 2));
 
         var arguments = SearchQueryCommandBuilder.BuildVectorSearchArguments(schema, query);
         var rendered = arguments.Select(RenderArgument).ToArray();
@@ -237,7 +238,7 @@ public sealed class SearchQueryCommandBuilderTests
                 "PARAMS", "4", "vector", "<binary>", "ef_runtime", "125",
                 "SORTBY", "distance", "ASC",
                 "RETURN", "2", "title", "distance",
-                "LIMIT", "0", "3",
+                "LIMIT", "1", "2",
                 "DIALECT", "2"
             ],
             rendered[2..]);
@@ -306,7 +307,8 @@ public sealed class SearchQueryCommandBuilderTests
             topK: 3,
             filter: Filter.Tag("category").Eq("footwear"),
             returnFields: ["title"],
-            runtimeOptions: new VectorKnnRuntimeOptions(efRuntime: 64));
+            runtimeOptions: new VectorKnnRuntimeOptions(efRuntime: 64),
+            pagination: new QueryPagination(offset: 1, limit: 2));
 
         var arguments = SearchQueryCommandBuilder.BuildMultiVectorSearchArguments(schema, query);
 
@@ -318,7 +320,7 @@ public sealed class SearchQueryCommandBuilderTests
                 "PARAMS", "4", "vector", "<binary>", "ef_runtime", "64",
                 "SORTBY", "__mv_score_0", "ASC",
                 "RETURN", "2", "title", "__mv_score_0",
-                "LIMIT", "0", "3",
+                "LIMIT", "1", "2",
                 "DIALECT", "2"
             ],
             arguments[0].Select(RenderArgument).ToArray());
@@ -329,7 +331,7 @@ public sealed class SearchQueryCommandBuilderTests
                 "PARAMS", "4", "vector", "<binary>", "ef_runtime", "64",
                 "SORTBY", "__mv_score_1", "ASC",
                 "RETURN", "2", "title", "__mv_score_1",
-                "LIMIT", "0", "3",
+                "LIMIT", "1", "2",
                 "DIALECT", "2"
             ],
             arguments[1].Select(RenderArgument).ToArray());
@@ -361,7 +363,8 @@ public sealed class SearchQueryCommandBuilderTests
             Filter.Tag("genre").Eq("crime"),
             ["title"],
             scoreAlias: "distance",
-            runtimeOptions: new VectorKnnRuntimeOptions(efRuntime: 100));
+            runtimeOptions: new VectorKnnRuntimeOptions(efRuntime: 100),
+            pagination: new QueryPagination(limit: 1));
 
         var arguments = SearchQueryCommandBuilder.BuildHybridSearchArguments(schema, query);
         var rendered = arguments.Select(RenderArgument).ToArray();
@@ -373,7 +376,7 @@ public sealed class SearchQueryCommandBuilderTests
                 "PARAMS", "4", "vector", "<binary>", "ef_runtime", "100",
                 "SORTBY", "distance", "ASC",
                 "RETURN", "2", "title", "distance",
-                "LIMIT", "0", "2",
+                "LIMIT", "0", "1",
                 "DIALECT", "2"
             ],
             rendered[2..]);
@@ -585,11 +588,15 @@ public sealed class SearchQueryCommandBuilderTests
             [1f, 2f],
             1,
             returnFields: ["@title", "title", "distance"],
-            scoreAlias: "@distance");
+            scoreAlias: "@distance",
+            pagination: new QueryPagination(offset: 0, limit: 1));
 
         Assert.Equal("embedding", query.FieldName);
         Assert.Equal("distance", query.ScoreAlias);
         Assert.Equal(["title", "distance"], query.ReturnFields);
+        Assert.Equal(0, query.Offset);
+        Assert.Equal(1, query.Limit);
+        Assert.Equal(1, query.Pagination.Limit);
     }
 
     [Fact]
@@ -613,11 +620,14 @@ public sealed class SearchQueryCommandBuilderTests
             [1f, 2f],
             2,
             returnFields: ["@title", "title", "distance"],
-            scoreAlias: "@distance");
+            scoreAlias: "@distance",
+            pagination: new QueryPagination(offset: 1, limit: 1));
 
         Assert.Equal("embedding", query.VectorFieldName);
         Assert.Equal("distance", query.ScoreAlias);
         Assert.Equal(["title", "distance"], query.ReturnFields);
+        Assert.Equal(1, query.Offset);
+        Assert.Equal(1, query.Limit);
     }
 
     [Fact]
@@ -657,12 +667,12 @@ public sealed class SearchQueryCommandBuilderTests
     {
         var query = new FilterQuery(
             returnFields: ["@title", "title", "year"],
-            offset: 2,
-            limit: 5);
+            pagination: new QueryPagination(offset: 2, limit: 5));
 
         Assert.Equal(["title", "year"], query.ReturnFields);
         Assert.Equal(2, query.Offset);
         Assert.Equal(5, query.Limit);
+        Assert.Equal(2, query.Pagination.Offset);
     }
 
     [Fact]
@@ -671,8 +681,7 @@ public sealed class SearchQueryCommandBuilderTests
         var query = new TextQuery(
             "  hello world  ",
             returnFields: ["@title", "title", "year"],
-            offset: 2,
-            limit: 5);
+            pagination: new QueryPagination(offset: 2, limit: 5));
 
         Assert.Equal("hello world", query.Text);
         Assert.Equal(["title", "year"], query.ReturnFields);
@@ -720,14 +729,42 @@ public sealed class SearchQueryCommandBuilderTests
             0.5,
             returnFields: ["@title", "title", "distance"],
             scoreAlias: "@distance",
-            offset: 2,
-            limit: 5);
+            pagination: new QueryPagination(offset: 2, limit: 5));
 
         Assert.Equal("embedding", query.FieldName);
         Assert.Equal("distance", query.ScoreAlias);
         Assert.Equal(["title", "distance"], query.ReturnFields);
         Assert.Equal(2, query.Offset);
         Assert.Equal(5, query.Limit);
+    }
+
+    [Fact]
+    public void QueryPaginationRejectsNegativeValues()
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() => new QueryPagination(offset: -1));
+        Assert.Throws<ArgumentOutOfRangeException>(() => new QueryPagination(limit: -1));
+    }
+
+    [Fact]
+    public void VectorStyleQueriesRejectPaginationPastTopK()
+    {
+        Assert.Throws<ArgumentException>(() => VectorQuery.FromFloat32(
+            "embedding",
+            [1f, 0f],
+            2,
+            pagination: new QueryPagination(offset: 1, limit: 2)));
+
+        Assert.Throws<ArgumentException>(() => HybridQuery.FromFloat32(
+            Filter.Text("title").Prefix("He"),
+            "embedding",
+            [1f, 0f],
+            2,
+            pagination: new QueryPagination(offset: 1, limit: 2)));
+
+        Assert.Throws<ArgumentException>(() => new MultiVectorQuery(
+            [MultiVectorInput.FromFloat32("embedding", [1f, 0f])],
+            2,
+            pagination: new QueryPagination(offset: 1, limit: 2)));
     }
 
     [Fact]

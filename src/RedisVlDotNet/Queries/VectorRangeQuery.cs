@@ -14,7 +14,8 @@ public sealed class VectorRangeQuery
         string scoreAlias = "vector_distance",
         int offset = 0,
         int limit = 10,
-        VectorRangeRuntimeOptions? runtimeOptions = null)
+        VectorRangeRuntimeOptions? runtimeOptions = null,
+        QueryPagination? pagination = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(fieldName);
         ArgumentNullException.ThrowIfNull(vector);
@@ -30,23 +31,14 @@ public sealed class VectorRangeQuery
             throw new ArgumentOutOfRangeException(nameof(distanceThreshold), distanceThreshold, "Distance threshold must be greater than zero.");
         }
 
-        if (offset < 0)
-        {
-            throw new ArgumentOutOfRangeException(nameof(offset), offset, "Offset cannot be negative.");
-        }
-
-        if (limit < 0)
-        {
-            throw new ArgumentOutOfRangeException(nameof(limit), limit, "Limit cannot be negative.");
-        }
-
         FieldName = FilterExpression.NormalizeFieldName(fieldName);
         Vector = vector.ToArray();
         DistanceThreshold = distanceThreshold;
         Filter = filter;
         ScoreAlias = FilterExpression.NormalizeFieldName(scoreAlias);
-        Offset = offset;
-        Limit = limit;
+        Pagination = pagination ?? new QueryPagination(offset, limit);
+        Offset = Pagination.Offset;
+        Limit = Pagination.Limit;
         ReturnFields = QueryReturnFieldHelper.NormalizeReturnFields(returnFields, ScoreAlias);
         RuntimeOptions = runtimeOptions;
     }
@@ -65,6 +57,8 @@ public sealed class VectorRangeQuery
 
     public int Limit { get; }
 
+    public QueryPagination Pagination { get; }
+
     public IReadOnlyList<string> ReturnFields { get; }
 
     public VectorRangeRuntimeOptions? RuntimeOptions { get; }
@@ -78,8 +72,9 @@ public sealed class VectorRangeQuery
         string scoreAlias = "vector_distance",
         int offset = 0,
         int limit = 10,
-        VectorRangeRuntimeOptions? runtimeOptions = null) =>
-        new(fieldName, MemoryMarshal.AsBytes<float>(vector.AsSpan()).ToArray(), distanceThreshold, filter, returnFields, scoreAlias, offset, limit, runtimeOptions);
+        VectorRangeRuntimeOptions? runtimeOptions = null,
+        QueryPagination? pagination = null) =>
+        new(fieldName, MemoryMarshal.AsBytes<float>(vector.AsSpan()).ToArray(), distanceThreshold, filter, returnFields, scoreAlias, offset, limit, runtimeOptions, pagination);
 
     public static VectorRangeQuery FromFloat64(
         string fieldName,
@@ -90,6 +85,7 @@ public sealed class VectorRangeQuery
         string scoreAlias = "vector_distance",
         int offset = 0,
         int limit = 10,
-        VectorRangeRuntimeOptions? runtimeOptions = null) =>
-        new(fieldName, MemoryMarshal.AsBytes<double>(vector.AsSpan()).ToArray(), distanceThreshold, filter, returnFields, scoreAlias, offset, limit, runtimeOptions);
+        VectorRangeRuntimeOptions? runtimeOptions = null,
+        QueryPagination? pagination = null) =>
+        new(fieldName, MemoryMarshal.AsBytes<double>(vector.AsSpan()).ToArray(), distanceThreshold, filter, returnFields, scoreAlias, offset, limit, runtimeOptions, pagination);
 }

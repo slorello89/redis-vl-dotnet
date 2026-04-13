@@ -20,6 +20,7 @@ Started: Mon Apr 13 10:35:34 EDT 2026
 - Aggregate hybrid support should reuse the plain aggregation pipeline model and treat the KNN score alias like any other aggregation property reference, so reducers and sort clauses can operate on `vector_distance` without a separate result-mapping path.
 - Multi-vector search on the current Redis 7.4 test target should compose existing per-field `FT.SEARCH` calls, restrict inputs to cosine vector fields, and merge only intersection candidates using weighted distance ordering plus stable per-clause and document-id tie-breaks.
 - Runtime vector tuning should stay query-local and flow through the shared vector command builder so composed queries reuse one `PARAMS` serializer while schema-based algorithm checks reject HNSW-only options on `FLAT` fields before Redis execution.
+- Shared query paging should flow through `QueryPagination`; vector-style queries keep `topK` as the retrieval window and must reject `offset + limit` values that would page past that window.
 
 ---
 
@@ -175,4 +176,13 @@ Started: Mon Apr 13 10:35:34 EDT 2026
   - Patterns discovered: runtime vector options should be modeled as optional query objects instead of extra scalar constructor parameters so each vector-capable query can opt in without destabilizing the shared query surface.
   - Gotchas encountered: runtime option validation must use the schema field algorithm, not just the presence of a vector clause, because the same query model can target both `HNSW` and `FLAT` indexes.
   - Useful context: there are still no `AGENTS.md` files anywhere in this repository, so reusable implementation guidance remains centralized in `progress.txt`.
+---
+## 2026-04-13 12:53:29 EDT - US-018
+- Implemented shared `QueryPagination` support across filter, text, aggregation, aggregate-hybrid, vector, hybrid, multi-vector, and vector-range queries; updated command generation to source `LIMIT` consistently; and paginated multi-vector result merging without changing `topK` semantics.
+- Files changed: `src/RedisVlDotNet/Queries/QueryPagination.cs`, `src/RedisVlDotNet/Queries/FilterQuery.cs`, `src/RedisVlDotNet/Queries/TextQuery.cs`, `src/RedisVlDotNet/Queries/AggregationQuery.cs`, `src/RedisVlDotNet/Queries/AggregateHybridQuery.cs`, `src/RedisVlDotNet/Queries/VectorQuery.cs`, `src/RedisVlDotNet/Queries/HybridQuery.cs`, `src/RedisVlDotNet/Queries/MultiVectorQuery.cs`, `src/RedisVlDotNet/Queries/VectorRangeQuery.cs`, `src/RedisVlDotNet/Indexes/SearchQueryCommandBuilder.cs`, `src/RedisVlDotNet/Indexes/SearchIndex.cs`, `tests/RedisVlDotNet.Tests/Indexes/SearchQueryCommandBuilderTests.cs`, `tests/RedisVlDotNet.Tests/Indexes/SearchIndexAsyncTests.cs`, `tests/RedisVlDotNet.Tests/Indexes/SearchIndexIntegrationTests.cs`, `examples/VectorSearchExample/Program.cs`, `docs/getting-started.md`, `prd.json`, `progress.txt`
+- Quality checks run and result: `dotnet test tests/RedisVlDotNet.Tests/RedisVlDotNet.Tests.csproj --filter "FullyQualifiedName~SearchQueryCommandBuilderTests|FullyQualifiedName~SearchIndexAsyncTests|FullyQualifiedName~SearchIndexIntegrationTests"` passed with 28 Redis-backed integration tests skipped because `REDIS_VL_REDIS_URL` was not configured locally. `dotnet test redis-vl-dotnet.sln --no-restore` passed with 34 Redis-backed integration tests skipped because `REDIS_VL_REDIS_URL` was not configured locally.
+- Learnings for future iterations:
+  - Patterns discovered: pagination consistency is easiest to preserve when all query models expose one shared pagination object and command builders treat `LIMIT` emission as a common helper instead of per-query inline logic.
+  - Gotchas encountered: vector-style queries still need `topK` to bound the retrieval window, so paging validation has to reject pages beyond `topK` rather than silently expanding the KNN clause and changing ranking semantics.
+  - Useful context: there are still no `AGENTS.md` files anywhere in this repository, so there was no area-local agent guidance to update for this iteration.
 ---

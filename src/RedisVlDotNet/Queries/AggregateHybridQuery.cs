@@ -18,7 +18,8 @@ public sealed class AggregateHybridQuery
         int offset = 0,
         int limit = 10,
         string scoreAlias = "vector_distance",
-        VectorKnnRuntimeOptions? runtimeOptions = null)
+        VectorKnnRuntimeOptions? runtimeOptions = null,
+        QueryPagination? pagination = null)
     {
         ArgumentNullException.ThrowIfNull(textFilter);
         ArgumentException.ThrowIfNullOrWhiteSpace(vectorFieldName);
@@ -35,16 +36,6 @@ public sealed class AggregateHybridQuery
             throw new ArgumentOutOfRangeException(nameof(topK), topK, "TopK must be greater than zero.");
         }
 
-        if (offset < 0)
-        {
-            throw new ArgumentOutOfRangeException(nameof(offset), offset, "Offset cannot be negative.");
-        }
-
-        if (limit < 0)
-        {
-            throw new ArgumentOutOfRangeException(nameof(limit), limit, "Limit cannot be negative.");
-        }
-
         if (!QueryFilterInspector.ContainsTextExpression(textFilter))
         {
             throw new ArgumentException("Aggregate hybrid queries require at least one text predicate in the text filter.", nameof(textFilter));
@@ -59,8 +50,9 @@ public sealed class AggregateHybridQuery
         ApplyClauses = applyClauses?.ToArray() ?? [];
         GroupBy = groupBy;
         SortBy = sortBy;
-        Offset = offset;
-        Limit = limit;
+        Pagination = pagination ?? new QueryPagination(offset, limit);
+        Offset = Pagination.Offset;
+        Limit = Pagination.Limit;
         ScoreAlias = FilterExpression.NormalizeFieldName(scoreAlias);
         RuntimeOptions = runtimeOptions;
     }
@@ -87,6 +79,8 @@ public sealed class AggregateHybridQuery
 
     public int Limit { get; }
 
+    public QueryPagination Pagination { get; }
+
     public string ScoreAlias { get; }
 
     public VectorKnnRuntimeOptions? RuntimeOptions { get; }
@@ -106,7 +100,8 @@ public sealed class AggregateHybridQuery
         int offset = 0,
         int limit = 10,
         string scoreAlias = "vector_distance",
-        VectorKnnRuntimeOptions? runtimeOptions = null) =>
+        VectorKnnRuntimeOptions? runtimeOptions = null,
+        QueryPagination? pagination = null) =>
         new(
             textFilter,
             vectorFieldName,
@@ -120,7 +115,8 @@ public sealed class AggregateHybridQuery
             offset,
             limit,
             scoreAlias,
-            runtimeOptions);
+            runtimeOptions,
+            pagination);
 
     public static AggregateHybridQuery FromFloat64(
         FilterExpression textFilter,
@@ -135,7 +131,8 @@ public sealed class AggregateHybridQuery
         int offset = 0,
         int limit = 10,
         string scoreAlias = "vector_distance",
-        VectorKnnRuntimeOptions? runtimeOptions = null) =>
+        VectorKnnRuntimeOptions? runtimeOptions = null,
+        QueryPagination? pagination = null) =>
         new(
             textFilter,
             vectorFieldName,
@@ -149,7 +146,8 @@ public sealed class AggregateHybridQuery
             offset,
             limit,
             scoreAlias,
-            runtimeOptions);
+            runtimeOptions,
+            pagination);
 
     private static IReadOnlyList<string> NormalizeFields(IEnumerable<string>? fields)
     {

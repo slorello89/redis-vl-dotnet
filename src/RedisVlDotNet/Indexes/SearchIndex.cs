@@ -671,7 +671,8 @@ public sealed class SearchIndex
 
         var totalCount = combinedDocuments.LongLength;
         var topDocuments = combinedDocuments
-            .Take(query.TopK)
+            .Skip(query.Offset)
+            .Take(query.Limit)
             .Select(static item => item.Document)
             .ToArray();
 

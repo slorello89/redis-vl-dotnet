@@ -846,6 +846,45 @@ public sealed class SearchIndexIntegrationTests
     }
 
     [RedisSearchIntegrationFact]
+    public async Task ExecutesTextQueriesAcrossPages()
+    {
+        await using var connection = await RedisSearchTestEnvironment.ConnectAsync();
+        var database = connection.GetDatabase();
+
+        var token = Guid.NewGuid().ToString("N");
+        var schema = new SearchSchema(
+            new IndexDefinition($"text-query-pages-idx-{token}", $"text-query-pages:{token}:", StorageType.Hash),
+            [
+                new TextFieldDefinition("title", weight: 3.0),
+                new NumericFieldDefinition("year"),
+                new TagFieldDefinition("genre")
+            ]);
+        var index = new SearchIndex(database, schema);
+
+        try
+        {
+            await index.CreateAsync();
+            await SeedHashDocumentsAsync(database, schema, SearchIndexSeedData.TextQueryMovies);
+            await RedisSearchTestEnvironment.WaitForIndexDocumentCountAsync(index, SearchIndexSeedData.TextQueryMovies.Count);
+
+            var firstPage = await index.SearchAsync(new TextQuery("heat", ["title"], pagination: new QueryPagination(limit: 1)));
+            var secondPage = await index.SearchAsync(new TextQuery("heat", ["title"], pagination: new QueryPagination(offset: 1, limit: 1)));
+
+            Assert.Equal(2, firstPage.TotalCount);
+            Assert.Equal(2, secondPage.TotalCount);
+            Assert.Equal("Heat Heat", Assert.Single(firstPage.Documents).Values["title"]);
+            Assert.Equal("Heat", Assert.Single(secondPage.Documents).Values["title"]);
+        }
+        finally
+        {
+            if (await index.ExistsAsync())
+            {
+                await index.DropAsync(deleteDocuments: true);
+            }
+        }
+    }
+
+    [RedisSearchIntegrationFact]
     public async Task ExecutesAggregationQueriesWithGroupedRowsAndTypedReducers()
     {
         await using var connection = await RedisSearchTestEnvironment.ConnectAsync();
@@ -904,6 +943,58 @@ public sealed class SearchIndexIntegrationTests
                     Assert.Equal(1, row.MovieCount);
                     Assert.Equal(2016d, row.AverageYear);
                 });
+        }
+        finally
+        {
+            if (await index.ExistsAsync())
+            {
+                await index.DropAsync(deleteDocuments: true);
+            }
+        }
+    }
+
+    [RedisSearchIntegrationFact]
+    public async Task ExecutesAggregationQueriesAcrossPages()
+    {
+        await using var connection = await RedisSearchTestEnvironment.ConnectAsync();
+        var database = connection.GetDatabase();
+
+        var token = Guid.NewGuid().ToString("N");
+        var schema = new SearchSchema(
+            new IndexDefinition($"aggregate-pages-idx-{token}", $"aggregate-pages:{token}:", StorageType.Hash),
+            [
+                new TextFieldDefinition("title"),
+                new NumericFieldDefinition("year"),
+                new TagFieldDefinition("genre")
+            ]);
+        var index = new SearchIndex(database, schema);
+
+        try
+        {
+            await index.CreateAsync();
+            await SeedHashDocumentsAsync(database, schema, SearchIndexSeedData.AggregationMovies);
+            await RedisSearchTestEnvironment.WaitForIndexDocumentCountAsync(index, SearchIndexSeedData.AggregationMovies.Count);
+
+            var query = new AggregationQuery(
+                groupBy: new AggregationGroupBy(
+                    ["genre"],
+                    [
+                        AggregationReducer.Count("movieCount"),
+                        AggregationReducer.Average("year", "averageYear")
+                    ]),
+                sortBy: new AggregationSortBy(
+                    [
+                        new AggregationSortField("movieCount", descending: true),
+                        new AggregationSortField("averageYear", descending: true)
+                    ]),
+                pagination: new QueryPagination(offset: 1, limit: 1));
+
+            var results = await index.AggregateAsync(query);
+
+            Assert.Equal(2, results.TotalCount);
+            var row = Assert.Single(results.Rows);
+            Assert.Equal("science-fiction", row.Values["genre"]);
+            Assert.Equal("1", row.Values["movieCount"]);
         }
         finally
         {
@@ -1038,6 +1129,65 @@ public sealed class SearchIndexIntegrationTests
             Assert.Equal("Thief", results.Documents[1].Values["title"]);
             Assert.True(double.Parse(results.Documents[0].Values["distance"]!, System.Globalization.CultureInfo.InvariantCulture) <
                         double.Parse(results.Documents[1].Values["distance"]!, System.Globalization.CultureInfo.InvariantCulture));
+        }
+        finally
+        {
+            if (await index.ExistsAsync())
+            {
+                await index.DropAsync(deleteDocuments: true);
+            }
+        }
+    }
+
+    [RedisSearchIntegrationFact]
+    public async Task ExecutesVectorQueriesAcrossPages()
+    {
+        await using var connection = await RedisSearchTestEnvironment.ConnectAsync();
+        var database = connection.GetDatabase();
+
+        var token = Guid.NewGuid().ToString("N");
+        var schema = new SearchSchema(
+            new IndexDefinition($"vector-pages-idx-{token}", $"vector-pages:{token}:", StorageType.Hash),
+            [
+                new TagFieldDefinition("genre"),
+                new TextFieldDefinition("title"),
+                new VectorFieldDefinition(
+                    "embedding",
+                    new VectorFieldAttributes(
+                        VectorAlgorithm.Flat,
+                        VectorDataType.Float32,
+                        VectorDistanceMetric.Cosine,
+                        2))
+            ]);
+        var index = new SearchIndex(database, schema);
+
+        try
+        {
+            await index.CreateAsync();
+            await SeedHashDocumentsAsync(database, schema, SearchIndexSeedData.VectorMovies);
+            await RedisSearchTestEnvironment.WaitForIndexDocumentCountAsync(index, SearchIndexSeedData.VectorMovies.Count);
+
+            var firstPage = await index.SearchAsync(VectorQuery.FromFloat32(
+                "embedding",
+                [1f, 0f],
+                2,
+                Filter.Tag("genre").Eq("crime"),
+                ["title"],
+                scoreAlias: "distance",
+                pagination: new QueryPagination(limit: 1)));
+            var secondPage = await index.SearchAsync(VectorQuery.FromFloat32(
+                "embedding",
+                [1f, 0f],
+                2,
+                Filter.Tag("genre").Eq("crime"),
+                ["title"],
+                scoreAlias: "distance",
+                pagination: new QueryPagination(offset: 1, limit: 1)));
+
+            Assert.Equal(2, firstPage.TotalCount);
+            Assert.Equal(2, secondPage.TotalCount);
+            Assert.Equal("Heat", Assert.Single(firstPage.Documents).Values["title"]);
+            Assert.Equal("Thief", Assert.Single(secondPage.Documents).Values["title"]);
         }
         finally
         {
@@ -1328,6 +1478,76 @@ public sealed class SearchIndexIntegrationTests
 
             Assert.True(scores[0] < scores[1]);
             Assert.True(scores[1] < scores[2]);
+        }
+        finally
+        {
+            if (await index.ExistsAsync())
+            {
+                await index.DropAsync(deleteDocuments: true);
+            }
+        }
+    }
+
+    [RedisSearchIntegrationFact]
+    public async Task ExecutesMultiVectorQueriesAcrossPages()
+    {
+        await using var connection = await RedisSearchTestEnvironment.ConnectAsync();
+        var database = connection.GetDatabase();
+
+        var token = Guid.NewGuid().ToString("N");
+        var schema = new SearchSchema(
+            new IndexDefinition($"multi-vector-pages-idx-{token}", $"multi-vector-pages:{token}:", StorageType.Hash),
+            [
+                new TagFieldDefinition("category"),
+                new TextFieldDefinition("title"),
+                new VectorFieldDefinition(
+                    "text_embedding",
+                    new VectorFieldAttributes(
+                        VectorAlgorithm.Flat,
+                        VectorDataType.Float32,
+                        VectorDistanceMetric.Cosine,
+                        2)),
+                new VectorFieldDefinition(
+                    "image_embedding",
+                    new VectorFieldAttributes(
+                        VectorAlgorithm.Flat,
+                        VectorDataType.Float32,
+                        VectorDistanceMetric.Cosine,
+                        2))
+            ]);
+        var index = new SearchIndex(database, schema);
+
+        try
+        {
+            await index.CreateAsync();
+            await SeedHashDocumentsAsync(database, schema, SearchIndexSeedData.MultiVectorMovies);
+            await RedisSearchTestEnvironment.WaitForIndexDocumentCountAsync(index, SearchIndexSeedData.MultiVectorMovies.Count);
+
+            var firstPage = await index.SearchAsync(new MultiVectorQuery(
+                [
+                    MultiVectorInput.FromFloat32("text_embedding", [1f, 0f], weight: 0.7),
+                    MultiVectorInput.FromFloat32("image_embedding", [0f, 1f], weight: 0.3)
+                ],
+                topK: 3,
+                filter: Filter.Tag("category").Eq("footwear"),
+                returnFields: ["title"],
+                scoreAlias: "combined_distance",
+                pagination: new QueryPagination(limit: 1)));
+            var secondPage = await index.SearchAsync(new MultiVectorQuery(
+                [
+                    MultiVectorInput.FromFloat32("text_embedding", [1f, 0f], weight: 0.7),
+                    MultiVectorInput.FromFloat32("image_embedding", [0f, 1f], weight: 0.3)
+                ],
+                topK: 3,
+                filter: Filter.Tag("category").Eq("footwear"),
+                returnFields: ["title"],
+                scoreAlias: "combined_distance",
+                pagination: new QueryPagination(offset: 1, limit: 1)));
+
+            Assert.Equal(3, firstPage.TotalCount);
+            Assert.Equal(3, secondPage.TotalCount);
+            Assert.Equal("Runner", Assert.Single(firstPage.Documents).Values["title"]);
+            Assert.Equal("Hiker", Assert.Single(secondPage.Documents).Values["title"]);
         }
         finally
         {

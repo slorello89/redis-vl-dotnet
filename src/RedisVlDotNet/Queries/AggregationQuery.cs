@@ -9,27 +9,19 @@ public sealed class AggregationQuery
         AggregationGroupBy? groupBy = null,
         AggregationSortBy? sortBy = null,
         int offset = 0,
-        int limit = 10)
+        int limit = 10,
+        QueryPagination? pagination = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(queryString);
-
-        if (offset < 0)
-        {
-            throw new ArgumentOutOfRangeException(nameof(offset), offset, "Offset cannot be negative.");
-        }
-
-        if (limit < 0)
-        {
-            throw new ArgumentOutOfRangeException(nameof(limit), limit, "Limit cannot be negative.");
-        }
 
         QueryString = queryString.Trim();
         LoadFields = NormalizeFields(loadFields);
         ApplyClauses = applyClauses?.ToArray() ?? [];
         GroupBy = groupBy;
         SortBy = sortBy;
-        Offset = offset;
-        Limit = limit;
+        Pagination = pagination ?? new QueryPagination(offset, limit);
+        Offset = Pagination.Offset;
+        Limit = Pagination.Limit;
     }
 
     public string QueryString { get; }
@@ -45,6 +37,8 @@ public sealed class AggregationQuery
     public int Offset { get; }
 
     public int Limit { get; }
+
+    public QueryPagination Pagination { get; }
 
     private static IReadOnlyList<string> NormalizeFields(IEnumerable<string>? fields)
     {

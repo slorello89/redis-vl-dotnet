@@ -24,9 +24,7 @@ internal static class SearchQueryCommandBuilder
             arguments.AddRange(query.ReturnFields);
         }
 
-        arguments.Add("LIMIT");
-        arguments.Add(query.Offset.ToString(CultureInfo.InvariantCulture));
-        arguments.Add(query.Limit.ToString(CultureInfo.InvariantCulture));
+        AppendLimit(arguments, query.Offset, query.Limit);
         arguments.Add("DIALECT");
         arguments.Add("2");
 
@@ -51,9 +49,7 @@ internal static class SearchQueryCommandBuilder
             arguments.AddRange(query.ReturnFields);
         }
 
-        arguments.Add("LIMIT");
-        arguments.Add(query.Offset.ToString(CultureInfo.InvariantCulture));
-        arguments.Add(query.Limit.ToString(CultureInfo.InvariantCulture));
+        AppendLimit(arguments, query.Offset, query.Limit);
         arguments.Add("DIALECT");
         arguments.Add("2");
 
@@ -191,9 +187,7 @@ internal static class SearchQueryCommandBuilder
             }
         }
 
-        arguments.Add("LIMIT");
-        arguments.Add(offset.ToString(CultureInfo.InvariantCulture));
-        arguments.Add(limit.ToString(CultureInfo.InvariantCulture));
+        AppendLimit(arguments, offset, limit);
     }
 
     public static object[] BuildVectorSearchArguments(SearchSchema schema, VectorQuery query)
@@ -221,9 +215,7 @@ internal static class SearchQueryCommandBuilder
         ]);
 
         arguments.AddRange(query.ReturnFields);
-        arguments.Add("LIMIT");
-        arguments.Add("0");
-        arguments.Add(query.TopK.ToString(CultureInfo.InvariantCulture));
+        AppendLimit(arguments, query.Offset, query.Limit);
         arguments.Add("DIALECT");
         arguments.Add("2");
 
@@ -249,7 +241,8 @@ internal static class SearchQueryCommandBuilder
                 query.Filter,
                 query.ProjectedFields,
                 GetMultiVectorScoreAlias(index),
-                query.RuntimeOptions);
+                query.RuntimeOptions,
+                query.Pagination);
 
             arguments.Add(BuildVectorSearchArguments(schema, subQuery));
         }
@@ -282,9 +275,7 @@ internal static class SearchQueryCommandBuilder
         ]);
 
         arguments.AddRange(query.ReturnFields);
-        arguments.Add("LIMIT");
-        arguments.Add("0");
-        arguments.Add(query.TopK.ToString(CultureInfo.InvariantCulture));
+        AppendLimit(arguments, query.Offset, query.Limit);
         arguments.Add("DIALECT");
         arguments.Add("2");
 
@@ -316,9 +307,7 @@ internal static class SearchQueryCommandBuilder
         ]);
 
         arguments.AddRange(query.ReturnFields);
-        arguments.Add("LIMIT");
-        arguments.Add(query.Offset.ToString(CultureInfo.InvariantCulture));
-        arguments.Add(query.Limit.ToString(CultureInfo.InvariantCulture));
+        AppendLimit(arguments, query.Offset, query.Limit);
         arguments.Add("DIALECT");
         arguments.Add("2");
 
@@ -525,4 +514,11 @@ internal static class SearchQueryCommandBuilder
 
     internal static string GetMultiVectorScoreAlias(int index) =>
         $"__mv_score_{index.ToString(CultureInfo.InvariantCulture)}";
+
+    private static void AppendLimit(List<object> arguments, int offset, int limit)
+    {
+        arguments.Add("LIMIT");
+        arguments.Add(offset.ToString(CultureInfo.InvariantCulture));
+        arguments.Add(limit.ToString(CultureInfo.InvariantCulture));
+    }
 }

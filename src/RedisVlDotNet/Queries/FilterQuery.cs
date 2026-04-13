@@ -8,21 +8,13 @@ public sealed class FilterQuery
         FilterExpression? filter = null,
         IEnumerable<string>? returnFields = null,
         int offset = 0,
-        int limit = 10)
+        int limit = 10,
+        QueryPagination? pagination = null)
     {
-        if (offset < 0)
-        {
-            throw new ArgumentOutOfRangeException(nameof(offset), offset, "Offset cannot be negative.");
-        }
-
-        if (limit < 0)
-        {
-            throw new ArgumentOutOfRangeException(nameof(limit), limit, "Limit cannot be negative.");
-        }
-
+        Pagination = pagination ?? new QueryPagination(offset, limit);
         Filter = filter;
-        Offset = offset;
-        Limit = limit;
+        Offset = Pagination.Offset;
+        Limit = Pagination.Limit;
         ReturnFields = QueryFieldNormalizer.NormalizeReturnFields(returnFields);
     }
 
@@ -31,6 +23,8 @@ public sealed class FilterQuery
     public int Offset { get; }
 
     public int Limit { get; }
+
+    public QueryPagination Pagination { get; }
 
     public IReadOnlyList<string> ReturnFields { get; }
 }

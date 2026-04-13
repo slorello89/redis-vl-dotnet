@@ -153,7 +153,17 @@ var textResults = await index.SearchAsync<Movie>(
 - the first argument is the raw RediSearch query string
 - `returnFields` limits the projected fields returned from Redis
 - `SearchAsync<T>(...)` maps those projected fields into a typed result document
-- `offset` and `limit` control pagination
+- `QueryPagination` provides the shared paging model across text, filter, vector, hybrid, aggregation, and vector-range queries
+
+```csharp
+var pagedVectorResults = await index.SearchAsync(
+    VectorQuery.FromFloat32(
+        "embedding",
+        [1f, 0f],
+        topK: 10,
+        returnFields: ["title"],
+        pagination: new QueryPagination(offset: 3, limit: 3)));
+```
 
 ## Run Aggregations With Typed Results
 

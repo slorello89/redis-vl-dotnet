@@ -741,18 +741,24 @@ public sealed class SearchIndexAsyncTests
                     MultiVectorInput.FromFloat32("text_embedding", [1f, 0f], weight: 0.7),
                     MultiVectorInput.FromFloat32("image_embedding", [0f, 1f], weight: 0.3)
                 ],
-                topK: 2,
+                topK: 3,
                 returnFields: ["title"],
-                scoreAlias: "combined_distance"));
+                scoreAlias: "combined_distance",
+                pagination: new QueryPagination(offset: 1, limit: 2)));
 
         Assert.Equal(2, recorder.ExecuteAsyncCallCount);
         Assert.All(recorder.ExecuteAsyncCalls, static call => Assert.Equal("FT.SEARCH", call.Command));
         Assert.Equal(3, results.TotalCount);
-        Assert.Equal(["product:2", "product:1"], results.Documents.Select(static document => document.Id).ToArray());
-        Assert.Equal("Hiker", results.Documents[0].Values["title"]);
-        Assert.Equal("Runner", results.Documents[1].Values["title"]);
-        Assert.Equal("0.084999999999999992", results.Documents[0].Values["combined_distance"]);
-        Assert.Equal("0.095000000000000001", results.Documents[1].Values["combined_distance"]);
+        Assert.Equal(["product:1", "product:3"], results.Documents.Select(static document => document.Id).ToArray());
+        Assert.Equal("Runner", results.Documents[0].Values["title"]);
+        Assert.Equal("Boot", results.Documents[1].Values["title"]);
+        Assert.Equal("0.095000000000000001", results.Documents[0].Values["combined_distance"]);
+        Assert.Equal("0.22999999999999998", results.Documents[1].Values["combined_distance"]);
+        Assert.All(
+            recorder.ExecuteAsyncCalls,
+            static call => Assert.Equal(
+                ["LIMIT", "1", "2", "DIALECT", "2"],
+                call.Arguments.Select(static argument => argument?.ToString() ?? string.Empty).TakeLast(5).ToArray()));
     }
 
     [Fact]

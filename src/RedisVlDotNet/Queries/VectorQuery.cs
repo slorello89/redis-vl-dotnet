@@ -12,7 +12,8 @@ public sealed class VectorQuery
         FilterExpression? filter = null,
         IEnumerable<string>? returnFields = null,
         string scoreAlias = "vector_distance",
-        VectorKnnRuntimeOptions? runtimeOptions = null)
+        VectorKnnRuntimeOptions? runtimeOptions = null,
+        QueryPagination? pagination = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(fieldName);
         ArgumentNullException.ThrowIfNull(vector);
@@ -35,6 +36,10 @@ public sealed class VectorQuery
         ScoreAlias = FilterExpression.NormalizeFieldName(scoreAlias);
         ReturnFields = NormalizeReturnFields(returnFields, ScoreAlias);
         RuntimeOptions = runtimeOptions;
+        Pagination = pagination ?? new QueryPagination(limit: topK);
+        Offset = Pagination.Offset;
+        Limit = Pagination.Limit;
+        ValidatePaginationWindow(TopK, Pagination, nameof(topK));
     }
 
     public string FieldName { get; }
@@ -42,6 +47,10 @@ public sealed class VectorQuery
     public byte[] Vector { get; }
 
     public int TopK { get; }
+
+    public int Offset { get; }
+
+    public int Limit { get; }
 
     public FilterExpression? Filter { get; }
 
@@ -51,6 +60,8 @@ public sealed class VectorQuery
 
     public VectorKnnRuntimeOptions? RuntimeOptions { get; }
 
+    public QueryPagination Pagination { get; }
+
     public static VectorQuery FromFloat32(
         string fieldName,
         float[] vector,
@@ -58,8 +69,9 @@ public sealed class VectorQuery
         FilterExpression? filter = null,
         IEnumerable<string>? returnFields = null,
         string scoreAlias = "vector_distance",
-        VectorKnnRuntimeOptions? runtimeOptions = null) =>
-        new(fieldName, MemoryMarshal.AsBytes<float>(vector.AsSpan()).ToArray(), topK, filter, returnFields, scoreAlias, runtimeOptions);
+        VectorKnnRuntimeOptions? runtimeOptions = null,
+        QueryPagination? pagination = null) =>
+        new(fieldName, MemoryMarshal.AsBytes<float>(vector.AsSpan()).ToArray(), topK, filter, returnFields, scoreAlias, runtimeOptions, pagination);
 
     public static VectorQuery FromFloat64(
         string fieldName,
@@ -68,9 +80,20 @@ public sealed class VectorQuery
         FilterExpression? filter = null,
         IEnumerable<string>? returnFields = null,
         string scoreAlias = "vector_distance",
-        VectorKnnRuntimeOptions? runtimeOptions = null) =>
-        new(fieldName, MemoryMarshal.AsBytes<double>(vector.AsSpan()).ToArray(), topK, filter, returnFields, scoreAlias, runtimeOptions);
+        VectorKnnRuntimeOptions? runtimeOptions = null,
+        QueryPagination? pagination = null) =>
+        new(fieldName, MemoryMarshal.AsBytes<double>(vector.AsSpan()).ToArray(), topK, filter, returnFields, scoreAlias, runtimeOptions, pagination);
 
     private static IReadOnlyList<string> NormalizeReturnFields(IEnumerable<string>? returnFields, string scoreAlias) =>
         QueryReturnFieldHelper.NormalizeReturnFields(returnFields, scoreAlias);
+
+    private static void ValidatePaginationWindow(int topK, QueryPagination pagination, string parameterName)
+    {
+        if (pagination.Offset + pagination.Limit > topK)
+        {
+            throw new ArgumentException(
+                "Offset plus limit cannot exceed the vector retrieval window defined by topK.",
+                parameterName);
+        }
+    }
 }

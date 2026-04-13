@@ -63,7 +63,17 @@ try
         filter: Filter.Tag("genre").Eq("crime"),
         returnFields: ["title", "summary"],
         scoreAlias: "distance",
-        runtimeOptions: new VectorKnnRuntimeOptions(efRuntime: 150));
+        runtimeOptions: new VectorKnnRuntimeOptions(efRuntime: 150),
+        pagination: new QueryPagination(limit: 2));
+    var secondPageResults = await index.SearchAsync(
+        VectorQuery.FromFloat32(
+            fieldName: "plot_embedding",
+            vector: queryVector,
+            topK: 3,
+            filter: Filter.Tag("genre").Eq("crime"),
+            returnFields: ["title"],
+            scoreAlias: "distance",
+            pagination: new QueryPagination(offset: 2, limit: 1)));
     var multiVectorResults = await index.SearchAsync(
         new MultiVectorQuery(
             [
@@ -125,6 +135,13 @@ try
     foreach (var row in aggregateHybridResults.Rows)
     {
         Console.WriteLine($"- {row.Genre}: matches={row.MatchCount}, average distance={row.AvgDistance:F6}");
+    }
+
+    Console.WriteLine("Second page of the plot_embedding vector search:");
+
+    foreach (var document in secondPageResults.Documents)
+    {
+        Console.WriteLine($"- {document.Values["title"]}");
     }
 }
 finally

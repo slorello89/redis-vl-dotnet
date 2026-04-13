@@ -13,7 +13,8 @@ public sealed class HybridQuery
         FilterExpression? filter = null,
         IEnumerable<string>? returnFields = null,
         string scoreAlias = "vector_distance",
-        VectorKnnRuntimeOptions? runtimeOptions = null)
+        VectorKnnRuntimeOptions? runtimeOptions = null,
+        QueryPagination? pagination = null)
     {
         ArgumentNullException.ThrowIfNull(textFilter);
         ArgumentException.ThrowIfNullOrWhiteSpace(vectorFieldName);
@@ -43,6 +44,10 @@ public sealed class HybridQuery
         ScoreAlias = FilterExpression.NormalizeFieldName(scoreAlias);
         ReturnFields = QueryReturnFieldHelper.NormalizeReturnFields(returnFields, ScoreAlias);
         RuntimeOptions = runtimeOptions;
+        Pagination = pagination ?? new QueryPagination(limit: topK);
+        Offset = Pagination.Offset;
+        Limit = Pagination.Limit;
+        ValidatePaginationWindow(TopK, Pagination, nameof(topK));
     }
 
     public FilterExpression TextFilter { get; }
@@ -53,6 +58,10 @@ public sealed class HybridQuery
 
     public int TopK { get; }
 
+    public int Offset { get; }
+
+    public int Limit { get; }
+
     public FilterExpression? Filter { get; }
 
     public string ScoreAlias { get; }
@@ -60,6 +69,8 @@ public sealed class HybridQuery
     public IReadOnlyList<string> ReturnFields { get; }
 
     public VectorKnnRuntimeOptions? RuntimeOptions { get; }
+
+    public QueryPagination Pagination { get; }
 
     internal FilterExpression CombinedFilter => Filter is null ? TextFilter : TextFilter & Filter;
 
@@ -71,8 +82,9 @@ public sealed class HybridQuery
         FilterExpression? filter = null,
         IEnumerable<string>? returnFields = null,
         string scoreAlias = "vector_distance",
-        VectorKnnRuntimeOptions? runtimeOptions = null) =>
-        new(textFilter, vectorFieldName, MemoryMarshal.AsBytes<float>(vector.AsSpan()).ToArray(), topK, filter, returnFields, scoreAlias, runtimeOptions);
+        VectorKnnRuntimeOptions? runtimeOptions = null,
+        QueryPagination? pagination = null) =>
+        new(textFilter, vectorFieldName, MemoryMarshal.AsBytes<float>(vector.AsSpan()).ToArray(), topK, filter, returnFields, scoreAlias, runtimeOptions, pagination);
 
     public static HybridQuery FromFloat64(
         FilterExpression textFilter,
@@ -82,6 +94,17 @@ public sealed class HybridQuery
         FilterExpression? filter = null,
         IEnumerable<string>? returnFields = null,
         string scoreAlias = "vector_distance",
-        VectorKnnRuntimeOptions? runtimeOptions = null) =>
-        new(textFilter, vectorFieldName, MemoryMarshal.AsBytes<double>(vector.AsSpan()).ToArray(), topK, filter, returnFields, scoreAlias, runtimeOptions);
+        VectorKnnRuntimeOptions? runtimeOptions = null,
+        QueryPagination? pagination = null) =>
+        new(textFilter, vectorFieldName, MemoryMarshal.AsBytes<double>(vector.AsSpan()).ToArray(), topK, filter, returnFields, scoreAlias, runtimeOptions, pagination);
+
+    private static void ValidatePaginationWindow(int topK, QueryPagination pagination, string parameterName)
+    {
+        if (pagination.Offset + pagination.Limit > topK)
+        {
+            throw new ArgumentException(
+                "Offset plus limit cannot exceed the vector retrieval window defined by topK.",
+                parameterName);
+        }
+    }
 }
