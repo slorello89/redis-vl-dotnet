@@ -1,16 +1,16 @@
 {
   "project": "redis-vl-dotnet",
-  "branchName": "ralph/redis-vl-dotnet",
-  "description": "Build a .NET-native Redis Vector Library that reaches practical feature parity with redis-vl-java, selectively adopts core redis-vl-python workflows, and is defined by an executable unit and integration test contract.",
+  "branchName": "ralph/full-parity-roadmap",
+  "description": "Close the remaining parity gaps between redis-vl-dotnet and the broader RedisVL Java and Python ecosystems while preserving a .NET-native async-first API.",
   "userStories": [
     {
       "id": "US-001",
-      "title": "Publish v1 parity matrix and architecture decisions",
-      "description": "As a maintainer, I want a written parity matrix and core architecture decisions so that implementation has a stable contract against redis-vl-java and selected redis-vl-python workflows.",
+      "title": "Refresh the parity matrix and roadmap docs",
+      "description": "As a maintainer, I want the repository parity docs updated to reflect the current Java and Python gap analysis so that implementation work is guided by the new roadmap instead of the completed v1 baseline.",
       "acceptanceCriteria": [
-        "Add a parity matrix covering schema, index lifecycle, document lifecycle, query types, caches, and higher-level workflow primitives",
-        "Mark each parity item as v1 required, v1 deferred, or out of scope",
-        "Document intentional .NET-native API divergences from redis-vl-java and redis-vl-python",
+        "Add or update a parity matrix document that compares current .NET, Java, and Python capabilities",
+        "Mark each identified gap as required, deferred, or out of scope for the parity roadmap",
+        "Document intentional .NET-native API differences that remain after parity work",
         "Typecheck passes"
       ],
       "priority": 1,
@@ -19,306 +19,526 @@
     },
     {
       "id": "US-002",
-      "title": "Add schema model for index and field definitions",
-      "description": "As a .NET developer, I want strongly typed schema objects so that I can define Redis search indexes in code without writing raw FT schema commands.",
+      "title": "Add multiple prefix support to index metadata",
+      "description": "As a .NET developer, I want index schemas to support multiple prefixes so that .NET schemas can express the same index metadata as the Java and Python libraries.",
       "acceptanceCriteria": [
-        "Add schema types for index metadata including name, prefix, and storage type",
-        "Add field types for text, tag, numeric, geo, and vector fields",
-        "Expose typed options or enums instead of raw string flags for schema configuration",
+        "Extend the schema model to support multiple prefixes in code-first configuration",
+        "Generate valid FT.CREATE arguments for multiple prefixes",
+        "Add unit tests covering single-prefix and multi-prefix schema construction",
+        "Add integration tests proving index creation succeeds with multiple prefixes",
+        "Add or update an example that creates an index with multiple prefixes",
         "Typecheck passes",
         "Tests pass"
       ],
       "priority": 2,
-      "passes": true,
+      "passes": false,
       "notes": ""
     },
     {
       "id": "US-003",
-      "title": "Validate vector field schema rules",
-      "description": "As a .NET developer, I want vector schema validation so that invalid dimensions, datatypes, and distance settings fail before Redis commands are sent.",
+      "title": "Add key separator and stopwords schema options",
+      "description": "As a .NET developer, I want key separator and stopwords options on index metadata so that advanced search index configuration matches upstream RedisVL behavior.",
       "acceptanceCriteria": [
-        "Validate required vector attributes including dimensions, datatype, algorithm, and distance metric",
-        "Return clear exceptions for missing or incompatible vector field settings",
-        "Add unit tests for valid and invalid vector schema definitions",
+        "Extend the schema model to support key separator configuration",
+        "Extend the schema model to support default stopwords, disabled stopwords, and explicit custom stopwords",
+        "Generate valid FT.CREATE arguments for key separator and stopwords options",
+        "Add unit tests covering supported and invalid configurations",
+        "Add integration tests proving index creation succeeds with the new options",
+        "Add or update an example showing key separator and stopwords configuration",
         "Typecheck passes",
         "Tests pass"
       ],
       "priority": 3,
-      "passes": true,
+      "passes": false,
       "notes": ""
     },
     {
       "id": "US-004",
-      "title": "Load schema from file format selected for v1",
-      "description": "As a .NET developer, I want to load search schemas from files so that application configuration can mirror upstream RedisVL workflows.",
+      "title": "Add remaining field and index schema parity options",
+      "description": "As a .NET developer, I want the schema model to expose the selected missing field and index options from Java and Python so that advanced Redis search definitions can be represented without raw command strings.",
       "acceptanceCriteria": [
-        "Support loading schema definitions from the file format selected for v1",
-        "Map file-based schema definitions into the same strongly typed schema model used by code-first configuration",
-        "Add unit tests for successful parsing and validation failures",
+        "Implement the selected missing field and index options as strongly typed API surface",
+        "Reject invalid or incompatible schema combinations with clear exceptions",
+        "Add unit tests for valid and invalid advanced schema combinations",
+        "Add integration tests covering index creation for the newly supported options",
+        "Add or update an example schema that uses the new options",
         "Typecheck passes",
         "Tests pass"
       ],
       "priority": 4,
-      "passes": true,
+      "passes": false,
       "notes": ""
     },
     {
       "id": "US-005",
-      "title": "Implement index lifecycle operations",
-      "description": "As a .NET developer, I want to create, inspect, and delete indexes through one abstraction so that Redis search setup and teardown are automated.",
+      "title": "Add YAML support for advanced schema options",
+      "description": "As a .NET developer, I want YAML schema loading to support the new advanced schema options so that upstream-style schema files load into the .NET model without manual translation.",
       "acceptanceCriteria": [
-        "Add API methods for create, exists, info, and drop or delete",
-        "Support safe-create and overwrite behavior defined by the public contract",
-        "Add integration tests against Redis Stack or RediSearch for create and cleanup flows",
+        "Extend YAML schema parsing to support multiple prefixes, key separator, stopwords, and the newly added schema options",
+        "Reject unsupported or invalid YAML with clear exceptions",
+        "Add unit tests for successful parsing and validation failures",
+        "Add fixture YAML files that exercise the advanced schema surface",
+        "Add or update an example that loads an advanced YAML schema from disk",
         "Typecheck passes",
         "Tests pass"
       ],
       "priority": 5,
-      "passes": true,
+      "passes": false,
       "notes": ""
     },
     {
       "id": "US-006",
-      "title": "Add document load and fetch support for JSON storage",
-      "description": "As a .NET developer, I want to load and fetch JSON-backed documents through the index abstraction so that application objects round-trip cleanly through Redis.",
+      "title": "Add index clear helper",
+      "description": "As a .NET developer, I want to clear all indexed documents without dropping the index so that test setup and operational maintenance workflows match upstream RedisVL capabilities.",
       "acceptanceCriteria": [
-        "Support single and batch document load for JSON storage",
-        "Support explicit key or id mapping when loading documents",
-        "Support fetch by key or id and delete by key or id for JSON-backed records",
-        "Add integration tests covering round-trip persistence for representative JSON documents",
+        "Add a clear helper that removes indexed documents while preserving the index definition",
+        "Document the storage-specific behavior for HASH and JSON keys",
+        "Add unit tests for command generation or key enumeration logic",
+        "Add integration tests proving the index remains after clear and document count drops to zero",
+        "Add or update an example showing how to clear an index safely",
         "Typecheck passes",
         "Tests pass"
       ],
       "priority": 6,
-      "passes": true,
+      "passes": false,
       "notes": ""
     },
     {
       "id": "US-007",
-      "title": "Add document load and fetch support for hash storage",
-      "description": "As a .NET developer, I want to load and fetch hash-backed documents through the same abstraction so that the library supports both upstream RedisVL storage modes.",
+      "title": "Add index listing helper",
+      "description": "As a .NET developer, I want to list existing search indexes so that .NET applications and tools can inspect the Redis search environment without raw Redis commands.",
       "acceptanceCriteria": [
-        "Support single and batch document load for hash storage",
-        "Support fetch by key or id and delete by key or id for hash-backed records",
-        "Keep public document lifecycle APIs consistent between JSON and hash storage modes",
-        "Add integration tests covering round-trip persistence for representative hash documents",
+        "Add an API that lists existing Redis search indexes",
+        "Return enough metadata to identify each index name reliably",
+        "Add unit tests for response parsing",
+        "Add integration tests proving created indexes are returned by the list helper",
+        "Add or update an example that lists indexes from Redis",
         "Typecheck passes",
         "Tests pass"
       ],
       "priority": 7,
-      "passes": true,
+      "passes": false,
       "notes": ""
     },
     {
       "id": "US-008",
-      "title": "Implement composable filter expressions",
-      "description": "As a .NET developer, I want composable filter builders so that I can express tag, numeric, text, geo, and logical predicates without raw query strings.",
+      "title": "Add from-existing index construction",
+      "description": "As a .NET developer, I want to construct a SearchIndex from an existing Redis index so that I can reconnect to indexes created outside the current process.",
       "acceptanceCriteria": [
-        "Add filter builders for tag, numeric, text, and geo expressions",
-        "Support logical composition such as and, or, and not",
-        "Add unit tests covering generated filter expressions and edge cases",
+        "Add an API that builds a SearchIndex abstraction from an existing Redis index definition",
+        "Recover the supported schema metadata and field definitions needed by the public API",
+        "Add unit tests for mapping FT.INFO or other Redis metadata into the schema model",
+        "Add integration tests proving an existing index can be rediscovered and reused for queries",
+        "Add or update an example demonstrating reconnecting to an existing index",
         "Typecheck passes",
         "Tests pass"
       ],
       "priority": 8,
-      "passes": true,
+      "passes": false,
       "notes": ""
     },
     {
       "id": "US-009",
-      "title": "Implement vector query abstraction",
-      "description": "As a .NET developer, I want a first-class vector query API so that I can perform nearest-neighbor retrieval with optional metadata filters and field projection.",
+      "title": "Add JSON partial update helpers",
+      "description": "As a .NET developer, I want partial update helpers for JSON documents so that I can modify stored records without rewriting the full JSON payload.",
       "acceptanceCriteria": [
-        "Add a vector query abstraction with vector input, target field, top-k, and return field selection",
-        "Support metadata pre-filters and configurable score or distance aliases",
-        "Add unit tests for generated command structure and edge cases",
-        "Add integration tests verifying ranking behavior on deterministic seeded data",
+        "Add partial update APIs for JSON-backed documents by key and by id",
+        "Define how field paths are addressed and validated",
+        "Add unit tests for valid updates, missing documents, and invalid update requests",
+        "Add integration tests proving partial JSON updates persist correctly",
+        "Add or update an example demonstrating partial updates on JSON documents",
         "Typecheck passes",
         "Tests pass"
       ],
       "priority": 9,
-      "passes": true,
+      "passes": false,
       "notes": ""
     },
     {
       "id": "US-010",
-      "title": "Implement filter and count query abstractions",
-      "description": "As a .NET developer, I want filter-only and count queries so that I can use the library for metadata search and result counting without vector input.",
+      "title": "Add HASH partial update helpers",
+      "description": "As a .NET developer, I want partial update helpers for HASH documents so that I can update a subset of stored fields while preserving the current HASH lifecycle abstraction.",
       "acceptanceCriteria": [
-        "Add a filter query abstraction for non-vector retrieval",
-        "Add a count query abstraction for matching documents",
-        "Add integration tests for tag, numeric, text, and geo filter scenarios",
+        "Add partial update APIs for HASH-backed documents by key and by id",
+        "Document the supported update semantics and any storage-specific constraints",
+        "Add unit tests for valid updates, missing documents, and invalid update requests",
+        "Add integration tests proving partial HASH updates persist correctly",
+        "Add or update an example demonstrating partial updates on HASH documents",
         "Typecheck passes",
         "Tests pass"
       ],
       "priority": 10,
-      "passes": true,
+      "passes": false,
       "notes": ""
     },
     {
       "id": "US-011",
-      "title": "Implement hybrid and vector-range query abstractions",
-      "description": "As a .NET developer, I want hybrid and vector-range queries so that I can combine lexical and semantic search and run threshold-based vector retrieval with first-class APIs.",
+      "title": "Add TextQuery model and command builder support",
+      "description": "As a .NET developer, I want a first-class TextQuery abstraction so that I can perform full-text search without overloading the filter query model.",
       "acceptanceCriteria": [
-        "Add a hybrid query abstraction that combines text and vector search",
-        "Add a vector-range query abstraction for radius or threshold-style retrieval",
-        "Define deterministic result ordering and score field behavior for both query types",
-        "Add integration tests for hybrid and vector-range queries on seeded fixtures",
+        "Add a TextQuery type with explicit text-search semantics",
+        "Build valid FT.SEARCH arguments for TextQuery including return fields and pagination",
+        "Add unit tests for generated query syntax and invalid inputs",
+        "Add search APIs on SearchIndex for raw and typed TextQuery execution",
         "Typecheck passes",
         "Tests pass"
       ],
       "priority": 11,
-      "passes": true,
+      "passes": false,
       "notes": ""
     },
     {
       "id": "US-012",
-      "title": "Add typed result mapping and projection support",
-      "description": "As a .NET developer, I want query results to map into predictable .NET shapes so that application code does not need to manually parse raw Redis responses.",
+      "title": "Add TextQuery integration coverage and example",
+      "description": "As a .NET developer, I want deterministic integration coverage and a runnable example for TextQuery so that the new full-text search workflow is validated and discoverable.",
       "acceptanceCriteria": [
-        "Support raw result access and typed result mapping",
-        "Support field projection and alias handling during result materialization",
-        "Return clear exceptions for missing or incompatible field mappings",
-        "Add unit tests for primitive, nested, and vector field mapping behavior",
+        "Add Redis-backed integration tests validating TextQuery ranking and projections on seeded data",
+        "Add typed result mapping coverage for TextQuery results",
+        "Add or update an example demonstrating TextQuery usage",
+        "Document the TextQuery workflow in repo docs",
         "Typecheck passes",
         "Tests pass"
       ],
       "priority": 12,
-      "passes": true,
+      "passes": false,
       "notes": ""
     },
     {
       "id": "US-013",
-      "title": "Add async-first APIs for Redis-backed operations",
-      "description": "As a .NET developer, I want standard task-based async APIs so that the library fits naturally into ASP.NET and worker-service applications.",
+      "title": "Add aggregation query model and command builder support",
+      "description": "As a .NET developer, I want an aggregation query abstraction so that I can perform grouping and reducer workflows supported by the upstream libraries.",
       "acceptanceCriteria": [
-        "Expose async APIs for index lifecycle, document lifecycle, queries, and caches",
-        "Define cancellation token behavior for long-running or network-bound operations where practical",
-        "Add integration tests covering async index and query flows",
+        "Add a first-class aggregation query type covering the selected aggregate pipeline operations",
+        "Build valid FT.AGGREGATE arguments for the supported operations",
+        "Add unit tests for command generation and invalid aggregation definitions",
+        "Add SearchIndex APIs for executing aggregation queries",
         "Typecheck passes",
         "Tests pass"
       ],
       "priority": 13,
-      "passes": true,
+      "passes": false,
       "notes": ""
     },
     {
       "id": "US-014",
-      "title": "Implement embeddings cache",
-      "description": "As a .NET developer, I want an exact-match embeddings cache so that repeated deterministic vectorization work can be skipped.",
+      "title": "Add aggregation result parsing and example",
+      "description": "As a .NET developer, I want parsed aggregation results and a runnable example so that aggregation workflows are usable without manual Redis response parsing.",
       "acceptanceCriteria": [
-        "Add an embeddings cache abstraction with configurable name or namespace and TTL",
-        "Support store, lookup, overwrite, and miss behavior without requiring any built-in external provider integration",
-        "Add integration tests covering hit, miss, overwrite, and expiration behavior",
+        "Add raw and typed result handling for aggregation responses",
+        "Add Redis-backed integration tests for grouping and reducer scenarios on seeded data",
+        "Add or update an example demonstrating aggregation queries",
+        "Document the aggregation query workflow in repo docs",
         "Typecheck passes",
         "Tests pass"
       ],
       "priority": 14,
-      "passes": true,
+      "passes": false,
       "notes": ""
     },
     {
       "id": "US-015",
-      "title": "Implement semantic cache with provider-agnostic embedding input",
-      "description": "As a .NET developer, I want a semantic cache that accepts caller-supplied embeddings or a provider-agnostic embedding interface so that semantically similar prompts can reuse prior responses.",
+      "title": "Add aggregate hybrid query support",
+      "description": "As a .NET developer, I want aggregate hybrid queries so that I can combine vector retrieval with aggregate processing like the Java library.",
       "acceptanceCriteria": [
-        "Add semantic cache create, check, and store operations",
-        "Support configurable distance threshold and TTL",
-        "Accept caller-supplied embeddings or a provider-agnostic embedding interface instead of built-in vendor SDK dependencies",
-        "Add integration tests covering semantic match, miss, and threshold boundary behavior",
+        "Add an aggregate hybrid query type that combines vector search with the supported aggregation stages",
+        "Build valid Redis commands for the supported aggregate hybrid combinations",
+        "Add unit tests for command generation and unsupported combinations",
+        "Add Redis-backed integration tests for deterministic aggregate hybrid scenarios",
+        "Add or update an example demonstrating aggregate hybrid search",
         "Typecheck passes",
         "Tests pass"
       ],
       "priority": 15,
-      "passes": true,
+      "passes": false,
       "notes": ""
     },
     {
       "id": "US-016",
-      "title": "Add selected higher-level workflow primitives",
-      "description": "As a .NET developer, I want selected higher-level workflow primitives such as semantic routing or message history so that I can build AI application workflows on top of Redis without provider lock-in.",
+      "title": "Add multi-vector query support",
+      "description": "As a .NET developer, I want multi-vector queries so that I can express upstream workflows that search across multiple vector clauses or vector inputs.",
       "acceptanceCriteria": [
-        "Implement only the workflow primitives selected for v1 in the parity matrix",
-        "Ensure each included workflow primitive relies on caller-supplied embeddings or provider-agnostic extension interfaces",
-        "Add unit and integration tests for each included workflow primitive",
+        "Add a multi-vector query type with explicit field and vector inputs",
+        "Define and implement deterministic ordering semantics for multi-vector search",
+        "Add unit tests for validation and command generation",
+        "Add Redis-backed integration tests for deterministic multi-vector retrieval behavior",
+        "Add or update an example demonstrating multi-vector search",
         "Typecheck passes",
         "Tests pass"
       ],
       "priority": 16,
-      "passes": true,
+      "passes": false,
       "notes": ""
     },
     {
       "id": "US-017",
-      "title": "Set up deterministic Redis-backed test harness and CI execution",
-      "description": "As a maintainer, I want a deterministic unit and integration test harness so that Redis-backed behavior is reproducible locally and in CI.",
+      "title": "Add runtime vector parameter support",
+      "description": "As a .NET developer, I want query-time vector tuning parameters such as EF_RUNTIME and EPSILON so that I can tune performance and recall at runtime.",
       "acceptanceCriteria": [
-        "Add test fixtures and seeded datasets that make vector and hybrid query assertions deterministic",
-        "Add a Redis Stack or RediSearch-capable integration test setup for local and CI execution",
-        "Document how unit tests and integration tests are run",
+        "Add strongly typed runtime vector parameter options on the relevant query types",
+        "Reject invalid parameter combinations for unsupported vector algorithms",
+        "Add unit tests for parameter validation and command generation",
+        "Add Redis-backed integration tests proving supported parameters are accepted by Redis",
+        "Add or update an example demonstrating runtime vector tuning",
         "Typecheck passes",
         "Tests pass"
       ],
       "priority": 17,
-      "passes": true,
+      "passes": false,
       "notes": ""
     },
     {
       "id": "US-018",
-      "title": "Write getting started guide for core index and document workflows",
-      "description": "As a .NET developer, I want a getting started guide so that I can install the library, connect to Redis, define a schema, create an index, and load and query documents without reading the source.",
+      "title": "Add shared pagination support across query types",
+      "description": "As a .NET developer, I want consistent pagination support across the query surface so that large result sets can be navigated without ad hoc query construction.",
       "acceptanceCriteria": [
-        "Add a getting started guide that covers package installation, Redis prerequisites, connection setup, schema definition, index creation, document load, and a basic query flow",
-        "Include command or code snippets that match the public APIs implemented for v1",
-        "Document how to run the getting started flow locally against Redis Stack or RediSearch-capable Redis",
-        "Typecheck passes"
+        "Add shared pagination options to all relevant query types that do not already expose them consistently",
+        "Build valid Redis commands using the shared pagination options",
+        "Add unit tests for offset and limit validation",
+        "Add Redis-backed integration tests for multi-page retrieval flows",
+        "Add or update an example demonstrating paginated search",
+        "Typecheck passes",
+        "Tests pass"
       ],
       "priority": 18,
-      "passes": true,
+      "passes": false,
       "notes": ""
     },
     {
       "id": "US-019",
-      "title": "Add a minimal JSON storage example application",
-      "description": "As a .NET developer, I want a runnable JSON storage example so that I can see the expected setup and document lifecycle APIs in a concrete project.",
+      "title": "Add batch query helper APIs",
+      "description": "As a .NET developer, I want batch query helper APIs so that repeated retrieval workflows can be executed without reimplementing pagination loops in application code.",
       "acceptanceCriteria": [
-        "Add a minimal runnable example that defines a schema, creates a JSON-backed index, loads sample documents, and fetches or queries them",
-        "Place the example in a discoverable examples location and document how to run it",
-        "Ensure the example builds against the current library code without manual code edits",
+        "Add helper APIs or iterators for repeated batched retrieval on the selected query types",
+        "Define deterministic continuation behavior for batch iteration",
+        "Add unit tests for batching edge cases and termination behavior",
+        "Add Redis-backed integration tests for batched retrieval over seeded data",
+        "Add or update an example demonstrating batch query iteration",
         "Typecheck passes",
         "Tests pass"
       ],
       "priority": 19,
-      "passes": true,
+      "passes": false,
       "notes": ""
     },
     {
       "id": "US-020",
-      "title": "Add a vector search example application",
-      "description": "As a .NET developer, I want a runnable vector search example so that I can understand how to define vector fields and execute nearest-neighbor queries with the library.",
+      "title": "Add base message history workflow",
+      "description": "As a .NET developer, I want a message history workflow so that conversational records can be stored and retrieved by session, role, and recency.",
       "acceptanceCriteria": [
-        "Add a runnable example that defines a vector field schema and executes a vector query against deterministic sample data",
-        "Show how to provide vector input, select the target field, and inspect returned scores or distances",
-        "Document how to seed and run the example locally",
+        "Add a message history workflow with storage for role, content, metadata, timestamp, and session identity",
+        "Support appending messages and retrieving recent messages in deterministic order",
+        "Add unit tests for schema, validation, and recent-message retrieval logic",
+        "Add Redis-backed integration tests for message history storage and recent retrieval",
+        "Add or update an example demonstrating message history usage",
         "Typecheck passes",
         "Tests pass"
       ],
       "priority": 20,
-      "passes": true,
+      "passes": false,
       "notes": ""
     },
     {
       "id": "US-021",
-      "title": "Add examples index and documentation navigation",
-      "description": "As a .NET developer, I want a clear examples and docs entry point so that I can quickly find the getting started guide and runnable samples for the main library workflows.",
+      "title": "Add semantic message history retrieval",
+      "description": "As a .NET developer, I want semantic message history retrieval so that conversational context can be retrieved by embedding similarity instead of recency alone.",
       "acceptanceCriteria": [
-        "Add or update top-level documentation to link to the getting started guide and each runnable example",
-        "Summarize what each example demonstrates and the Redis prerequisites needed to run it",
-        "Keep docs navigation consistent with the repository structure used for examples and guides",
-        "Typecheck passes"
+        "Extend message history with semantic retrieval using caller-supplied embeddings or the vectorizer abstraction",
+        "Support configurable semantic distance thresholds and session scoping",
+        "Add unit tests for validation and query construction",
+        "Add Redis-backed integration tests for semantic retrieval and threshold behavior",
+        "Add or update an example demonstrating semantic message history retrieval",
+        "Typecheck passes",
+        "Tests pass"
       ],
       "priority": 21,
-      "passes": true,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-022",
+      "title": "Add semantic cache metadata and filter support",
+      "description": "As a .NET developer, I want richer semantic cache records and filterable retrieval so that semantic caching can support more realistic LLM workflows.",
+      "acceptanceCriteria": [
+        "Extend semantic cache entries to support structured metadata in addition to prompt and response fields",
+        "Support filterable semantic cache retrieval for the selected filterable fields design",
+        "Add unit tests for metadata handling, filter validation, and schema compatibility behavior",
+        "Add Redis-backed integration tests for semantic cache hit, miss, threshold, TTL, and filter scenarios",
+        "Add or update an example demonstrating enriched semantic cache usage",
+        "Typecheck passes",
+        "Tests pass"
+      ],
+      "priority": 22,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-023",
+      "title": "Add vectorizer extension abstractions",
+      "description": "As a maintainer, I want a provider-agnostic vectorizer abstraction in extension packages so that built-in provider integrations can be added without coupling the core package to vendor SDKs.",
+      "acceptanceCriteria": [
+        "Add a stable vectorizer abstraction outside the core package boundary",
+        "Define shared contracts for single-text and multi-text embedding workflows",
+        "Add unit tests for the vectorizer abstraction contracts",
+        "Add extension package scaffolding for provider-specific vectorizers",
+        "Document the extension package architecture in repo docs",
+        "Typecheck passes",
+        "Tests pass"
+      ],
+      "priority": 23,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-024",
+      "title": "Add OpenAI vectorizer extension package",
+      "description": "As a .NET developer, I want an OpenAI vectorizer extension package so that I can generate embeddings using a supported provider without writing custom adapter code.",
+      "acceptanceCriteria": [
+        "Add an OpenAI vectorizer extension package that implements the shared vectorizer abstraction",
+        "Support the configured embedding request flow for single and multi-text embedding",
+        "Add unit tests for request construction and error handling",
+        "Add smoke-test or gated integration coverage for the OpenAI vectorizer package",
+        "Add an example demonstrating OpenAI vectorization with redis-vl-dotnet",
+        "Typecheck passes",
+        "Tests pass"
+      ],
+      "priority": 24,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-025",
+      "title": "Add Hugging Face vectorizer extension package",
+      "description": "As a .NET developer, I want a Hugging Face vectorizer extension package so that I can use a common upstream-style vectorizer option in .NET.",
+      "acceptanceCriteria": [
+        "Add a Hugging Face vectorizer extension package that implements the shared vectorizer abstraction",
+        "Support the selected embedding request flow for the package",
+        "Add unit tests for request construction and error handling",
+        "Add smoke-test or gated integration coverage for the Hugging Face vectorizer package",
+        "Add an example demonstrating Hugging Face vectorization with redis-vl-dotnet",
+        "Typecheck passes",
+        "Tests pass"
+      ],
+      "priority": 25,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-026",
+      "title": "Add reranker extension abstractions",
+      "description": "As a maintainer, I want a provider-agnostic reranker abstraction in extension packages so that reranking support can be added without placing provider SDKs in the core package.",
+      "acceptanceCriteria": [
+        "Add a stable reranker abstraction outside the core package boundary",
+        "Define shared contracts for reranking candidate documents against a query",
+        "Add unit tests for the reranker abstraction contracts",
+        "Add extension package scaffolding for provider-specific rerankers",
+        "Document the extension package architecture in repo docs",
+        "Typecheck passes",
+        "Tests pass"
+      ],
+      "priority": 26,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-027",
+      "title": "Add Cohere reranker extension package",
+      "description": "As a .NET developer, I want a Cohere reranker extension package so that I can improve retrieval relevance using a supported reranking provider.",
+      "acceptanceCriteria": [
+        "Add a Cohere reranker extension package that implements the shared reranker abstraction",
+        "Support the configured ranking request flow for the package",
+        "Add unit tests for request construction and error handling",
+        "Add smoke-test or gated integration coverage for the Cohere reranker package",
+        "Add an example demonstrating search plus Cohere reranking",
+        "Typecheck passes",
+        "Tests pass"
+      ],
+      "priority": 27,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-028",
+      "title": "Add cluster-aware connection support",
+      "description": "As a .NET developer, I want first-class support for Redis cluster deployments so that the library works in a common production topology without custom connection glue.",
+      "acceptanceCriteria": [
+        "Add documented cluster connection configuration support for the selected .NET Redis client capabilities",
+        "Add connection helper APIs where needed to support cluster workflows",
+        "Add unit tests for cluster configuration parsing and validation",
+        "Add gated integration coverage for cluster scenarios where practical",
+        "Add or update an example demonstrating cluster connection setup",
+        "Typecheck passes",
+        "Tests pass"
+      ],
+      "priority": 28,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-029",
+      "title": "Add Sentinel-aware connection support",
+      "description": "As a .NET developer, I want first-class support for Sentinel-style Redis deployments so that the library can connect to high-availability environments without custom connection glue.",
+      "acceptanceCriteria": [
+        "Add documented Sentinel connection configuration support for the selected .NET Redis client capabilities",
+        "Add connection helper APIs where needed to support Sentinel workflows",
+        "Add unit tests for Sentinel configuration parsing and validation",
+        "Add gated integration coverage for Sentinel scenarios where practical",
+        "Add or update an example demonstrating Sentinel connection setup",
+        "Typecheck passes",
+        "Tests pass"
+      ],
+      "priority": 29,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-030",
+      "title": "Add CLI project scaffold and index commands",
+      "description": "As a maintainer or developer, I want a CLI for common index operations so that RedisVL artifacts can be inspected and managed from the terminal.",
+      "acceptanceCriteria": [
+        "Add a CLI project with commands for index create, info, list, clear, and delete",
+        "Provide stable help output for the implemented commands",
+        "Add unit tests for command parsing and output behavior",
+        "Add integration tests for create, info, list, and delete flows",
+        "Document the CLI index commands in repo docs",
+        "Typecheck passes",
+        "Tests pass"
+      ],
+      "priority": 30,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-031",
+      "title": "Add CLI schema commands",
+      "description": "As a maintainer or developer, I want CLI schema commands so that YAML-backed schema workflows can be executed without writing custom bootstrap code.",
+      "acceptanceCriteria": [
+        "Add CLI commands for loading or validating schemas from file",
+        "Support using schema files with the implemented index commands",
+        "Add unit tests for schema command parsing and validation behavior",
+        "Add integration tests for core CLI schema workflows",
+        "Document the CLI schema commands in repo docs",
+        "Typecheck passes",
+        "Tests pass"
+      ],
+      "priority": 31,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-032",
+      "title": "Expand examples, docs, and test matrix for parity features",
+      "description": "As a maintainer, I want the expanded parity surface fully documented and covered by examples and tests so that users can adopt the new features safely and maintainers can validate them reliably.",
+      "acceptanceCriteria": [
+        "Add or update examples for each newly added parity feature area",
+        "Document environment prerequisites for provider-specific packages and gated integration tests",
+        "Document the test matrix and how to run each test tier locally and in CI",
+        "Verify all example projects build successfully",
+        "Run the default dotnet test suite successfully",
+        "Typecheck passes",
+        "Tests pass"
+      ],
+      "priority": 32,
+      "passes": false,
       "notes": ""
     }
   ]

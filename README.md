@@ -2,14 +2,14 @@
 
 `redis-vl-dotnet` is a .NET-native Redis Vector Library for Redis Search and vector workloads.
 
-The implementation plan for v1 is defined in [docs/v1-architecture.md](/Users/steve.lorello/projects/redis/redis-vl-dotnet/docs/v1-architecture.md). That document is the contract for feature parity, scope, and public API direction across future Ralph iterations.
+The active implementation roadmap is defined in [docs/parity-roadmap.md](/Users/steve.lorello/projects/redis/redis-vl-dotnet/docs/parity-roadmap.md). That document is the current contract for cross-language parity scope, intentional .NET-native differences, and feature priority across future Ralph iterations.
 
 Start with [docs/getting-started.md](/Users/steve.lorello/projects/redis/redis-vl-dotnet/docs/getting-started.md) for the core install, connection, schema, index, document, and query flow.
 Browse [examples/README.md](/Users/steve.lorello/projects/redis/redis-vl-dotnet/examples/README.md) for the runnable sample index, Redis prerequisites, and links to each example's local run instructions.
 
 ## Current Workspace
 
-- `docs/v1-architecture.md`: v1 parity matrix and architecture decisions
+- `docs/parity-roadmap.md`: current .NET/Java/Python parity matrix and roadmap decisions
 - `docs/getting-started.md`: end-to-end guide for creating an index, loading documents, and running basic queries
 - `docs/testing.md`: local and CI test harness instructions for unit and Redis-backed integration coverage
 - `examples/README.md`: examples index with prerequisites and workflow summaries
