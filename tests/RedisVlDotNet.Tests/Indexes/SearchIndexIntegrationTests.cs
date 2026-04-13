@@ -1160,6 +1160,77 @@ public sealed class SearchIndexIntegrationTests
         }
     }
 
+    [RedisSearchIntegrationFact]
+    public async Task ExecutesMultiVectorQueriesWithDeterministicRanking()
+    {
+        await using var connection = await RedisSearchTestEnvironment.ConnectAsync();
+        var database = connection.GetDatabase();
+
+        var token = Guid.NewGuid().ToString("N");
+        var schema = new SearchSchema(
+            new IndexDefinition($"multi-vector-idx-{token}", $"multi-vector:{token}:", StorageType.Hash),
+            [
+                new TagFieldDefinition("category"),
+                new TextFieldDefinition("title"),
+                new VectorFieldDefinition(
+                    "text_embedding",
+                    new VectorFieldAttributes(
+                        VectorAlgorithm.Flat,
+                        VectorDataType.Float32,
+                        VectorDistanceMetric.Cosine,
+                        2)),
+                new VectorFieldDefinition(
+                    "image_embedding",
+                    new VectorFieldAttributes(
+                        VectorAlgorithm.Flat,
+                        VectorDataType.Float32,
+                        VectorDistanceMetric.Cosine,
+                        2))
+            ]);
+        var index = new SearchIndex(database, schema);
+
+        try
+        {
+            await index.CreateAsync();
+            await SeedHashDocumentsAsync(database, schema, SearchIndexSeedData.MultiVectorMovies);
+            await RedisSearchTestEnvironment.WaitForIndexDocumentCountAsync(index, SearchIndexSeedData.MultiVectorMovies.Count);
+
+            var query = new MultiVectorQuery(
+                [
+                    MultiVectorInput.FromFloat32("text_embedding", [1f, 0f], weight: 0.7),
+                    MultiVectorInput.FromFloat32("image_embedding", [0f, 1f], weight: 0.3)
+                ],
+                topK: 3,
+                filter: Filter.Tag("category").Eq("footwear"),
+                returnFields: ["title"],
+                scoreAlias: "combined_distance");
+
+            var results = await index.SearchAsync(query);
+
+            Assert.Equal(3, results.Documents.Count);
+            Assert.Equal($"{schema.Index.Prefix}1", results.Documents[0].Id);
+            Assert.Equal($"{schema.Index.Prefix}2", results.Documents[1].Id);
+            Assert.Equal($"{schema.Index.Prefix}3", results.Documents[2].Id);
+            Assert.Equal("Runner", results.Documents[0].Values["title"]);
+            Assert.Equal("Hiker", results.Documents[1].Values["title"]);
+            Assert.Equal("Boot", results.Documents[2].Values["title"]);
+
+            var scores = results.Documents
+                .Select(document => double.Parse(document.Values["combined_distance"]!, System.Globalization.CultureInfo.InvariantCulture))
+                .ToArray();
+
+            Assert.True(scores[0] < scores[1]);
+            Assert.True(scores[1] < scores[2]);
+        }
+        finally
+        {
+            if (await index.ExistsAsync())
+            {
+                await index.DropAsync(deleteDocuments: true);
+            }
+        }
+    }
+
     private sealed record JsonMovieDocument(string Id, string Title, int Year, string Genre);
 
     private sealed record JsonMovieEnvelope(string ExternalId, string Title, int Year, string Genre);

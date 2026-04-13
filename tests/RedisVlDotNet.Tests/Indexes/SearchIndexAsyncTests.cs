@@ -37,6 +37,25 @@ public sealed class SearchIndexAsyncTests
     }
 
     [Fact]
+    public async Task MultiVectorSearchAsync_WithCancelledToken_DoesNotExecuteRedisCommand()
+    {
+        var (database, recorder) = RecordingDatabaseProxy.CreatePair();
+        var index = new SearchIndex(database, CreateMultiVectorSchema("cancel-multi-search"));
+        var query = new MultiVectorQuery(
+            [
+                MultiVectorInput.FromFloat32("text_embedding", [1f, 0f], weight: 0.7),
+                MultiVectorInput.FromFloat32("image_embedding", [0f, 1f], weight: 0.3)
+            ],
+            2);
+
+        using var cancellationTokenSource = new CancellationTokenSource();
+        await cancellationTokenSource.CancelAsync();
+
+        await Assert.ThrowsAsync<OperationCanceledException>(() => index.SearchAsync(query, cancellationToken: cancellationTokenSource.Token));
+        Assert.Equal(0, recorder.ExecuteAsyncCallCount);
+    }
+
+    [Fact]
     public async Task TextSearchAsync_WithCancelledToken_DoesNotExecuteRedisCommand()
     {
         var (database, recorder) = RecordingDatabaseProxy.CreatePair();
@@ -651,6 +670,137 @@ public sealed class SearchIndexAsyncTests
         Assert.Equal(0.0125d, row.AvgDistance);
     }
 
+    [Fact]
+    public async Task MultiVectorSearchAsync_CombinesPerVectorScoresDeterministically()
+    {
+        var (database, recorder) = RecordingDatabaseProxy.CreatePair();
+        var index = new SearchIndex(database, CreateMultiVectorSchema("multi-vector"));
+        recorder.ExecuteAsyncResponses.Enqueue(
+            RedisResult.Create(
+                [
+                    RedisResult.Create(3),
+                    RedisResult.Create((RedisValue)"product:1"),
+                    RedisResult.Create(
+                        [
+                            RedisResult.Create((RedisValue)"title"),
+                            RedisResult.Create((RedisValue)"Runner"),
+                            RedisResult.Create((RedisValue)"__mv_score_0"),
+                            RedisResult.Create((RedisValue)"0.05")
+                        ]),
+                    RedisResult.Create((RedisValue)"product:2"),
+                    RedisResult.Create(
+                        [
+                            RedisResult.Create((RedisValue)"title"),
+                            RedisResult.Create((RedisValue)"Hiker"),
+                            RedisResult.Create((RedisValue)"__mv_score_0"),
+                            RedisResult.Create((RedisValue)"0.10")
+                        ]),
+                    RedisResult.Create((RedisValue)"product:3"),
+                    RedisResult.Create(
+                        [
+                            RedisResult.Create((RedisValue)"title"),
+                            RedisResult.Create((RedisValue)"Boot"),
+                            RedisResult.Create((RedisValue)"__mv_score_0"),
+                            RedisResult.Create((RedisValue)"0.20")
+                        ])
+                ]));
+        recorder.ExecuteAsyncResponses.Enqueue(
+            RedisResult.Create(
+                [
+                    RedisResult.Create(3),
+                    RedisResult.Create((RedisValue)"product:2"),
+                    RedisResult.Create(
+                        [
+                            RedisResult.Create((RedisValue)"title"),
+                            RedisResult.Create((RedisValue)"Hiker"),
+                            RedisResult.Create((RedisValue)"__mv_score_1"),
+                            RedisResult.Create((RedisValue)"0.05")
+                        ]),
+                    RedisResult.Create((RedisValue)"product:1"),
+                    RedisResult.Create(
+                        [
+                            RedisResult.Create((RedisValue)"title"),
+                            RedisResult.Create((RedisValue)"Runner"),
+                            RedisResult.Create((RedisValue)"__mv_score_1"),
+                            RedisResult.Create((RedisValue)"0.20")
+                        ]),
+                    RedisResult.Create((RedisValue)"product:3"),
+                    RedisResult.Create(
+                        [
+                            RedisResult.Create((RedisValue)"title"),
+                            RedisResult.Create((RedisValue)"Boot"),
+                            RedisResult.Create((RedisValue)"__mv_score_1"),
+                            RedisResult.Create((RedisValue)"0.30")
+                        ])
+                ]));
+
+        var results = await index.SearchAsync(
+            new MultiVectorQuery(
+                [
+                    MultiVectorInput.FromFloat32("text_embedding", [1f, 0f], weight: 0.7),
+                    MultiVectorInput.FromFloat32("image_embedding", [0f, 1f], weight: 0.3)
+                ],
+                topK: 2,
+                returnFields: ["title"],
+                scoreAlias: "combined_distance"));
+
+        Assert.Equal(2, recorder.ExecuteAsyncCallCount);
+        Assert.All(recorder.ExecuteAsyncCalls, static call => Assert.Equal("FT.SEARCH", call.Command));
+        Assert.Equal(3, results.TotalCount);
+        Assert.Equal(["product:2", "product:1"], results.Documents.Select(static document => document.Id).ToArray());
+        Assert.Equal("Hiker", results.Documents[0].Values["title"]);
+        Assert.Equal("Runner", results.Documents[1].Values["title"]);
+        Assert.Equal("0.084999999999999992", results.Documents[0].Values["combined_distance"]);
+        Assert.Equal("0.095000000000000001", results.Documents[1].Values["combined_distance"]);
+    }
+
+    [Fact]
+    public async Task MultiVectorSearchAsync_TypedResults_MapReturnedDocuments()
+    {
+        var (database, recorder) = RecordingDatabaseProxy.CreatePair();
+        var index = new SearchIndex(database, CreateMultiVectorSchema("typed-multi-vector"));
+        recorder.ExecuteAsyncResponses.Enqueue(
+            RedisResult.Create(
+                [
+                    RedisResult.Create(1),
+                    RedisResult.Create((RedisValue)"product:1"),
+                    RedisResult.Create(
+                        [
+                            RedisResult.Create((RedisValue)"title"),
+                            RedisResult.Create((RedisValue)"Runner"),
+                            RedisResult.Create((RedisValue)"__mv_score_0"),
+                            RedisResult.Create((RedisValue)"0.05")
+                        ])
+                ]));
+        recorder.ExecuteAsyncResponses.Enqueue(
+            RedisResult.Create(
+                [
+                    RedisResult.Create(1),
+                    RedisResult.Create((RedisValue)"product:1"),
+                    RedisResult.Create(
+                        [
+                            RedisResult.Create((RedisValue)"title"),
+                            RedisResult.Create((RedisValue)"Runner"),
+                            RedisResult.Create((RedisValue)"__mv_score_1"),
+                            RedisResult.Create((RedisValue)"0.20")
+                        ])
+                ]));
+
+        var results = await index.SearchAsync<MultiVectorResultDocument>(
+            new MultiVectorQuery(
+                [
+                    MultiVectorInput.FromFloat32("text_embedding", [1f, 0f], weight: 0.7),
+                    MultiVectorInput.FromFloat32("image_embedding", [0f, 1f], weight: 0.3)
+                ],
+                topK: 1,
+                returnFields: ["title"],
+                scoreAlias: "combinedDistance"));
+
+        var document = Assert.Single(results.Documents);
+        Assert.Equal("Runner", document.Title);
+        Assert.Equal(0.095d, document.CombinedDistance, 10);
+    }
+
     private static SearchSchema CreateHashSchema(string token) =>
         new(
             new IndexDefinition($"hash-{token}", $"movie:{token}:", StorageType.Hash),
@@ -683,6 +833,27 @@ public sealed class SearchIndexAsyncTests
                 new TextFieldDefinition("title"),
                 new VectorFieldDefinition(
                     "embedding",
+                    new VectorFieldAttributes(
+                        VectorAlgorithm.Flat,
+                        VectorDataType.Float32,
+                        VectorDistanceMetric.Cosine,
+                        2))
+            ]);
+
+    private static SearchSchema CreateMultiVectorSchema(string token) =>
+        new(
+            new IndexDefinition($"multi-vector-{token}", $"product:{token}:", StorageType.Hash),
+            [
+                new TextFieldDefinition("title"),
+                new VectorFieldDefinition(
+                    "text_embedding",
+                    new VectorFieldAttributes(
+                        VectorAlgorithm.Flat,
+                        VectorDataType.Float32,
+                        VectorDistanceMetric.Cosine,
+                        2)),
+                new VectorFieldDefinition(
+                    "image_embedding",
                     new VectorFieldAttributes(
                         VectorAlgorithm.Flat,
                         VectorDataType.Float32,
@@ -802,6 +973,8 @@ public sealed class SearchIndexAsyncTests
     private sealed record GenreAggregateRow(string Genre, int MovieCount, double AvgYear);
 
     private sealed record HybridAggregateRow(string Genre, int MatchCount, double AvgDistance);
+
+    private sealed record MultiVectorResultDocument(string Title, double CombinedDistance);
 
     private class RecordingDatabaseProxy : DispatchProxy
     {

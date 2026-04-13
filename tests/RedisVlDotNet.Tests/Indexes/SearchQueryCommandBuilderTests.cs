@@ -266,6 +266,65 @@ public sealed class SearchQueryCommandBuilderTests
     }
 
     [Fact]
+    public void BuildsMultiVectorSearchArgumentsWithStableAliases()
+    {
+        var schema = new SearchSchema(
+            new IndexDefinition("products-idx", "product:", StorageType.Hash),
+            [
+                new TagFieldDefinition("category"),
+                new TextFieldDefinition("title"),
+                new VectorFieldDefinition(
+                    "text_embedding",
+                    new VectorFieldAttributes(
+                        VectorAlgorithm.Flat,
+                        VectorDataType.Float32,
+                        VectorDistanceMetric.Cosine,
+                        2)),
+                new VectorFieldDefinition(
+                    "image_embedding",
+                    new VectorFieldAttributes(
+                        VectorAlgorithm.Flat,
+                        VectorDataType.Float32,
+                        VectorDistanceMetric.Cosine,
+                        2))
+            ]);
+        var query = new MultiVectorQuery(
+            [
+                MultiVectorInput.FromFloat32("text_embedding", [1f, 0f], weight: 0.7),
+                MultiVectorInput.FromFloat32("image_embedding", [0f, 1f], weight: 0.3)
+            ],
+            topK: 3,
+            filter: Filter.Tag("category").Eq("footwear"),
+            returnFields: ["title"]);
+
+        var arguments = SearchQueryCommandBuilder.BuildMultiVectorSearchArguments(schema, query);
+
+        Assert.Equal(2, arguments.Count);
+        Assert.Equal(
+            [
+                "products-idx",
+                "@category:{footwear}=>[KNN 3 @text_embedding $vector AS __mv_score_0]",
+                "PARAMS", "2", "vector", "<binary>",
+                "SORTBY", "__mv_score_0", "ASC",
+                "RETURN", "2", "title", "__mv_score_0",
+                "LIMIT", "0", "3",
+                "DIALECT", "2"
+            ],
+            arguments[0].Select(RenderArgument).ToArray());
+        Assert.Equal(
+            [
+                "products-idx",
+                "@category:{footwear}=>[KNN 3 @image_embedding $vector AS __mv_score_1]",
+                "PARAMS", "2", "vector", "<binary>",
+                "SORTBY", "__mv_score_1", "ASC",
+                "RETURN", "2", "title", "__mv_score_1",
+                "LIMIT", "0", "3",
+                "DIALECT", "2"
+            ],
+            arguments[1].Select(RenderArgument).ToArray());
+    }
+
+    [Fact]
     public void BuildsHybridSearchArgumentsWithTextAndMetadataFilters()
     {
         var schema = new SearchSchema(
@@ -393,6 +452,27 @@ public sealed class SearchQueryCommandBuilderTests
         var exception = Assert.Throws<ArgumentException>(() => SearchQueryCommandBuilder.BuildVectorSearchArguments(schema, query));
 
         Assert.Contains("exactly 8 bytes", exception.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void RejectsMultiVectorQueriesAgainstNonCosineFields()
+    {
+        var schema = new SearchSchema(
+            new IndexDefinition("docs-idx", "doc:", StorageType.Hash),
+            [
+                new VectorFieldDefinition(
+                    "embedding",
+                    new VectorFieldAttributes(
+                        VectorAlgorithm.Flat,
+                        VectorDataType.Float32,
+                        VectorDistanceMetric.L2,
+                        2))
+            ]);
+        var query = new MultiVectorQuery([MultiVectorInput.FromFloat32("embedding", [1f, 0f])], 2);
+
+        var exception = Assert.Throws<InvalidOperationException>(() => SearchQueryCommandBuilder.BuildMultiVectorSearchArguments(schema, query));
+
+        Assert.Contains("cosine distance fields", exception.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

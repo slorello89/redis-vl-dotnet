@@ -376,6 +376,12 @@ public sealed class SearchIndex
     public SearchResults<TDocument> Search<TDocument>(VectorQuery query, JsonSerializerOptions? serializerOptions = null) =>
         SearchAsync<TDocument>(query, serializerOptions).GetAwaiter().GetResult();
 
+    public SearchResults Search(MultiVectorQuery query) =>
+        SearchAsync(query).GetAwaiter().GetResult();
+
+    public SearchResults<TDocument> Search<TDocument>(MultiVectorQuery query, JsonSerializerOptions? serializerOptions = null) =>
+        SearchAsync<TDocument>(query, serializerOptions).GetAwaiter().GetResult();
+
     public SearchResults Search(FilterQuery query) =>
         SearchAsync(query).GetAwaiter().GetResult();
 
@@ -424,8 +430,32 @@ public sealed class SearchIndex
         return SearchResultsParser.Parse(result);
     }
 
+    public async Task<SearchResults> SearchAsync(MultiVectorQuery query, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(query);
+
+        var perVectorResults = new List<SearchResults>(query.Vectors.Count);
+        foreach (var arguments in SearchQueryCommandBuilder.BuildMultiVectorSearchArguments(Schema, query))
+        {
+            var result = await ExecuteAsync("FT.SEARCH", arguments, cancellationToken).ConfigureAwait(false);
+            perVectorResults.Add(SearchResultsParser.Parse(result));
+        }
+
+        return CombineMultiVectorResults(query, perVectorResults);
+    }
+
     public async Task<SearchResults<TDocument>> SearchAsync<TDocument>(
         VectorQuery query,
+        JsonSerializerOptions? serializerOptions = null,
+        CancellationToken cancellationToken = default)
+    {
+        var results = await SearchAsync(query, cancellationToken).ConfigureAwait(false);
+        cancellationToken.ThrowIfCancellationRequested();
+        return results.Map<TDocument>(serializerOptions);
+    }
+
+    public async Task<SearchResults<TDocument>> SearchAsync<TDocument>(
+        MultiVectorQuery query,
         JsonSerializerOptions? serializerOptions = null,
         CancellationToken cancellationToken = default)
     {
@@ -595,6 +625,98 @@ public sealed class SearchIndex
         cancellationToken.ThrowIfCancellationRequested();
         var result = await database.ExecuteAsync(InfoCommand, [indexName]).WaitAsync(cancellationToken).ConfigureAwait(false);
         return SearchIndexInfo.FromRedisResult(result);
+    }
+
+    private static SearchResults CombineMultiVectorResults(MultiVectorQuery query, IReadOnlyList<SearchResults> perVectorResults)
+    {
+        if (perVectorResults.Count == 0)
+        {
+            return new SearchResults(0, []);
+        }
+
+        var scoreLookups = new List<Dictionary<string, double>>(perVectorResults.Count);
+        var documentLookups = new List<Dictionary<string, SearchDocument>>(perVectorResults.Count);
+
+        for (var index = 0; index < perVectorResults.Count; index++)
+        {
+            var scoreAlias = SearchQueryCommandBuilder.GetMultiVectorScoreAlias(index);
+            var scores = new Dictionary<string, double>(StringComparer.Ordinal);
+            var documents = new Dictionary<string, SearchDocument>(StringComparer.Ordinal);
+
+            foreach (var document in perVectorResults[index].Documents)
+            {
+                if (!document.TryGetValue(scoreAlias, out var value))
+                {
+                    continue;
+                }
+
+                scores[document.Id] = ParseScore(value, scoreAlias, document.Id);
+                documents[document.Id] = document;
+            }
+
+            scoreLookups.Add(scores);
+            documentLookups.Add(documents);
+        }
+
+        var candidateIds = scoreLookups[0].Keys
+            .Where(id => scoreLookups.All(scores => scores.ContainsKey(id)))
+            .ToArray();
+
+        var combinedDocuments = candidateIds
+            .Select(id => CreateCombinedSearchDocument(id, query, scoreLookups, documentLookups))
+            .OrderBy(static item => item.CombinedScore)
+            .ThenBy(item => item.PerVectorScores, ScoreSequenceComparer.Instance)
+            .ThenBy(item => item.Document.Id, StringComparer.Ordinal)
+            .ToArray();
+
+        var totalCount = combinedDocuments.LongLength;
+        var topDocuments = combinedDocuments
+            .Take(query.TopK)
+            .Select(static item => item.Document)
+            .ToArray();
+
+        return new SearchResults(totalCount, topDocuments);
+    }
+
+    private static CombinedSearchDocument CreateCombinedSearchDocument(
+        string documentId,
+        MultiVectorQuery query,
+        IReadOnlyList<Dictionary<string, double>> scoreLookups,
+        IReadOnlyList<Dictionary<string, SearchDocument>> documentLookups)
+    {
+        var values = new Dictionary<string, RedisValue>(StringComparer.Ordinal);
+        var perVectorScores = new double[scoreLookups.Count];
+        var combinedScore = 0d;
+
+        for (var index = 0; index < scoreLookups.Count; index++)
+        {
+            var score = scoreLookups[index][documentId];
+            perVectorScores[index] = score;
+            combinedScore += query.Vectors[index].Weight * score;
+
+            foreach (var fieldName in query.ProjectedFields)
+            {
+                if (!values.ContainsKey(fieldName) &&
+                    documentLookups[index][documentId].TryGetValue(fieldName, out var fieldValue))
+                {
+                    values[fieldName] = fieldValue;
+                }
+            }
+        }
+
+        values[query.ScoreAlias] = combinedScore.ToString("G17", CultureInfo.InvariantCulture);
+        return new CombinedSearchDocument(new SearchDocument(documentId, values), combinedScore, perVectorScores);
+    }
+
+    private static double ParseScore(RedisValue value, string scoreAlias, string documentId)
+    {
+        if (double.TryParse(value.ToString(), NumberStyles.Float, CultureInfo.InvariantCulture, out var score))
+        {
+            return score;
+        }
+
+        throw new InvalidOperationException(
+            $"Document '{documentId}' returned a non-numeric score for field '{scoreAlias}'.");
     }
 
     private void EnsureJsonStorage()
@@ -770,5 +892,42 @@ public sealed class SearchIndex
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(field);
         return field.Trim();
+    }
+
+    private sealed record CombinedSearchDocument(SearchDocument Document, double CombinedScore, double[] PerVectorScores);
+
+    private sealed class ScoreSequenceComparer : IComparer<double[]>
+    {
+        public static ScoreSequenceComparer Instance { get; } = new();
+
+        public int Compare(double[]? left, double[]? right)
+        {
+            if (ReferenceEquals(left, right))
+            {
+                return 0;
+            }
+
+            if (left is null)
+            {
+                return -1;
+            }
+
+            if (right is null)
+            {
+                return 1;
+            }
+
+            var length = Math.Min(left.Length, right.Length);
+            for (var index = 0; index < length; index++)
+            {
+                var comparison = left[index].CompareTo(right[index]);
+                if (comparison != 0)
+                {
+                    return comparison;
+                }
+            }
+
+            return left.Length.CompareTo(right.Length);
+        }
     }
 }

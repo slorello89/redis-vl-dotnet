@@ -231,6 +231,32 @@ internal static class SearchQueryCommandBuilder
         return arguments.ToArray();
     }
 
+    public static IReadOnlyList<object[]> BuildMultiVectorSearchArguments(SearchSchema schema, MultiVectorQuery query)
+    {
+        ArgumentNullException.ThrowIfNull(schema);
+        ArgumentNullException.ThrowIfNull(query);
+
+        var arguments = new List<object[]>(query.Vectors.Count);
+        for (var index = 0; index < query.Vectors.Count; index++)
+        {
+            var vector = query.Vectors[index];
+            var vectorField = ResolveVectorField(schema, vector.FieldName);
+            ValidateCosineDistanceMetric(vectorField, vector.FieldName);
+
+            var subQuery = new VectorQuery(
+                vector.FieldName,
+                vector.Vector,
+                query.TopK,
+                query.Filter,
+                query.ProjectedFields,
+                GetMultiVectorScoreAlias(index));
+
+            arguments.Add(BuildVectorSearchArguments(schema, subQuery));
+        }
+
+        return arguments;
+    }
+
     public static object[] BuildHybridSearchArguments(SearchSchema schema, HybridQuery query)
     {
         ArgumentNullException.ThrowIfNull(schema);
@@ -403,6 +429,15 @@ internal static class SearchQueryCommandBuilder
         ValidateVectorPayload(field.Attributes, query.FieldName, query.Vector);
     }
 
+    private static void ValidateCosineDistanceMetric(VectorFieldDefinition field, string fieldName)
+    {
+        if (field.Attributes.DistanceMetric != VectorDistanceMetric.Cosine)
+        {
+            throw new InvalidOperationException(
+                $"Multi-vector queries require cosine distance fields. Field '{fieldName}' uses '{field.Attributes.DistanceMetric}'.");
+        }
+    }
+
     private static void ValidateVectorPayload(VectorFieldAttributes attributes, string fieldName, byte[] vector)
     {
         var bytesPerDimension = attributes.DataType switch
@@ -420,4 +455,7 @@ internal static class SearchQueryCommandBuilder
                 nameof(vector));
         }
     }
+
+    internal static string GetMultiVectorScoreAlias(int index) =>
+        $"__mv_score_{index.ToString(CultureInfo.InvariantCulture)}";
 }

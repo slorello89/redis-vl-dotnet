@@ -19,7 +19,14 @@ var schema = new SearchSchema(
         new TextFieldDefinition("title"),
         new TextFieldDefinition("summary"),
         new VectorFieldDefinition(
-            "embedding",
+            "plot_embedding",
+            new VectorFieldAttributes(
+                VectorAlgorithm.Flat,
+                VectorDataType.Float32,
+                VectorDistanceMetric.Cosine,
+                dimensions: 2)),
+        new VectorFieldDefinition(
+            "poster_embedding",
             new VectorFieldAttributes(
                 VectorAlgorithm.Flat,
                 VectorDataType.Float32,
@@ -46,18 +53,28 @@ try
 
     var queryVector = new[] { 1f, 0f };
     var vectorQuery = VectorQuery.FromFloat32(
-        fieldName: "embedding",
+        fieldName: "plot_embedding",
         vector: queryVector,
         topK: 3,
         filter: Filter.Tag("genre").Eq("crime"),
         returnFields: ["title", "summary"],
         scoreAlias: "distance");
+    var multiVectorResults = await index.SearchAsync(
+        new MultiVectorQuery(
+            [
+                MultiVectorInput.FromFloat32("plot_embedding", queryVector, weight: 0.7),
+                MultiVectorInput.FromFloat32("poster_embedding", [0f, 1f], weight: 0.3)
+            ],
+            topK: 3,
+            filter: Filter.Tag("genre").Eq("crime"),
+            returnFields: ["title"],
+            scoreAlias: "combined_distance"));
 
     var results = await index.SearchAsync(vectorQuery);
     var aggregateHybridResults = await index.AggregateAsync<GenreHybridSummary>(
         AggregateHybridQuery.FromFloat32(
             Filter.Text("title").Prefix("He") | Filter.Text("title").Prefix("Ar"),
-            "embedding",
+            "plot_embedding",
             queryVector,
             topK: 3,
             groupBy: new AggregationGroupBy(
@@ -84,6 +101,15 @@ try
 
         Console.WriteLine($"- {title} | distance={distance:F6}");
         Console.WriteLine($"  {summary}");
+    }
+
+    Console.WriteLine("Weighted multi-vector query results across plot and poster embeddings:");
+
+    foreach (var document in multiVectorResults.Documents)
+    {
+        var title = document.Values["title"];
+        var combinedDistance = double.Parse(document.Values["combined_distance"]!, CultureInfo.InvariantCulture);
+        Console.WriteLine($"- {title} | combined_distance={combinedDistance:F6}");
     }
 
     Console.WriteLine("Aggregate hybrid query results for titles starting with He or Ar:");
@@ -145,7 +171,8 @@ static IReadOnlyList<HashSeedDocument> CreateSeedDocuments() =>
             new HashEntry("title", "Heat"),
             new HashEntry("genre", "crime"),
             new HashEntry("summary", "A detective and a crew collide in Los Angeles."),
-            new HashEntry("embedding", EncodeFloat32([1f, 0f]))
+            new HashEntry("plot_embedding", EncodeFloat32([1f, 0f])),
+            new HashEntry("poster_embedding", EncodeFloat32([0f, 1f]))
         ]),
     new(
         "thief",
@@ -153,7 +180,8 @@ static IReadOnlyList<HashSeedDocument> CreateSeedDocuments() =>
             new HashEntry("title", "Thief"),
             new HashEntry("genre", "crime"),
             new HashEntry("summary", "A professional thief tries one last high-stakes score."),
-            new HashEntry("embedding", EncodeFloat32([0.8f, 0.2f]))
+            new HashEntry("plot_embedding", EncodeFloat32([0.8f, 0.2f])),
+            new HashEntry("poster_embedding", EncodeFloat32([0.2f, 0.8f]))
         ]),
     new(
         "heatwave",
@@ -161,7 +189,8 @@ static IReadOnlyList<HashSeedDocument> CreateSeedDocuments() =>
             new HashEntry("title", "Heatwave"),
             new HashEntry("genre", "crime"),
             new HashEntry("summary", "A second crew surfaces as a citywide manhunt intensifies."),
-            new HashEntry("embedding", EncodeFloat32([0.9f, 0.1f]))
+            new HashEntry("plot_embedding", EncodeFloat32([0.9f, 0.1f])),
+            new HashEntry("poster_embedding", EncodeFloat32([0.1f, 0.9f]))
         ]),
     new(
         "arrival",
@@ -169,7 +198,8 @@ static IReadOnlyList<HashSeedDocument> CreateSeedDocuments() =>
             new HashEntry("title", "Arrival"),
             new HashEntry("genre", "science-fiction"),
             new HashEntry("summary", "A linguist is recruited after alien ships arrive."),
-            new HashEntry("embedding", EncodeFloat32([0f, 1f]))
+            new HashEntry("plot_embedding", EncodeFloat32([0f, 1f])),
+            new HashEntry("poster_embedding", EncodeFloat32([1f, 0f]))
         ])
 ];
 

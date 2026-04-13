@@ -2,12 +2,13 @@
 
 This example is a runnable .NET 9 console app that demonstrates the smallest vector-search flow in `redis-vl-dotnet`:
 
-- define a HASH-backed schema with a vector field
-- seed deterministic sample documents with raw float32 embedding bytes
+- define a HASH-backed schema with two vector fields
+- seed deterministic sample documents with raw float32 embedding bytes for plot and poster embeddings
 - partially update top-level HASH fields with `UpdateHashByIdAsync(...)`
 - execute a nearest-neighbor query against the vector field
+- execute a weighted `MultiVectorQuery` across both vector fields
 - execute an aggregate hybrid query that combines text predicates, KNN retrieval, and aggregation reducers
-- inspect returned titles, summaries, and vector distances
+- inspect returned titles, summaries, single-vector distances, and weighted combined distances
 - drop the example index and documents
 
 HASH partial updates in this example use Redis `HSET` semantics:

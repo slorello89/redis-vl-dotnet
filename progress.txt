@@ -18,6 +18,7 @@ Started: Mon Apr 13 10:35:34 EDT 2026
 - Redis-backed query integration tests should seed tiny HASH datasets with intentionally different match strength, wait on `num_docs` before asserting, and verify projected-field omission explicitly when a query narrows `RETURN` fields.
 - Typed aggregation projections should use reducer aliases that match the serializer naming policy used by `SearchResultMapper` (for example `movieCount` instead of `movie_count`) unless the target properties add explicit `JsonPropertyName` attributes.
 - Aggregate hybrid support should reuse the plain aggregation pipeline model and treat the KNN score alias like any other aggregation property reference, so reducers and sort clauses can operate on `vector_distance` without a separate result-mapping path.
+- Multi-vector search on the current Redis 7.4 test target should compose existing per-field `FT.SEARCH` calls, restrict inputs to cosine vector fields, and merge only intersection candidates using weighted distance ordering plus stable per-clause and document-id tie-breaks.
 
 ---
 
@@ -155,4 +156,13 @@ Started: Mon Apr 13 10:35:34 EDT 2026
   - Patterns discovered: aggregate hybrid queries can stay API-consistent by reusing the existing aggregation stage objects and only adding the hybrid text/vector inputs plus KNN score alias.
   - Gotchas encountered: running `dotnet build` and `dotnet test` in parallel against the same project can trigger ref-assembly file locks, so verification should serialize compile steps or reuse `--no-build`.
   - Useful context: there are still no `AGENTS.md` files anywhere in this repository, so there was no area-local agent guidance to update for this iteration.
+---
+## 2026-04-13 12:39:51 EDT - US-016
+- Implemented `MultiVectorQuery` and `MultiVectorInput`, added multi-vector command generation plus `SearchIndex.SearchAsync(...)` overloads, and composed weighted deterministic ranking from per-field vector searches on the current Redis target.
+- Files changed: `src/RedisVlDotNet/Queries/MultiVectorQuery.cs`, `src/RedisVlDotNet/Indexes/SearchQueryCommandBuilder.cs`, `src/RedisVlDotNet/Indexes/SearchIndex.cs`, `tests/RedisVlDotNet.Tests/Indexes/SearchQueryCommandBuilderTests.cs`, `tests/RedisVlDotNet.Tests/Indexes/SearchIndexAsyncTests.cs`, `tests/RedisVlDotNet.Tests/Indexes/SearchIndexIntegrationTests.cs`, `tests/RedisVlDotNet.Tests/Indexes/SearchIndexSeedData.cs`, `examples/VectorSearchExample/Program.cs`, `examples/VectorSearchExample/README.md`, `prd.json`, `progress.txt`
+- Quality checks run and result: `dotnet build redis-vl-dotnet.sln --no-restore` passed. `dotnet test tests/RedisVlDotNet.Tests/RedisVlDotNet.Tests.csproj --filter "FullyQualifiedName~SearchQueryCommandBuilderTests|FullyQualifiedName~SearchIndexAsyncTests|FullyQualifiedName~SearchIndexIntegrationTests"` passed with Redis-backed integration tests skipped because `REDIS_VL_REDIS_URL` was not configured locally. `dotnet test redis-vl-dotnet.sln` passed with 28 Redis-backed integration tests skipped because `REDIS_VL_REDIS_URL` was not configured locally.
+- Learnings for future iterations:
+  - Patterns discovered: multi-vector ranking fits the existing query stack cleanly when each vector clause reuses `VectorQuery` argument generation and the final merge adds only one public combined score field.
+  - Gotchas encountered: `dotnet test --no-build` can report stale results if a prior run started before the latest rebuild completed, so serialize repo-level verification after assertion fixes.
+  - Useful context: the checked-in Redis integration target is `redis/redis-stack-server:7.4.0-v8`, so native `FT.HYBRID` is not available yet and multi-vector support needs to stay compatible with `FT.SEARCH`.
 ---

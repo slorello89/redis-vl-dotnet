@@ -164,6 +164,34 @@ internal static class SearchIndexSeedData
             ])
     ];
 
+    public static IReadOnlyList<HashSeedDocument> MultiVectorMovies { get; } =
+    [
+        new(
+            "1",
+            [
+                new HashEntry("title", "Runner"),
+                new HashEntry("category", "footwear"),
+                new HashEntry("text_embedding", EncodeFloat32([1f, 0f])),
+                new HashEntry("image_embedding", EncodeFloat32([0f, 1f]))
+            ]),
+        new(
+            "2",
+            [
+                new HashEntry("title", "Hiker"),
+                new HashEntry("category", "footwear"),
+                new HashEntry("text_embedding", EncodeFloat32([0.9f, 0.1f])),
+                new HashEntry("image_embedding", EncodeFloat32([0.2f, 0.8f]))
+            ]),
+        new(
+            "3",
+            [
+                new HashEntry("title", "Boot"),
+                new HashEntry("category", "footwear"),
+                new HashEntry("text_embedding", EncodeFloat32([0.7f, 0.3f])),
+                new HashEntry("image_embedding", EncodeFloat32([0.4f, 0.6f]))
+            ])
+    ];
+
     public sealed record HashSeedDocument(string Id, HashEntry[] Entries);
 
     private static byte[] EncodeFloat32(float[] vector)
