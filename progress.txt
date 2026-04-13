@@ -21,6 +21,7 @@ Started: Mon Apr 13 10:35:34 EDT 2026
 - Multi-vector search on the current Redis 7.4 test target should compose existing per-field `FT.SEARCH` calls, restrict inputs to cosine vector fields, and merge only intersection candidates using weighted distance ordering plus stable per-clause and document-id tie-breaks.
 - Runtime vector tuning should stay query-local and flow through the shared vector command builder so composed queries reuse one `PARAMS` serializer while schema-based algorithm checks reject HNSW-only options on `FLAT` fields before Redis execution.
 - Shared query paging should flow through `QueryPagination`; vector-style queries keep `topK` as the retrieval window and must reject `offset + limit` values that would page past that window.
+- Batch query iterators should reuse the existing query execution paths by cloning the original query with a new `QueryPagination` each round; vector-style batches must clamp the final page to the remaining `topK` window instead of widening it.
 
 ---
 
@@ -185,4 +186,13 @@ Started: Mon Apr 13 10:35:34 EDT 2026
   - Patterns discovered: pagination consistency is easiest to preserve when all query models expose one shared pagination object and command builders treat `LIMIT` emission as a common helper instead of per-query inline logic.
   - Gotchas encountered: vector-style queries still need `topK` to bound the retrieval window, so paging validation has to reject pages beyond `topK` rather than silently expanding the KNN clause and changing ranking semantics.
   - Useful context: there are still no `AGENTS.md` files anywhere in this repository, so there was no area-local agent guidance to update for this iteration.
+---
+## 2026-04-13 12:57:33 EDT - US-019
+- Implemented async batch query helpers on `SearchIndex` for filter, text, vector, hybrid, vector-range, multi-vector, aggregation, and aggregate-hybrid queries by reissuing the original query with deterministic `QueryPagination` continuation until the reported result set is exhausted.
+- Files changed: `src/RedisVlDotNet/Indexes/SearchIndex.cs`, `tests/RedisVlDotNet.Tests/Indexes/SearchIndexAsyncTests.cs`, `tests/RedisVlDotNet.Tests/Indexes/SearchIndexIntegrationTests.cs`, `examples/JsonStorageExample/Program.cs`, `docs/getting-started.md`, `prd.json`, `progress.txt`
+- Quality checks run and result: `dotnet test tests/RedisVlDotNet.Tests/RedisVlDotNet.Tests.csproj --filter "FullyQualifiedName~SearchIndexAsyncTests|FullyQualifiedName~SearchIndexIntegrationTests"` passed with Redis-backed integration tests skipped because `REDIS_VL_REDIS_URL` was not configured locally. `dotnet build redis-vl-dotnet.sln --no-restore` passed. `dotnet test redis-vl-dotnet.sln --no-restore` passed with 35 Redis-backed integration tests skipped because `REDIS_VL_REDIS_URL` was not configured locally.
+- Learnings for future iterations:
+  - Patterns discovered: batch helpers are easiest to keep consistent when they call the existing `SearchAsync` and `AggregateAsync` paths and only swap in a new pagination object for each iteration.
+  - Gotchas encountered: vector-style batch helpers need to shrink the last page to the remaining `topK` window or they will trip the existing pagination validation before the iterator can terminate cleanly.
+  - Useful context: no `AGENTS.md` files exist under the edited paths, and there are unrelated workspace changes outside this story, so commit only the story files when closing the iteration.
 ---

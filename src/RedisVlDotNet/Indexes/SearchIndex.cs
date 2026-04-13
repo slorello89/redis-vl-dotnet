@@ -2,6 +2,7 @@ using RedisVlDotNet.Schema;
 using RedisVlDotNet.Queries;
 using StackExchange.Redis;
 using System.Globalization;
+using System.Runtime.CompilerServices;
 using System.Text.Json;
 
 namespace RedisVlDotNet.Indexes;
@@ -596,6 +597,274 @@ public sealed class SearchIndex
         return results.Map<TDocument>(serializerOptions);
     }
 
+    public IAsyncEnumerable<SearchResults> SearchBatchesAsync(
+        FilterQuery query,
+        int? batchSize = null,
+        CancellationToken cancellationToken = default) =>
+        SearchBatchesAsyncCore(
+            query,
+            batchSize,
+            SearchAsync,
+            static query => query.Pagination,
+            static (query, pagination) => new FilterQuery(query.Filter, query.ReturnFields, pagination: pagination),
+            static _ => null,
+            static result => result.TotalCount,
+            static result => result.Documents.Count,
+            cancellationToken);
+
+    public async IAsyncEnumerable<SearchResults<TDocument>> SearchBatchesAsync<TDocument>(
+        FilterQuery query,
+        int? batchSize = null,
+        JsonSerializerOptions? serializerOptions = null,
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        await foreach (var batch in SearchBatchesAsync(query, batchSize, cancellationToken).ConfigureAwait(false))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            yield return batch.Map<TDocument>(serializerOptions);
+        }
+    }
+
+    public IAsyncEnumerable<SearchResults> SearchBatchesAsync(
+        TextQuery query,
+        int? batchSize = null,
+        CancellationToken cancellationToken = default) =>
+        SearchBatchesAsyncCore(
+            query,
+            batchSize,
+            SearchAsync,
+            static query => query.Pagination,
+            static (query, pagination) => new TextQuery(query.Text, query.ReturnFields, pagination: pagination),
+            static _ => null,
+            static result => result.TotalCount,
+            static result => result.Documents.Count,
+            cancellationToken);
+
+    public async IAsyncEnumerable<SearchResults<TDocument>> SearchBatchesAsync<TDocument>(
+        TextQuery query,
+        int? batchSize = null,
+        JsonSerializerOptions? serializerOptions = null,
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        await foreach (var batch in SearchBatchesAsync(query, batchSize, cancellationToken).ConfigureAwait(false))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            yield return batch.Map<TDocument>(serializerOptions);
+        }
+    }
+
+    public IAsyncEnumerable<SearchResults> SearchBatchesAsync(
+        VectorQuery query,
+        int? batchSize = null,
+        CancellationToken cancellationToken = default) =>
+        SearchBatchesAsyncCore(
+            query,
+            batchSize,
+            SearchAsync,
+            static query => query.Pagination,
+            static (query, pagination) => new VectorQuery(
+                query.FieldName,
+                query.Vector,
+                query.TopK,
+                query.Filter,
+                query.ReturnFields,
+                query.ScoreAlias,
+                query.RuntimeOptions,
+                pagination),
+            static query => query.TopK,
+            static result => result.TotalCount,
+            static result => result.Documents.Count,
+            cancellationToken);
+
+    public async IAsyncEnumerable<SearchResults<TDocument>> SearchBatchesAsync<TDocument>(
+        VectorQuery query,
+        int? batchSize = null,
+        JsonSerializerOptions? serializerOptions = null,
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        await foreach (var batch in SearchBatchesAsync(query, batchSize, cancellationToken).ConfigureAwait(false))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            yield return batch.Map<TDocument>(serializerOptions);
+        }
+    }
+
+    public IAsyncEnumerable<SearchResults> SearchBatchesAsync(
+        HybridQuery query,
+        int? batchSize = null,
+        CancellationToken cancellationToken = default) =>
+        SearchBatchesAsyncCore(
+            query,
+            batchSize,
+            SearchAsync,
+            static query => query.Pagination,
+            static (query, pagination) => new HybridQuery(
+                query.TextFilter,
+                query.VectorFieldName,
+                query.Vector,
+                query.TopK,
+                query.Filter,
+                query.ReturnFields,
+                query.ScoreAlias,
+                query.RuntimeOptions,
+                pagination),
+            static query => query.TopK,
+            static result => result.TotalCount,
+            static result => result.Documents.Count,
+            cancellationToken);
+
+    public async IAsyncEnumerable<SearchResults<TDocument>> SearchBatchesAsync<TDocument>(
+        HybridQuery query,
+        int? batchSize = null,
+        JsonSerializerOptions? serializerOptions = null,
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        await foreach (var batch in SearchBatchesAsync(query, batchSize, cancellationToken).ConfigureAwait(false))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            yield return batch.Map<TDocument>(serializerOptions);
+        }
+    }
+
+    public IAsyncEnumerable<SearchResults> SearchBatchesAsync(
+        VectorRangeQuery query,
+        int? batchSize = null,
+        CancellationToken cancellationToken = default) =>
+        SearchBatchesAsyncCore(
+            query,
+            batchSize,
+            SearchAsync,
+            static query => query.Pagination,
+            static (query, pagination) => new VectorRangeQuery(
+                query.FieldName,
+                query.Vector,
+                query.DistanceThreshold,
+                query.Filter,
+                query.ReturnFields,
+                query.ScoreAlias,
+                runtimeOptions: query.RuntimeOptions,
+                pagination: pagination),
+            static _ => null,
+            static result => result.TotalCount,
+            static result => result.Documents.Count,
+            cancellationToken);
+
+    public async IAsyncEnumerable<SearchResults<TDocument>> SearchBatchesAsync<TDocument>(
+        VectorRangeQuery query,
+        int? batchSize = null,
+        JsonSerializerOptions? serializerOptions = null,
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        await foreach (var batch in SearchBatchesAsync(query, batchSize, cancellationToken).ConfigureAwait(false))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            yield return batch.Map<TDocument>(serializerOptions);
+        }
+    }
+
+    public IAsyncEnumerable<SearchResults> SearchBatchesAsync(
+        MultiVectorQuery query,
+        int? batchSize = null,
+        CancellationToken cancellationToken = default) =>
+        SearchBatchesAsyncCore(
+            query,
+            batchSize,
+            SearchAsync,
+            static query => query.Pagination,
+            static (query, pagination) => new MultiVectorQuery(
+                query.Vectors,
+                query.TopK,
+                query.Filter,
+                query.ProjectedFields,
+                query.ScoreAlias,
+                query.RuntimeOptions,
+                pagination),
+            static query => query.TopK,
+            static result => result.TotalCount,
+            static result => result.Documents.Count,
+            cancellationToken);
+
+    public async IAsyncEnumerable<SearchResults<TDocument>> SearchBatchesAsync<TDocument>(
+        MultiVectorQuery query,
+        int? batchSize = null,
+        JsonSerializerOptions? serializerOptions = null,
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        await foreach (var batch in SearchBatchesAsync(query, batchSize, cancellationToken).ConfigureAwait(false))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            yield return batch.Map<TDocument>(serializerOptions);
+        }
+    }
+
+    public IAsyncEnumerable<AggregationResults> AggregateBatchesAsync(
+        AggregationQuery query,
+        int? batchSize = null,
+        CancellationToken cancellationToken = default) =>
+        AggregateBatchesAsyncCore(
+            query,
+            batchSize,
+            AggregateAsync,
+            static query => query.Pagination,
+            static (query, pagination) => new AggregationQuery(
+                query.QueryString,
+                query.LoadFields,
+                query.ApplyClauses,
+                query.GroupBy,
+                query.SortBy,
+                pagination: pagination),
+            cancellationToken);
+
+    public async IAsyncEnumerable<AggregationResults<TDocument>> AggregateBatchesAsync<TDocument>(
+        AggregationQuery query,
+        int? batchSize = null,
+        JsonSerializerOptions? serializerOptions = null,
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        await foreach (var batch in AggregateBatchesAsync(query, batchSize, cancellationToken).ConfigureAwait(false))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            yield return batch.Map<TDocument>(serializerOptions);
+        }
+    }
+
+    public IAsyncEnumerable<AggregationResults> AggregateBatchesAsync(
+        AggregateHybridQuery query,
+        int? batchSize = null,
+        CancellationToken cancellationToken = default) =>
+        AggregateBatchesAsyncCore(
+            query,
+            batchSize,
+            AggregateAsync,
+            static query => query.Pagination,
+            static (query, pagination) => new AggregateHybridQuery(
+                query.TextFilter,
+                query.VectorFieldName,
+                query.Vector,
+                query.TopK,
+                query.Filter,
+                query.LoadFields,
+                query.ApplyClauses,
+                query.GroupBy,
+                query.SortBy,
+                scoreAlias: query.ScoreAlias,
+                runtimeOptions: query.RuntimeOptions,
+                pagination: pagination),
+            cancellationToken);
+
+    public async IAsyncEnumerable<AggregationResults<TDocument>> AggregateBatchesAsync<TDocument>(
+        AggregateHybridQuery query,
+        int? batchSize = null,
+        JsonSerializerOptions? serializerOptions = null,
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        await foreach (var batch in AggregateBatchesAsync(query, batchSize, cancellationToken).ConfigureAwait(false))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            yield return batch.Map<TDocument>(serializerOptions);
+        }
+    }
+
     public long Count(CountQuery query) =>
         CountAsync(query).GetAwaiter().GetResult();
 
@@ -615,6 +884,113 @@ public sealed class SearchIndex
     {
         cancellationToken.ThrowIfCancellationRequested();
         return await _database.ExecuteAsync(command, arguments).WaitAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    private static async IAsyncEnumerable<SearchResults> SearchBatchesAsyncCore<TQuery>(
+        TQuery query,
+        int? batchSize,
+        Func<TQuery, CancellationToken, Task<SearchResults>> executeAsync,
+        Func<TQuery, QueryPagination> getPagination,
+        Func<TQuery, QueryPagination, TQuery> cloneWithPagination,
+        Func<TQuery, int?> getMaxWindow,
+        Func<SearchResults, long> getTotalCount,
+        Func<SearchResults, int> getBatchCount,
+        [EnumeratorCancellation] CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(query);
+
+        var initialPagination = getPagination(query);
+        var effectiveBatchSize = GetBatchSize(batchSize, initialPagination);
+        var maxWindow = getMaxWindow(query);
+        if (maxWindow is not null && initialPagination.Offset >= maxWindow.Value)
+        {
+            yield break;
+        }
+
+        var offset = initialPagination.Offset;
+        long? totalCount = null;
+
+        while (!totalCount.HasValue || offset < totalCount.Value)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var currentBatchSize = ResolveBatchSize(offset, effectiveBatchSize, maxWindow);
+            if (currentBatchSize == 0)
+            {
+                yield break;
+            }
+
+            var currentQuery = cloneWithPagination(query, new QueryPagination(offset, currentBatchSize));
+            var batch = await executeAsync(currentQuery, cancellationToken).ConfigureAwait(false);
+            yield return batch;
+
+            var count = getBatchCount(batch);
+            if (count == 0)
+            {
+                yield break;
+            }
+
+            totalCount = getTotalCount(batch);
+            offset += effectiveBatchSize;
+        }
+    }
+
+    private static async IAsyncEnumerable<AggregationResults> AggregateBatchesAsyncCore<TQuery>(
+        TQuery query,
+        int? batchSize,
+        Func<TQuery, CancellationToken, Task<AggregationResults>> executeAsync,
+        Func<TQuery, QueryPagination> getPagination,
+        Func<TQuery, QueryPagination, TQuery> cloneWithPagination,
+        [EnumeratorCancellation] CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(query);
+
+        var initialPagination = getPagination(query);
+        var effectiveBatchSize = GetBatchSize(batchSize, initialPagination);
+        var offset = initialPagination.Offset;
+        long? totalCount = null;
+
+        while (!totalCount.HasValue || offset < totalCount.Value)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var currentQuery = cloneWithPagination(query, new QueryPagination(offset, effectiveBatchSize));
+            var batch = await executeAsync(currentQuery, cancellationToken).ConfigureAwait(false);
+            yield return batch;
+
+            if (batch.Rows.Count == 0)
+            {
+                yield break;
+            }
+
+            totalCount = batch.TotalCount;
+            offset += effectiveBatchSize;
+        }
+    }
+
+    private static int GetBatchSize(int? batchSize, QueryPagination pagination)
+    {
+        var effectiveBatchSize = batchSize ?? pagination.Limit;
+        if (effectiveBatchSize <= 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                batchSize.HasValue ? nameof(batchSize) : nameof(pagination),
+                effectiveBatchSize,
+                "Batch size must be greater than zero.");
+        }
+
+        return effectiveBatchSize;
+    }
+
+    private static int ResolveBatchSize(int offset, int batchSize, int? maxWindow)
+    {
+        if (maxWindow is null)
+        {
+            return batchSize;
+        }
+
+        var remaining = maxWindow.Value - offset;
+        return remaining <= 0 ? 0 : Math.Min(batchSize, remaining);
     }
 
     private static async Task<SearchIndexInfo> LoadInfoAsync(

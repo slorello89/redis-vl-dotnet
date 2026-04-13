@@ -52,6 +52,13 @@ var projectedTextResults = await rediscoveredIndex.SearchAsync(
     new TextQuery("Alien|Arrival", ["title", "year"], limit: 2));
 var typedTextResults = await rediscoveredIndex.SearchAsync<Movie>(
     new TextQuery("Alien|Arrival", ["title", "year", "genre", "summary"], limit: 2));
+var batchedTitles = new List<string>();
+await foreach (var batch in rediscoveredIndex.SearchBatchesAsync(
+    new TextQuery("Alien|Arrival", ["title"], pagination: new QueryPagination(limit: 1)),
+    batchSize: 1))
+{
+    batchedTitles.AddRange(batch.Documents.Select(static document => document.Values["title"].ToString()));
+}
 var aggregationResults = await rediscoveredIndex.AggregateAsync<GenreSummary>(
     new AggregationQuery(
         groupBy: new AggregationGroupBy(
@@ -77,6 +84,7 @@ Console.WriteLine($"Fetched via rediscovered index: {rediscoveredMovie?.Title} (
 Console.WriteLine($"Science fiction count: {scienceFictionCount}");
 Console.WriteLine($"Projected text query hits: {projectedTextResults.TotalCount}");
 Console.WriteLine($"Typed text query hits: {typedTextResults.TotalCount}");
+Console.WriteLine($"Batched text query titles: {string.Join(", ", batchedTitles)}");
 Console.WriteLine($"Aggregation rows: {aggregationResults.TotalCount}");
 Console.WriteLine($"Cleared indexed documents without dropping the index: {clearedCount}");
 Console.WriteLine($"Index metadata: {schema.Index.Prefixes.Count} prefixes, separator '{schema.Index.KeySeparator}', stopwords {(schema.Index.Stopwords?.Count == 0 ? "disabled" : "configured")}.");

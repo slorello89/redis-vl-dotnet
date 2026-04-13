@@ -165,6 +165,20 @@ var pagedVectorResults = await index.SearchAsync(
         pagination: new QueryPagination(offset: 3, limit: 3)));
 ```
 
+When you want to consume every page without writing the continuation loop yourself, use the batch helpers:
+
+```csharp
+await foreach (var batch in index.SearchBatchesAsync(
+    new TextQuery("Alien|Arrival", ["title"], pagination: new QueryPagination(limit: 1)),
+    batchSize: 1))
+{
+    foreach (var document in batch.Documents)
+    {
+        Console.WriteLine(document.Values["title"]);
+    }
+}
+```
+
 ## Run Aggregations With Typed Results
 
 Use `AggregationQuery` when you want RediSearch grouping and reducer pipelines without parsing raw Redis arrays yourself:

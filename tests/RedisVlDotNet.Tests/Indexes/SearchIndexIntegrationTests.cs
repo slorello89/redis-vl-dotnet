@@ -885,6 +885,50 @@ public sealed class SearchIndexIntegrationTests
     }
 
     [RedisSearchIntegrationFact]
+    public async Task IteratesTextQueryBatchesDeterministically()
+    {
+        await using var connection = await RedisSearchTestEnvironment.ConnectAsync();
+        var database = connection.GetDatabase();
+
+        var token = Guid.NewGuid().ToString("N");
+        var schema = new SearchSchema(
+            new IndexDefinition($"text-query-batches-idx-{token}", $"text-query-batches:{token}:", StorageType.Hash),
+            [
+                new TextFieldDefinition("title", weight: 3.0),
+                new NumericFieldDefinition("year"),
+                new TagFieldDefinition("genre")
+            ]);
+        var index = new SearchIndex(database, schema);
+
+        try
+        {
+            await index.CreateAsync();
+            await SeedHashDocumentsAsync(database, schema, SearchIndexSeedData.TextQueryMovies);
+            await RedisSearchTestEnvironment.WaitForIndexDocumentCountAsync(index, SearchIndexSeedData.TextQueryMovies.Count);
+
+            var batches = new List<SearchResults>();
+            await foreach (var batch in index.SearchBatchesAsync(
+                new TextQuery("heat", ["title"], pagination: new QueryPagination(limit: 1)),
+                batchSize: 1))
+            {
+                batches.Add(batch);
+            }
+
+            Assert.Equal(2, batches.Count);
+            Assert.All(batches, static batch => Assert.Equal(2, batch.TotalCount));
+            Assert.Equal("Heat Heat", Assert.Single(batches[0].Documents).Values["title"]);
+            Assert.Equal("Heat", Assert.Single(batches[1].Documents).Values["title"]);
+        }
+        finally
+        {
+            if (await index.ExistsAsync())
+            {
+                await index.DropAsync(deleteDocuments: true);
+            }
+        }
+    }
+
+    [RedisSearchIntegrationFact]
     public async Task ExecutesAggregationQueriesWithGroupedRowsAndTypedReducers()
     {
         await using var connection = await RedisSearchTestEnvironment.ConnectAsync();

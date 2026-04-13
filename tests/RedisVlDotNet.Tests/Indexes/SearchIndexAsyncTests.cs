@@ -504,6 +504,128 @@ public sealed class SearchIndexAsyncTests
     }
 
     [Fact]
+    public async Task SearchBatchesAsync_TextQuery_AdvancesOffsetAndStopsAfterLastBatch()
+    {
+        var (database, recorder) = RecordingDatabaseProxy.CreatePair();
+        var index = new SearchIndex(database, CreateHashSchema("text-batches"));
+        recorder.ExecuteAsyncResponses.Enqueue(
+            RedisResult.Create(
+                [
+                    RedisResult.Create(3),
+                    RedisResult.Create((RedisValue)"movie:1"),
+                    RedisResult.Create(
+                        [
+                            RedisResult.Create((RedisValue)"title"),
+                            RedisResult.Create((RedisValue)"Heat Heat")
+                        ]),
+                    RedisResult.Create((RedisValue)"movie:2"),
+                    RedisResult.Create(
+                        [
+                            RedisResult.Create((RedisValue)"title"),
+                            RedisResult.Create((RedisValue)"Heat")
+                        ])
+                ]));
+        recorder.ExecuteAsyncResponses.Enqueue(
+            RedisResult.Create(
+                [
+                    RedisResult.Create(3),
+                    RedisResult.Create((RedisValue)"movie:3"),
+                    RedisResult.Create(
+                        [
+                            RedisResult.Create((RedisValue)"title"),
+                            RedisResult.Create((RedisValue)"Heatwave")
+                        ])
+                ]));
+
+        var batches = new List<SearchResults>();
+        await foreach (var batch in index.SearchBatchesAsync(new TextQuery("heat", ["title"], limit: 1), batchSize: 2))
+        {
+            batches.Add(batch);
+        }
+
+        Assert.Equal(2, recorder.ExecuteAsyncCallCount);
+        Assert.Collection(
+            batches,
+            batch =>
+            {
+                Assert.Equal(3, batch.TotalCount);
+                Assert.Equal(["movie:1", "movie:2"], batch.Documents.Select(static document => document.Id).ToArray());
+            },
+            batch =>
+            {
+                Assert.Equal(3, batch.TotalCount);
+                Assert.Equal(["movie:3"], batch.Documents.Select(static document => document.Id).ToArray());
+            });
+        Assert.Equal(
+            [
+                ["LIMIT", "0", "2", "DIALECT", "2"],
+                ["LIMIT", "2", "2", "DIALECT", "2"]
+            ],
+            recorder.ExecuteAsyncCalls
+                .Select(static call => call.Arguments.Select(static argument => argument?.ToString() ?? string.Empty).TakeLast(5).ToArray())
+                .ToArray());
+    }
+
+    [Fact]
+    public async Task SearchBatchesAsync_VectorQuery_ShrinksFinalBatchToRemainingTopKWindow()
+    {
+        var (database, recorder) = RecordingDatabaseProxy.CreatePair();
+        var index = new SearchIndex(database, CreateVectorSchema("vector-batches"));
+        recorder.ExecuteAsyncResponses.Enqueue(
+            RedisResult.Create(
+                [
+                    RedisResult.Create(3),
+                    RedisResult.Create((RedisValue)"movie:1"),
+                    RedisResult.Create(
+                        [
+                            RedisResult.Create((RedisValue)"title"),
+                            RedisResult.Create((RedisValue)"Heat"),
+                            RedisResult.Create((RedisValue)"vector_distance"),
+                            RedisResult.Create((RedisValue)"0.01")
+                        ]),
+                    RedisResult.Create((RedisValue)"movie:2"),
+                    RedisResult.Create(
+                        [
+                            RedisResult.Create((RedisValue)"title"),
+                            RedisResult.Create((RedisValue)"Thief"),
+                            RedisResult.Create((RedisValue)"vector_distance"),
+                            RedisResult.Create((RedisValue)"0.02")
+                        ])
+                ]));
+        recorder.ExecuteAsyncResponses.Enqueue(
+            RedisResult.Create(
+                [
+                    RedisResult.Create(3),
+                    RedisResult.Create((RedisValue)"movie:3"),
+                    RedisResult.Create(
+                        [
+                            RedisResult.Create((RedisValue)"title"),
+                            RedisResult.Create((RedisValue)"Arrival"),
+                            RedisResult.Create((RedisValue)"vector_distance"),
+                            RedisResult.Create((RedisValue)"0.03")
+                        ])
+                ]));
+
+        var batches = new List<SearchResults>();
+        await foreach (var batch in index.SearchBatchesAsync(
+            VectorQuery.FromFloat32("embedding", [1f, 0f], topK: 3, returnFields: ["title"]),
+            batchSize: 2))
+        {
+            batches.Add(batch);
+        }
+
+        Assert.Equal(2, batches.Count);
+        Assert.Equal(
+            [
+                ["LIMIT", "0", "2", "DIALECT", "2"],
+                ["LIMIT", "2", "1", "DIALECT", "2"]
+            ],
+            recorder.ExecuteAsyncCalls
+                .Select(static call => call.Arguments.Select(static argument => argument?.ToString() ?? string.Empty).TakeLast(5).ToArray())
+                .ToArray());
+    }
+
+    [Fact]
     public async Task AggregateAsync_ExecutesFtAggregateWithAggregationArguments()
     {
         var (database, recorder) = RecordingDatabaseProxy.CreatePair();
@@ -580,6 +702,65 @@ public sealed class SearchIndexAsyncTests
         Assert.Equal("crime", row.Genre);
         Assert.Equal(2, row.MovieCount);
         Assert.Equal(1988d, row.AvgYear);
+    }
+
+    [Fact]
+    public async Task AggregateBatchesAsync_TypedResults_MapRowsAcrossPages()
+    {
+        var (database, recorder) = RecordingDatabaseProxy.CreatePair();
+        var index = new SearchIndex(database, CreateHashSchema("aggregate-batches"));
+        recorder.ExecuteAsyncResponses.Enqueue(
+            RedisResult.Create(
+                [
+                    RedisResult.Create(3),
+                    RedisResult.Create(
+                        [
+                            RedisResult.Create((RedisValue)"genre"),
+                            RedisResult.Create((RedisValue)"crime"),
+                            RedisResult.Create((RedisValue)"movieCount"),
+                            RedisResult.Create((RedisValue)"2")
+                        ]),
+                    RedisResult.Create(
+                        [
+                            RedisResult.Create((RedisValue)"genre"),
+                            RedisResult.Create((RedisValue)"thriller"),
+                            RedisResult.Create((RedisValue)"movieCount"),
+                            RedisResult.Create((RedisValue)"1")
+                        ])
+                ]));
+        recorder.ExecuteAsyncResponses.Enqueue(
+            RedisResult.Create(
+                [
+                    RedisResult.Create(3),
+                    RedisResult.Create(
+                        [
+                            RedisResult.Create((RedisValue)"genre"),
+                            RedisResult.Create((RedisValue)"science-fiction"),
+                            RedisResult.Create((RedisValue)"movieCount"),
+                            RedisResult.Create((RedisValue)"1")
+                        ])
+                ]));
+
+        var batches = new List<AggregationResults<GenreAggregateCountRow>>();
+        await foreach (var batch in index.AggregateBatchesAsync<GenreAggregateCountRow>(
+            new AggregationQuery(
+                groupBy: new AggregationGroupBy(["genre"], [AggregationReducer.Count("movieCount")])),
+            batchSize: 2))
+        {
+            batches.Add(batch);
+        }
+
+        Assert.Equal(2, batches.Count);
+        Assert.Equal(["crime", "thriller"], batches[0].Rows.Select(static row => row.Genre).ToArray());
+        Assert.Equal(["science-fiction"], batches[1].Rows.Select(static row => row.Genre).ToArray());
+        Assert.Equal(
+            [
+                ["LIMIT", "0", "2", "DIALECT", "2"],
+                ["LIMIT", "2", "2", "DIALECT", "2"]
+            ],
+            recorder.ExecuteAsyncCalls
+                .Select(static call => call.Arguments.Select(static argument => argument?.ToString() ?? string.Empty).TakeLast(5).ToArray())
+                .ToArray());
     }
 
     [Fact]
@@ -984,6 +1165,8 @@ public sealed class SearchIndexAsyncTests
     private sealed record HybridAggregateRow(string Genre, int MatchCount, double AvgDistance);
 
     private sealed record MultiVectorResultDocument(string Title, double CombinedDistance);
+
+    private sealed record GenreAggregateCountRow(string Genre, int MovieCount);
 
     private class RecordingDatabaseProxy : DispatchProxy
     {
