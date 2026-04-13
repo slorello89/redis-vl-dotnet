@@ -48,6 +48,10 @@ var scienceFictionQuery = new FilterQuery(
     returnFields: ["title", "year", "genre"]);
 
 var searchResults = await rediscoveredIndex.SearchAsync<Movie>(scienceFictionQuery);
+var projectedTextResults = await rediscoveredIndex.SearchAsync(
+    new TextQuery("Alien|Arrival", ["title", "year"], limit: 2));
+var typedTextResults = await rediscoveredIndex.SearchAsync<Movie>(
+    new TextQuery("Alien|Arrival", ["title", "year", "genre", "summary"], limit: 2));
 var scienceFictionCount = await rediscoveredIndex.CountAsync(
     new CountQuery(Filter.Tag("genre").Eq("science-fiction")));
 var rediscoveredMovie = await rediscoveredIndex.FetchJsonByIdAsync<Movie>("movie-3");
@@ -61,11 +65,27 @@ Console.WriteLine($"Available indexes: {string.Join(", ", indexes.Select(static 
 Console.WriteLine($"Rediscovered index '{rediscoveredIndex.Schema.Index.Name}' with prefixes: {string.Join(", ", rediscoveredIndex.Schema.Index.Prefixes)}");
 Console.WriteLine($"Fetched via rediscovered index: {rediscoveredMovie?.Title} ({rediscoveredMovie?.Year})");
 Console.WriteLine($"Science fiction count: {scienceFictionCount}");
+Console.WriteLine($"Projected text query hits: {projectedTextResults.TotalCount}");
+Console.WriteLine($"Typed text query hits: {typedTextResults.TotalCount}");
 Console.WriteLine($"Cleared indexed documents without dropping the index: {clearedCount}");
 Console.WriteLine($"Index metadata: {schema.Index.Prefixes.Count} prefixes, separator '{schema.Index.KeySeparator}', stopwords {(schema.Index.Stopwords?.Count == 0 ? "disabled" : "configured")}.");
 Console.WriteLine("Query results:");
 
 foreach (var movie in searchResults.Documents)
+{
+    Console.WriteLine($"- {movie.Title} ({movie.Year}) [{movie.Genre}]");
+}
+
+Console.WriteLine("Projected text query results:");
+
+foreach (var document in projectedTextResults.Documents)
+{
+    Console.WriteLine($"- {document.Values["title"]} ({document.Values["year"]})");
+}
+
+Console.WriteLine("Typed text query results:");
+
+foreach (var movie in typedTextResults.Documents)
 {
     Console.WriteLine($"- {movie.Title} ({movie.Year}) [{movie.Genre}]");
 }

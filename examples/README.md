@@ -29,8 +29,9 @@ Demonstrates the core JSON workflow:
 - create an index
 - load sample documents
 - fetch a document by id
-- run filter and count queries
-- drop the example index and documents
+- run filter, text, and count queries
+- clear indexed documents while preserving the index
+- drop the example index
 
 Redis prerequisites:
 

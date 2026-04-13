@@ -762,6 +762,90 @@ public sealed class SearchIndexIntegrationTests
     }
 
     [RedisSearchIntegrationFact]
+    public async Task ExecutesTextQueriesWithDeterministicRankingAndProjectedFields()
+    {
+        await using var connection = await RedisSearchTestEnvironment.ConnectAsync();
+        var database = connection.GetDatabase();
+
+        var token = Guid.NewGuid().ToString("N");
+        var schema = new SearchSchema(
+            new IndexDefinition($"text-query-idx-{token}", $"text-query:{token}:", StorageType.Hash),
+            [
+                new TextFieldDefinition("title", weight: 3.0),
+                new NumericFieldDefinition("year"),
+                new TagFieldDefinition("genre")
+            ]);
+        var index = new SearchIndex(database, schema);
+
+        try
+        {
+            await index.CreateAsync();
+            await SeedHashDocumentsAsync(database, schema, SearchIndexSeedData.TextQueryMovies);
+            await RedisSearchTestEnvironment.WaitForIndexDocumentCountAsync(index, SearchIndexSeedData.TextQueryMovies.Count);
+
+            var results = await index.SearchAsync(new TextQuery("heat", ["title", "year"], limit: 2));
+
+            Assert.Equal(2, results.TotalCount);
+            Assert.Equal(2, results.Documents.Count);
+            Assert.Equal($"{schema.Index.Prefix}1", results.Documents[0].Id);
+            Assert.Equal($"{schema.Index.Prefix}2", results.Documents[1].Id);
+            Assert.Equal("Heat Heat", results.Documents[0].Values["title"]);
+            Assert.Equal("1995", results.Documents[0].Values["year"]);
+            Assert.False(results.Documents[0].TryGetValue("genre", out _));
+            Assert.Equal("Heat", results.Documents[1].Values["title"]);
+            Assert.Equal("1981", results.Documents[1].Values["year"]);
+        }
+        finally
+        {
+            if (await index.ExistsAsync())
+            {
+                await index.DropAsync(deleteDocuments: true);
+            }
+        }
+    }
+
+    [RedisSearchIntegrationFact]
+    public async Task ExecutesTypedTextQueriesWithProjectedResults()
+    {
+        await using var connection = await RedisSearchTestEnvironment.ConnectAsync();
+        var database = connection.GetDatabase();
+
+        var token = Guid.NewGuid().ToString("N");
+        var schema = new SearchSchema(
+            new IndexDefinition($"typed-text-query-idx-{token}", $"typed-text-query:{token}:", StorageType.Hash),
+            [
+                new TextFieldDefinition("title", weight: 3.0),
+                new NumericFieldDefinition("year"),
+                new TagFieldDefinition("genre")
+            ]);
+        var index = new SearchIndex(database, schema);
+
+        try
+        {
+            await index.CreateAsync();
+            await SeedHashDocumentsAsync(database, schema, SearchIndexSeedData.TextQueryMovies);
+            await RedisSearchTestEnvironment.WaitForIndexDocumentCountAsync(index, SearchIndexSeedData.TextQueryMovies.Count);
+
+            var results = await index.SearchAsync<HashMovieDocument>(
+                new TextQuery("heat", ["title", "year", "genre"], limit: 2));
+
+            Assert.Equal(2, results.TotalCount);
+            Assert.Equal(
+                ["Heat Heat", "Heat"],
+                results.Documents.Select(static document => document.Title).ToArray());
+            Assert.Equal([1995, 1981], results.Documents.Select(static document => document.Year).ToArray());
+            Assert.All(results.Documents, static document => Assert.Equal("crime", document.Genre));
+        }
+        finally
+        {
+            if (await index.ExistsAsync())
+            {
+                await index.DropAsync(deleteDocuments: true);
+            }
+        }
+    }
+
+    [RedisSearchIntegrationFact]
     public async Task ExecutesVectorQueriesWithDeterministicRanking()
     {
         await using var connection = await RedisSearchTestEnvironment.ConnectAsync();

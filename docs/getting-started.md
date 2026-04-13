@@ -8,6 +8,8 @@ This guide walks through the smallest end-to-end `redis-vl-dotnet` flow for v1:
 4. create an index
 5. load documents
 6. fetch and query documents
+7. run full-text search with `TextQuery`
+8. optionally clear indexed documents without dropping the index
 
 The current repository does not publish a NuGet package yet, so local development uses a project reference.
 
@@ -82,18 +84,28 @@ var query = new FilterQuery(
     returnFields: ["title", "year", "genre"]);
 
 var results = await index.SearchAsync<Movie>(query);
+var textResults = await index.SearchAsync<Movie>(
+    new TextQuery("Alien|Arrival", ["title", "year", "genre"], limit: 2));
 var count = await index.CountAsync(new CountQuery(Filter.Tag("genre").Eq("science-fiction")));
+var cleared = await index.ClearAsync();
 
 Console.WriteLine($"Fetched: {fetched?.Title}");
 Console.WriteLine($"Search matches: {results.TotalCount}");
+Console.WriteLine($"Text matches: {textResults.TotalCount}");
 Console.WriteLine($"Genre count: {count}");
+Console.WriteLine($"Cleared documents: {cleared}");
 
 foreach (var movie in results.Documents)
 {
     Console.WriteLine($"{movie.Title} ({movie.Year})");
 }
 
-await index.DropAsync(deleteDocuments: true);
+foreach (var movie in textResults.Documents)
+{
+    Console.WriteLine($"Text search: {movie.Title} ({movie.Year})");
+}
+
+await index.DropAsync();
 
 public sealed record Movie(string Id, string Title, int Year, string Genre);
 ```
@@ -105,7 +117,24 @@ public sealed record Movie(string Id, string Title, int Year, string Genre);
 - `SearchIndex.CreateAsync(...)` issues `FT.CREATE`
 - `LoadJsonAsync(...)` stores JSON documents under keys derived from the schema prefix and document `Id`
 - `FetchJsonByIdAsync<T>(...)` round-trips a typed document from Redis JSON
-- `FilterQuery` and `CountQuery` run `FT.SEARCH`-based retrieval and counting through typed query objects
+- `FilterQuery`, `TextQuery`, and `CountQuery` run `FT.SEARCH`-based retrieval and counting through typed query objects
+- `ClearAsync(...)` deletes Redis keys matched by the schema prefixes and preserves the index definition for both JSON and HASH storage
+
+## Run Full-Text Search With `TextQuery`
+
+Use `TextQuery` when you want RediSearch text matching semantics instead of the structured filter builder:
+
+```csharp
+var textResults = await index.SearchAsync<Movie>(
+    new TextQuery("Alien|Arrival", ["title", "year", "genre"], limit: 2));
+```
+
+`TextQuery` keeps the same paging and return-field conventions as the other query types:
+
+- the first argument is the raw RediSearch query string
+- `returnFields` limits the projected fields returned from Redis
+- `SearchAsync<T>(...)` maps those projected fields into a typed result document
+- `offset` and `limit` control pagination
 
 ## Run the Flow Locally
 
@@ -121,8 +150,9 @@ Expected behavior:
 - three JSON documents are loaded under the `movie:` prefix
 - one document is fetched directly by id
 - a filtered search returns `Arrival`
+- a `TextQuery` returns `Arrival` and `Alien`
 - a count query returns `2` for the `science-fiction` genre
-- the sample drops the index and loaded documents before exiting
+- the sample clears the prefixed documents, then drops the now-empty index before exiting
 
 ## Switching to HASH Storage
 
@@ -135,6 +165,13 @@ Use `StorageType.Hash` when creating the schema, then switch document lifecycle 
 - `DeleteHashByKeyAsync(...)`
 
 The query APIs stay the same for JSON and HASH indexes because storage mode is a schema concern, not a separate client type.
+
+`ClearAsync(...)` is storage-agnostic at the API level but operates on Redis keys, not document payload internals:
+
+- for `StorageType.Json`, it deletes JSON document keys that match the schema prefixes
+- for `StorageType.Hash`, it deletes HASH document keys that match the schema prefixes
+
+Use narrow, index-specific prefixes so clearing one index does not remove unrelated application keys.
 
 ## Related Docs
 
