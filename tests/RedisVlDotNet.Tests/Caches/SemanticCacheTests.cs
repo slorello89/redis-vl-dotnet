@@ -2,6 +2,7 @@ using System.Reflection;
 using RedisVlDotNet.Caches;
 using RedisVlDotNet.Filters;
 using RedisVlDotNet.Schema;
+using RedisVlDotNet.Vectorizers;
 using StackExchange.Redis;
 
 namespace RedisVlDotNet.Tests.Caches;
@@ -205,11 +206,11 @@ public sealed class SemanticCacheTests
             VectorDistanceMetric.L2,
             2);
 
-    private sealed class RecordingEmbeddingGenerator(float[] embedding) : ITextEmbeddingGenerator
+    private sealed class RecordingEmbeddingGenerator(float[] embedding) : ITextVectorizer
     {
         public string? LastInput { get; private set; }
 
-        public Task<float[]> GenerateAsync(string input, CancellationToken cancellationToken = default)
+        public Task<float[]> VectorizeAsync(string input, CancellationToken cancellationToken = default)
         {
             LastInput = input;
             return Task.FromResult(embedding);

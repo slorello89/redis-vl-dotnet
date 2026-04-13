@@ -6,6 +6,7 @@ using RedisVlDotNet.Filters;
 using RedisVlDotNet.Indexes;
 using RedisVlDotNet.Queries;
 using RedisVlDotNet.Schema;
+using RedisVlDotNet.Vectorizers;
 using StackExchange.Redis;
 
 namespace RedisVlDotNet.Caches;
@@ -67,8 +68,8 @@ public sealed class SemanticCache
     public SemanticCacheHit? Check(string prompt, float[] embedding, FilterExpression? filter = null) =>
         CheckAsync(prompt, embedding, filter).GetAwaiter().GetResult();
 
-    public SemanticCacheHit? Check(string prompt, ITextEmbeddingGenerator embeddingGenerator, FilterExpression? filter = null) =>
-        CheckAsync(prompt, embeddingGenerator, filter).GetAwaiter().GetResult();
+    public SemanticCacheHit? Check(string prompt, ITextVectorizer vectorizer, FilterExpression? filter = null) =>
+        CheckAsync(prompt, vectorizer, filter).GetAwaiter().GetResult();
 
     public async Task<SemanticCacheHit?> CheckAsync(
         string prompt,
@@ -104,13 +105,13 @@ public sealed class SemanticCache
 
     public async Task<SemanticCacheHit?> CheckAsync(
         string prompt,
-        ITextEmbeddingGenerator embeddingGenerator,
+        ITextVectorizer vectorizer,
         FilterExpression? filter = null,
         CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(embeddingGenerator);
+        ArgumentNullException.ThrowIfNull(vectorizer);
 
-        var embedding = await embeddingGenerator.GenerateAsync(NormalizePrompt(prompt), cancellationToken).ConfigureAwait(false);
+        var embedding = await vectorizer.VectorizeAsync(NormalizePrompt(prompt), cancellationToken).ConfigureAwait(false);
         cancellationToken.ThrowIfCancellationRequested();
         return await CheckAsync(prompt, embedding, filter, cancellationToken).ConfigureAwait(false);
     }
@@ -126,10 +127,10 @@ public sealed class SemanticCache
     public string Store(
         string prompt,
         string response,
-        ITextEmbeddingGenerator embeddingGenerator,
+        ITextVectorizer vectorizer,
         object? metadata = null,
         IReadOnlyDictionary<string, object?>? filterValues = null) =>
-        StoreAsync(prompt, response, embeddingGenerator, metadata, filterValues).GetAwaiter().GetResult();
+        StoreAsync(prompt, response, vectorizer, metadata, filterValues).GetAwaiter().GetResult();
 
     public async Task<string> StoreAsync(
         string prompt,
@@ -179,14 +180,14 @@ public sealed class SemanticCache
     public async Task<string> StoreAsync(
         string prompt,
         string response,
-        ITextEmbeddingGenerator embeddingGenerator,
+        ITextVectorizer vectorizer,
         object? metadata = null,
         IReadOnlyDictionary<string, object?>? filterValues = null,
         CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(embeddingGenerator);
+        ArgumentNullException.ThrowIfNull(vectorizer);
 
-        var embedding = await embeddingGenerator.GenerateAsync(NormalizePrompt(prompt), cancellationToken).ConfigureAwait(false);
+        var embedding = await vectorizer.VectorizeAsync(NormalizePrompt(prompt), cancellationToken).ConfigureAwait(false);
         cancellationToken.ThrowIfCancellationRequested();
         return await StoreAsync(prompt, response, embedding, metadata, filterValues, cancellationToken).ConfigureAwait(false);
     }

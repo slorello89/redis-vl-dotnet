@@ -6,11 +6,13 @@ The active implementation roadmap is defined in [docs/parity-roadmap.md](/Users/
 
 Start with [docs/getting-started.md](/Users/steve.lorello/projects/redis/redis-vl-dotnet/docs/getting-started.md) for the core install, connection, schema, index, document, and query flow.
 Browse [examples/README.md](/Users/steve.lorello/projects/redis/redis-vl-dotnet/examples/README.md) for the runnable sample index, Redis prerequisites, and links to each example's local run instructions.
+Read [docs/extensions.md](/Users/steve.lorello/projects/redis/redis-vl-dotnet/docs/extensions.md) for the vectorizer abstractions package split and provider-extension layout.
 
 ## Current Workspace
 
 - `docs/parity-roadmap.md`: current .NET/Java/Python parity matrix and roadmap decisions
 - `docs/getting-started.md`: end-to-end guide for creating an index, loading documents, and running basic queries
+- `docs/extensions.md`: extension package architecture and shared text vectorizer contracts
 - `docs/testing.md`: local and CI test harness instructions for unit and Redis-backed integration coverage
 - `examples/README.md`: examples index with prerequisites and workflow summaries
 - `examples/JsonStorageExample`: runnable console app for JSON-backed schema, load, fetch, and query flows

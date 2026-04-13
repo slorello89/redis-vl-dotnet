@@ -1,6 +1,7 @@
 using RedisVlDotNet.Caches;
 using RedisVlDotNet.Indexes;
 using RedisVlDotNet.Schema;
+using RedisVlDotNet.Vectorizers;
 using RedisVlDotNet.Workflows;
 using StackExchange.Redis;
 
@@ -53,9 +54,9 @@ finally
     }
 }
 
-file sealed class KeywordEmbeddingGenerator : ITextEmbeddingGenerator
+file sealed class KeywordEmbeddingGenerator : ITextVectorizer
 {
-    public Task<float[]> GenerateAsync(string input, CancellationToken cancellationToken = default)
+    public Task<float[]> VectorizeAsync(string input, CancellationToken cancellationToken = default)
     {
         var normalized = input.ToLowerInvariant();
         var embedding = normalized.Contains("refund", StringComparison.Ordinal)

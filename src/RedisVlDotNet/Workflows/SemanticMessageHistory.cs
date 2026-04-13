@@ -7,6 +7,7 @@ using RedisVlDotNet.Filters;
 using RedisVlDotNet.Indexes;
 using RedisVlDotNet.Queries;
 using RedisVlDotNet.Schema;
+using RedisVlDotNet.Vectorizers;
 using StackExchange.Redis;
 
 namespace RedisVlDotNet.Workflows;
@@ -79,10 +80,10 @@ public sealed class SemanticMessageHistory
         string sessionId,
         string role,
         string content,
-        ITextEmbeddingGenerator embeddingGenerator,
+        ITextVectorizer vectorizer,
         object? metadata = null,
         DateTimeOffset? timestamp = null) =>
-        AppendAsync(sessionId, role, content, embeddingGenerator, metadata, timestamp).GetAwaiter().GetResult();
+        AppendAsync(sessionId, role, content, vectorizer, metadata, timestamp).GetAwaiter().GetResult();
 
     public async Task<string> AppendAsync(
         string sessionId,
@@ -129,15 +130,15 @@ public sealed class SemanticMessageHistory
         string sessionId,
         string role,
         string content,
-        ITextEmbeddingGenerator embeddingGenerator,
+        ITextVectorizer vectorizer,
         object? metadata = null,
         DateTimeOffset? timestamp = null,
         CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(embeddingGenerator);
+        ArgumentNullException.ThrowIfNull(vectorizer);
 
         var normalizedContent = NormalizeContent(content);
-        var embedding = await embeddingGenerator.GenerateAsync(normalizedContent, cancellationToken).ConfigureAwait(false);
+        var embedding = await vectorizer.VectorizeAsync(normalizedContent, cancellationToken).ConfigureAwait(false);
         cancellationToken.ThrowIfCancellationRequested();
         return await AppendAsync(sessionId, role, normalizedContent, embedding, metadata, timestamp, cancellationToken).ConfigureAwait(false);
     }
@@ -179,11 +180,11 @@ public sealed class SemanticMessageHistory
     public IReadOnlyList<SemanticMessageHistoryMatch> GetRelevant(
         string sessionId,
         string prompt,
-        ITextEmbeddingGenerator embeddingGenerator,
+        ITextVectorizer vectorizer,
         int limit = 5,
         string? role = null,
         double? distanceThreshold = null) =>
-        GetRelevantAsync(sessionId, prompt, embeddingGenerator, limit, role, distanceThreshold).GetAwaiter().GetResult();
+        GetRelevantAsync(sessionId, prompt, vectorizer, limit, role, distanceThreshold).GetAwaiter().GetResult();
 
     public async Task<IReadOnlyList<SemanticMessageHistoryMatch>> GetRelevantAsync(
         string sessionId,
@@ -228,16 +229,16 @@ public sealed class SemanticMessageHistory
     public async Task<IReadOnlyList<SemanticMessageHistoryMatch>> GetRelevantAsync(
         string sessionId,
         string prompt,
-        ITextEmbeddingGenerator embeddingGenerator,
+        ITextVectorizer vectorizer,
         int limit = 5,
         string? role = null,
         double? distanceThreshold = null,
         CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(embeddingGenerator);
+        ArgumentNullException.ThrowIfNull(vectorizer);
 
         var normalizedPrompt = NormalizeContent(prompt);
-        var embedding = await embeddingGenerator.GenerateAsync(normalizedPrompt, cancellationToken).ConfigureAwait(false);
+        var embedding = await vectorizer.VectorizeAsync(normalizedPrompt, cancellationToken).ConfigureAwait(false);
         cancellationToken.ThrowIfCancellationRequested();
         return await GetRelevantAsync(sessionId, embedding, limit, role, distanceThreshold, cancellationToken).ConfigureAwait(false);
     }

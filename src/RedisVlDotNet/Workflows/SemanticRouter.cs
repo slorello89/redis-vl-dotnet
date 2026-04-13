@@ -4,6 +4,7 @@ using RedisVlDotNet.Caches;
 using RedisVlDotNet.Indexes;
 using RedisVlDotNet.Queries;
 using RedisVlDotNet.Schema;
+using RedisVlDotNet.Vectorizers;
 using StackExchange.Redis;
 
 namespace RedisVlDotNet.Workflows;
@@ -60,8 +61,8 @@ public sealed class SemanticRouter
     public string AddRoute(string routeName, string reference, float[] embedding) =>
         AddRouteAsync(routeName, reference, embedding).GetAwaiter().GetResult();
 
-    public string AddRoute(string routeName, string reference, ITextEmbeddingGenerator embeddingGenerator) =>
-        AddRouteAsync(routeName, reference, embeddingGenerator).GetAwaiter().GetResult();
+    public string AddRoute(string routeName, string reference, ITextVectorizer vectorizer) =>
+        AddRouteAsync(routeName, reference, vectorizer).GetAwaiter().GetResult();
 
     public async Task<string> AddRouteAsync(
         string routeName,
@@ -90,12 +91,12 @@ public sealed class SemanticRouter
     public async Task<string> AddRouteAsync(
         string routeName,
         string reference,
-        ITextEmbeddingGenerator embeddingGenerator,
+        ITextVectorizer vectorizer,
         CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(embeddingGenerator);
+        ArgumentNullException.ThrowIfNull(vectorizer);
 
-        var embedding = await embeddingGenerator.GenerateAsync(NormalizeReference(reference), cancellationToken).ConfigureAwait(false);
+        var embedding = await vectorizer.VectorizeAsync(NormalizeReference(reference), cancellationToken).ConfigureAwait(false);
         cancellationToken.ThrowIfCancellationRequested();
         return await AddRouteAsync(routeName, reference, embedding, cancellationToken).ConfigureAwait(false);
     }
@@ -103,8 +104,8 @@ public sealed class SemanticRouter
     public SemanticRouteMatch? Route(string input, float[] embedding) =>
         RouteAsync(input, embedding).GetAwaiter().GetResult();
 
-    public SemanticRouteMatch? Route(string input, ITextEmbeddingGenerator embeddingGenerator) =>
-        RouteAsync(input, embeddingGenerator).GetAwaiter().GetResult();
+    public SemanticRouteMatch? Route(string input, ITextVectorizer vectorizer) =>
+        RouteAsync(input, vectorizer).GetAwaiter().GetResult();
 
     public async Task<SemanticRouteMatch?> RouteAsync(
         string input,
@@ -134,13 +135,13 @@ public sealed class SemanticRouter
 
     public async Task<SemanticRouteMatch?> RouteAsync(
         string input,
-        ITextEmbeddingGenerator embeddingGenerator,
+        ITextVectorizer vectorizer,
         CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(embeddingGenerator);
+        ArgumentNullException.ThrowIfNull(vectorizer);
 
         var normalizedInput = NormalizeInput(input);
-        var embedding = await embeddingGenerator.GenerateAsync(normalizedInput, cancellationToken).ConfigureAwait(false);
+        var embedding = await vectorizer.VectorizeAsync(normalizedInput, cancellationToken).ConfigureAwait(false);
         cancellationToken.ThrowIfCancellationRequested();
         return await RouteAsync(normalizedInput, embedding, cancellationToken).ConfigureAwait(false);
     }
