@@ -49,6 +49,47 @@ public sealed class SearchIndexIntegrationTests
     }
 
     [RedisSearchIntegrationFact]
+    public async Task CreatesIndexWithMultiplePrefixes()
+    {
+        await using var connection = await RedisSearchTestEnvironment.ConnectAsync();
+        var database = connection.GetDatabase();
+
+        var token = Guid.NewGuid().ToString("N");
+        var primaryPrefix = $"movie:{token}:";
+        var secondaryPrefix = $"archive:{token}:";
+        var schema = new SearchSchema(
+            new IndexDefinition($"movies-multi-prefix-idx-{token}", [primaryPrefix, secondaryPrefix], StorageType.Hash),
+            [
+                new TextFieldDefinition("title", sortable: true),
+                new TagFieldDefinition("genre")
+            ]);
+        var index = new SearchIndex(database, schema);
+
+        try
+        {
+            await index.CreateAsync();
+            await database.HashSetAsync($"{primaryPrefix}movie-1", [new HashEntry("title", "Heat"), new HashEntry("genre", "crime")]);
+            await database.HashSetAsync($"{secondaryPrefix}movie-2", [new HashEntry("title", "Arrival"), new HashEntry("genre", "science-fiction")]);
+            await RedisSearchTestEnvironment.WaitForIndexDocumentCountAsync(index, 2);
+
+            var crimeCount = await index.CountAsync(new CountQuery(Filter.Tag("genre").Eq("crime")));
+            var results = await index.SearchAsync(new FilterQuery(Filter.Tag("genre").Eq("science-fiction"), ["title", "genre"]));
+
+            Assert.Equal(1, crimeCount);
+            Assert.Single(results.Documents);
+            Assert.Equal($"{secondaryPrefix}movie-2", results.Documents[0].Id);
+            Assert.Equal("Arrival", results.Documents[0].Values["title"]);
+        }
+        finally
+        {
+            if (await index.ExistsAsync())
+            {
+                await index.DropAsync(deleteDocuments: true);
+            }
+        }
+    }
+
+    [RedisSearchIntegrationFact]
     public async Task ExecutesAsyncIndexAndTypedQueryFlowWithCancellationToken()
     {
         await using var connection = await RedisSearchTestEnvironment.ConnectAsync();

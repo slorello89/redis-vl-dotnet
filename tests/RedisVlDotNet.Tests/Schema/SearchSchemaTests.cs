@@ -193,8 +193,22 @@ public sealed class SearchSchemaTests
 
         Assert.Equal("docs-idx", schema.Index.Name);
         Assert.Equal("docs:", schema.Index.Prefix);
+        Assert.Equal(["docs:"], schema.Index.Prefixes);
         Assert.Equal(StorageType.Json, schema.Index.StorageType);
         Assert.Empty(schema.Fields);
+    }
+
+    [Fact]
+    public void CreatesSchemaWithMultiplePrefixes()
+    {
+        var schema = new SearchSchema(
+            new IndexDefinition("docs-idx", ["docs:", "archive:"], StorageType.Json),
+            Array.Empty<FieldDefinition>());
+
+        Assert.Equal("docs-idx", schema.Index.Name);
+        Assert.Equal("docs:", schema.Index.Prefix);
+        Assert.Equal(["docs:", "archive:"], schema.Index.Prefixes);
+        Assert.Equal(StorageType.Json, schema.Index.StorageType);
     }
 
     [Fact]
@@ -272,6 +286,8 @@ public sealed class SearchSchemaTests
     public void RejectsBlankIndexAndFieldNames()
     {
         Assert.Throws<ArgumentException>(() => new IndexDefinition("", "docs:", StorageType.Json));
+        Assert.Throws<ArgumentException>(() => new IndexDefinition("docs-idx", Array.Empty<string>(), StorageType.Json));
+        Assert.Throws<ArgumentException>(() => new IndexDefinition("docs-idx", ["docs:", " "], StorageType.Json));
         Assert.Throws<ArgumentException>(() => new TextFieldDefinition(" "));
     }
 

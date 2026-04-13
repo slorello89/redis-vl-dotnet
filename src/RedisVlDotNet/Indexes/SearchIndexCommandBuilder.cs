@@ -15,10 +15,10 @@ internal static class SearchIndexCommandBuilder
             "ON",
             ToRedisKeyword(schema.Index.StorageType),
             "PREFIX",
-            "1",
-            schema.Index.Prefix,
-            "SCHEMA"
+            schema.Index.Prefixes.Count.ToString(CultureInfo.InvariantCulture)
         };
+        arguments.AddRange(schema.Index.Prefixes);
+        arguments.Add("SCHEMA");
 
         foreach (var field in schema.Fields)
         {

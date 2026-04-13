@@ -77,6 +77,25 @@ public sealed class SearchIndexCommandBuilderTests
     }
 
     [Fact]
+    public void BuildsCreateArgumentsWithMultiplePrefixes()
+    {
+        var schema = new SearchSchema(
+            new IndexDefinition("docs-idx", ["docs:", "archive:"], StorageType.Hash),
+            [
+                new TextFieldDefinition("title")
+            ]);
+
+        var arguments = SearchIndexCommandBuilder.BuildCreateArguments(schema);
+
+        Assert.Equal(
+            [
+                "docs-idx", "ON", "HASH", "PREFIX", "2", "docs:", "archive:", "SCHEMA",
+                "title", "TEXT"
+            ],
+            arguments.Select(static argument => argument.ToString()!).ToArray());
+    }
+
+    [Fact]
     public void BuildsDropArgumentsWithDeleteDocumentsFlag()
     {
         var schema = new SearchSchema(

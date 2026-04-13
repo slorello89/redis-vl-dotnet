@@ -12,7 +12,7 @@ using var redis = await ConnectionMultiplexer.ConnectAsync(redisUrl);
 var database = redis.GetDatabase();
 
 var schema = new SearchSchema(
-    new IndexDefinition("json-storage-example-idx", "json-example:", StorageType.Json),
+    new IndexDefinition("json-storage-example-idx", ["json-example:", "json-example-archive:"], StorageType.Json),
     [
         new TextFieldDefinition("title"),
         new NumericFieldDefinition("year"),
