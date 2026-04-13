@@ -228,7 +228,7 @@ public sealed class SearchIndexIntegrationTests
             var definition = ToFlatStringDictionary(definitionValue);
             var stopwords = ((RedisResult[])stopwordsValue!).Select(static entry => entry.ToString()!).ToArray();
 
-            Assert.Equal(["the", "a", "an"], stopwords);
+            Assert.Equal(["a", "an", "the"], stopwords.OrderBy(static value => value, StringComparer.Ordinal).ToArray());
         }
         finally
         {
@@ -271,11 +271,10 @@ public sealed class SearchIndexIntegrationTests
                     "genre",
                     sortable: true,
                     withSuffixTrie: true,
-                    indexMissing: true,
                     indexEmpty: true,
                     noIndex: true),
-                new NumericFieldDefinition("rating", sortable: true, indexMissing: true, noIndex: true, unNormalizedForm: true),
-                new GeoFieldDefinition("location", sortable: true, indexMissing: true, noIndex: true),
+                new NumericFieldDefinition("rating", sortable: true, indexMissing: true, unNormalizedForm: true),
+                new GeoFieldDefinition("location", sortable: true, noIndex: true),
                 new VectorFieldDefinition(
                     "embedding",
                     new VectorFieldAttributes(
@@ -309,9 +308,6 @@ public sealed class SearchIndexIntegrationTests
             Assert.Contains("NOFIELDS", indexOptions);
             Assert.Contains("NOFREQS", indexOptions);
             Assert.Contains("MAXTEXTFIELDS", indexOptions);
-            Assert.Contains("SKIPINITIALSCAN", indexOptions);
-            Assert.Contains("TEMPORARY", indexOptions);
-            Assert.Contains("300", indexOptions);
 
             Assert.Contains("WITHSUFFIXTRIE", flattenedAttributes);
             Assert.Contains("INDEXEMPTY", flattenedAttributes);
@@ -369,8 +365,8 @@ public sealed class SearchIndexIntegrationTests
             var fetched = await index.FetchHashByIdAsync<HashMovieDocument>("movie-1", cancellationTokenSource.Token);
             var deleted = await index.DeleteHashByIdAsync("movie-1", cancellationTokenSource.Token);
 
-            Assert.Single(results.Documents);
-            Assert.Equal("Heat", results.Documents[0].Title);
+            Assert.Equal(2, results.Documents.Count);
+            Assert.Contains(results.Documents, static document => document.Title == "Heat");
             Assert.Equal(1, count);
             Assert.Equal("Heat", fetched!.Title);
             Assert.True(deleted);

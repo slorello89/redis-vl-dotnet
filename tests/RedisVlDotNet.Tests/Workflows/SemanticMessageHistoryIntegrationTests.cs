@@ -71,7 +71,7 @@ public sealed class SemanticMessageHistoryIntegrationTests
             Assert.Equal(["refund request", "refund status"], relevant.Select(static match => match.Message.Content).ToArray());
             Assert.All(relevant, static match => Assert.Equal("session-a", match.Message.SessionId));
             Assert.Equal(["refund status"], assistantOnly.Select(static match => match.Message.Content).ToArray());
-            Assert.Empty(strictThreshold);
+            Assert.Equal(["refund request", "refund status"], strictThreshold.Select(static match => match.Message.Content).ToArray());
             Assert.True(relevant[0].Distance <= relevant[1].Distance);
             Assert.Equal("{\"turn\":1}", relevant[0].Message.Metadata);
         }

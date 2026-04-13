@@ -242,7 +242,7 @@ internal static class SearchQueryCommandBuilder
                 query.ProjectedFields,
                 GetMultiVectorScoreAlias(index),
                 query.RuntimeOptions,
-                query.Pagination);
+                new QueryPagination(limit: query.TopK));
 
             arguments.Add(BuildVectorSearchArguments(schema, subQuery));
         }

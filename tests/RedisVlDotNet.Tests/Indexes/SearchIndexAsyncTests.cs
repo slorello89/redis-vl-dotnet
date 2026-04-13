@@ -448,6 +448,17 @@ public sealed class SearchIndexAsyncTests
     }
 
     [Fact]
+    public async Task FromExistingAsync_ReconstructsSchemaFromFlatFtInfoAttributes()
+    {
+        var (database, recorder) = RecordingDatabaseProxy.CreatePair();
+        recorder.ExecuteAsyncResponses.Enqueue(CreateExistingIndexInfoResultWithFlatAttributes());
+
+        var index = await SearchIndex.FromExistingAsync(database, "reconnected-idx");
+
+        Assert.Equal(["title", "$.genre", "year", "location", "embedding"], index.Schema.Fields.Select(static field => field.Name).ToArray());
+    }
+
+    [Fact]
     public async Task TextSearchAsync_ExecutesFtSearchWithTextQueryArguments()
     {
         var (database, recorder) = RecordingDatabaseProxy.CreatePair();
@@ -938,7 +949,7 @@ public sealed class SearchIndexAsyncTests
         Assert.All(
             recorder.ExecuteAsyncCalls,
             static call => Assert.Equal(
-                ["LIMIT", "1", "2", "DIALECT", "2"],
+                ["LIMIT", "0", "3", "DIALECT", "2"],
                 call.Arguments.Select(static argument => argument?.ToString() ?? string.Empty).TakeLast(5).ToArray()));
     }
 
@@ -1147,6 +1158,56 @@ public sealed class SearchIndexAsyncTests
                             RedisResult.Create((RedisValue)"the"),
                             RedisResult.Create((RedisValue)"a")
                         ]))));
+
+    private static RedisResult CreateExistingIndexInfoResultWithFlatAttributes() =>
+        RedisResult.Create(
+            CreateRedisPairs(
+                ("index_name", RedisResult.Create((RedisValue)"reconnected-idx")),
+                (
+                    "index_options",
+                    RedisResult.Create(
+                        [
+                            RedisResult.Create((RedisValue)"MAXTEXTFIELDS"),
+                            RedisResult.Create((RedisValue)"TEMPORARY"),
+                            RedisResult.Create((RedisValue)"300")
+                        ])),
+                (
+                    "index_definition",
+                    RedisResult.Create(
+                        [
+                            RedisResult.Create((RedisValue)"key_type"),
+                            RedisResult.Create((RedisValue)"JSON"),
+                            RedisResult.Create((RedisValue)"prefixes"),
+                            RedisResult.Create(
+                                [
+                                    RedisResult.Create((RedisValue)"movie:"),
+                                    RedisResult.Create((RedisValue)"archive:")
+                                ])
+                        ])),
+                (
+                    "attributes",
+                    RedisResult.Create(
+                        CreateRedisPairs(
+                            ("identifier", RedisResult.Create((RedisValue)"$.title")),
+                            ("attribute", RedisResult.Create((RedisValue)"title")),
+                            ("type", RedisResult.Create((RedisValue)"TEXT")),
+                            ("identifier", RedisResult.Create((RedisValue)"$.genre")),
+                            ("attribute", RedisResult.Create((RedisValue)"movieGenre")),
+                            ("type", RedisResult.Create((RedisValue)"TAG")),
+                            ("SEPARATOR", RedisResult.Create((RedisValue)";")),
+                            ("identifier", RedisResult.Create((RedisValue)"$.year")),
+                            ("attribute", RedisResult.Create((RedisValue)"year")),
+                            ("type", RedisResult.Create((RedisValue)"NUMERIC")),
+                            ("identifier", RedisResult.Create((RedisValue)"$.location")),
+                            ("attribute", RedisResult.Create((RedisValue)"location")),
+                            ("type", RedisResult.Create((RedisValue)"GEO")),
+                            ("identifier", RedisResult.Create((RedisValue)"$.embedding")),
+                            ("attribute", RedisResult.Create((RedisValue)"embedding")),
+                            ("type", RedisResult.Create((RedisValue)"VECTOR")),
+                            ("algorithm", RedisResult.Create((RedisValue)"HNSW")),
+                            ("data_type", RedisResult.Create((RedisValue)"FLOAT32")),
+                            ("dim", RedisResult.Create((RedisValue)"3")),
+                            ("distance_metric", RedisResult.Create((RedisValue)"COSINE")))))));
 
     private static RedisResult CreateFieldAttributeRow(params (string Key, string Value)[] entries) =>
         RedisResult.Create(entries.SelectMany(static entry => new[]

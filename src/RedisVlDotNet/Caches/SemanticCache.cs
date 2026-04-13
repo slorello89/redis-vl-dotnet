@@ -83,7 +83,7 @@ public sealed class SemanticCache
 
         cancellationToken.ThrowIfCancellationRequested();
 
-        var results = await _index.SearchAsync<SemanticCacheSearchDocument>(
+        var results = await _index.SearchAsync(
             VectorRangeQuery.FromFloat32(
                 Options.EmbeddingFieldName,
                 embedding,
@@ -94,13 +94,15 @@ public sealed class SemanticCache
                 limit: 1),
             cancellationToken: cancellationToken).ConfigureAwait(false);
 
-        var document = results.Documents.FirstOrDefault();
-        if (document is null)
+        foreach (var document in results.Documents)
         {
-            return null;
+            if (TryMapSearchHit(document, out var hit))
+            {
+                return hit;
+            }
         }
 
-        return new SemanticCacheHit(document.Prompt, document.Response, document.Distance, document.Metadata);
+        return null;
     }
 
     public async Task<SemanticCacheHit?> CheckAsync(
@@ -420,6 +422,26 @@ public sealed class SemanticCache
 
     private string? SerializeMetadata(object? metadata) =>
         metadata is null ? null : JsonSerializer.Serialize(metadata, _serializerOptions);
+
+    private bool TryMapSearchHit(SearchDocument document, out SemanticCacheHit hit)
+    {
+        if (!document.TryGetValue(Options.PromptFieldName, out var promptValue) ||
+            !document.TryGetValue(Options.ResponseFieldName, out var responseValue) ||
+            !document.TryGetValue("distance", out var distanceValue) ||
+            !double.TryParse(distanceValue.ToString(), NumberStyles.Float, CultureInfo.InvariantCulture, out var distance))
+        {
+            hit = default!;
+            return false;
+        }
+
+        document.TryGetValue(Options.MetadataFieldName, out var metadataValue);
+        hit = new SemanticCacheHit(
+            promptValue.ToString()!,
+            responseValue.ToString()!,
+            distance,
+            metadataValue.IsNull ? null : metadataValue.ToString());
+        return true;
+    }
 
     private sealed record SemanticCacheSearchDocument(string Prompt, string Response, double Distance, string? Metadata);
 }

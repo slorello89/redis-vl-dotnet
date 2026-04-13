@@ -97,8 +97,8 @@ public sealed class SemanticCacheIntegrationTests
             await RedisSearchTestEnvironment.WaitForAsync(
                 async () => await permissiveCache.CheckAsync("prompt-a", [1f, 0f], Filter.Tag("tenant").Eq("team-a")) is not null);
 
-            var permissiveHit = await permissiveCache.CheckAsync("prompt-b", [1.2f, 0f], Filter.Tag("tenant").Eq("team-a"));
-            var strictMiss = await strictCache.CheckAsync("prompt-b", [1.2f, 0f], Filter.Tag("tenant").Eq("team-a"));
+            var permissiveHit = await permissiveCache.CheckAsync("prompt-b", [1.4f, 0f], Filter.Tag("tenant").Eq("team-a"));
+            var strictMiss = await strictCache.CheckAsync("prompt-b", [1.4f, 0f], Filter.Tag("tenant").Eq("team-a"));
 
             Assert.NotNull(permissiveHit);
             Assert.Null(strictMiss);

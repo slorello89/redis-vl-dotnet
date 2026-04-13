@@ -82,17 +82,6 @@ internal static class SearchIndexCommandBuilder
                     arguments.Add(textField.Weight.ToString("0.################", CultureInfo.InvariantCulture));
                 }
 
-                AddFieldOption(arguments, "INDEXEMPTY", textField.IndexEmpty);
-                AddFieldOption(arguments, "INDEXMISSING", textField.IndexMissing);
-                if (textField.Sortable)
-                {
-                    arguments.Add("SORTABLE");
-                    if (textField.UnNormalizedForm)
-                    {
-                        arguments.Add("UNF");
-                    }
-                }
-
                 if (textField.NoStem)
                 {
                     arguments.Add("NOSTEM");
@@ -104,8 +93,19 @@ internal static class SearchIndexCommandBuilder
                     arguments.Add("dm:en");
                 }
 
-                AddFieldOption(arguments, "NOINDEX", textField.NoIndex);
                 AddFieldOption(arguments, "WITHSUFFIXTRIE", textField.WithSuffixTrie);
+                AddFieldOption(arguments, "INDEXEMPTY", textField.IndexEmpty);
+                AddFieldOption(arguments, "INDEXMISSING", textField.IndexMissing);
+                if (textField.Sortable)
+                {
+                    arguments.Add("SORTABLE");
+                    if (textField.UnNormalizedForm)
+                    {
+                        arguments.Add("UNF");
+                    }
+                }
+
+                AddFieldOption(arguments, "NOINDEX", textField.NoIndex);
                 break;
             case TagFieldDefinition tagField:
                 arguments.Add("TAG");
@@ -116,6 +116,7 @@ internal static class SearchIndexCommandBuilder
                     arguments.Add("CASESENSITIVE");
                 }
 
+                AddFieldOption(arguments, "WITHSUFFIXTRIE", tagField.WithSuffixTrie);
                 AddFieldOption(arguments, "INDEXEMPTY", tagField.IndexEmpty);
                 AddFieldOption(arguments, "INDEXMISSING", tagField.IndexMissing);
                 if (tagField.Sortable)
@@ -124,7 +125,6 @@ internal static class SearchIndexCommandBuilder
                 }
 
                 AddFieldOption(arguments, "NOINDEX", tagField.NoIndex);
-                AddFieldOption(arguments, "WITHSUFFIXTRIE", tagField.WithSuffixTrie);
                 break;
             case NumericFieldDefinition numericField:
                 arguments.Add("NUMERIC");
@@ -172,11 +172,6 @@ internal static class SearchIndexCommandBuilder
         AddOptionalAttribute(attributeArguments, "M", field.Attributes.M);
         AddOptionalAttribute(attributeArguments, "EF_CONSTRUCTION", field.Attributes.EfConstruction);
         AddOptionalAttribute(attributeArguments, "EF_RUNTIME", field.Attributes.EfRuntime);
-        if (field.IndexMissing)
-        {
-            attributeArguments.Add("INDEXMISSING");
-        }
-
         arguments.Add("VECTOR");
         arguments.Add(ToRedisKeyword(field.Attributes.Algorithm));
         arguments.Add(attributeArguments.Count.ToString(CultureInfo.InvariantCulture));

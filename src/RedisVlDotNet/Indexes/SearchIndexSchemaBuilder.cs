@@ -40,11 +40,79 @@ internal static class SearchIndexSchemaBuilder
     private static IReadOnlyList<FieldDefinition> ParseFields(SearchIndexInfo info, StorageType storageType)
     {
         var attributes = GetRequiredValue(info, "attributes");
-        var rows = attributes.Resp2Type == ResultType.Array
+        var rows = ParseAttributeRows(attributes);
+
+        return new ReadOnlyCollection<FieldDefinition>(rows.Select(row => ParseField(row, storageType)).ToList());
+    }
+
+    private static IReadOnlyList<RedisResult> ParseAttributeRows(RedisResult attributes)
+    {
+        var entries = attributes.Resp2Type == ResultType.Array
             ? (RedisResult[]?)attributes ?? []
             : throw new InvalidOperationException("Redis FT.INFO response must contain attribute rows.");
 
-        return new ReadOnlyCollection<FieldDefinition>(rows.Select(row => ParseField(row, storageType)).ToList());
+        if (entries.Length == 0)
+        {
+            return [];
+        }
+
+        if (entries.All(static entry => entry.Resp2Type == ResultType.Array))
+        {
+            return entries;
+        }
+
+        var rows = new List<RedisResult>();
+        var currentRow = new List<RedisResult>();
+        for (var index = 0; index < entries.Length;)
+        {
+            string? key;
+            RedisResult value;
+
+            if (entries[index].Resp2Type == ResultType.Array)
+            {
+                var nestedEntries = (RedisResult[]?)entries[index] ?? [];
+                if (nestedEntries.Length != 2)
+                {
+                    throw new InvalidOperationException("Redis FT.INFO attributes response must contain key-value pairs.");
+                }
+
+                key = nestedEntries[0].ToString()?.Trim();
+                value = nestedEntries[1];
+                index++;
+            }
+            else
+            {
+                if (index == entries.Length - 1)
+                {
+                    throw new InvalidOperationException("Redis FT.INFO attributes response must contain key-value pairs.");
+                }
+
+                key = entries[index].ToString()?.Trim();
+                value = entries[index + 1];
+                index += 2;
+            }
+
+            if (string.Equals(key, "identifier", StringComparison.OrdinalIgnoreCase) && currentRow.Count > 0)
+            {
+                rows.Add(RedisResult.Create(currentRow.ToArray()));
+                currentRow = [];
+            }
+
+            if (string.IsNullOrWhiteSpace(key))
+            {
+                continue;
+            }
+
+            currentRow.Add(RedisResult.Create((RedisValue)key));
+            currentRow.Add(value);
+        }
+
+        if (currentRow.Count > 0)
+        {
+            rows.Add(RedisResult.Create(currentRow.ToArray()));
+        }
+
+        return rows;
     }
 
     private static FieldDefinition ParseField(RedisResult row, StorageType storageType)
@@ -183,21 +251,49 @@ internal static class SearchIndexSchemaBuilder
             ? (RedisResult[]?)result ?? []
             : throw new InvalidOperationException($"Redis FT.INFO {context} response must contain key-value pairs.");
 
-        if (entries.Length % 2 != 0)
-        {
-            throw new InvalidOperationException($"Redis FT.INFO {context} response must contain key-value pairs.");
-        }
-
         var dictionary = new Dictionary<string, RedisResult>(StringComparer.OrdinalIgnoreCase);
-        for (var index = 0; index < entries.Length; index += 2)
+        for (var index = 0; index < entries.Length; index++)
         {
+            if (entries[index].Resp2Type == ResultType.Array)
+            {
+                var nestedEntries = (RedisResult[]?)entries[index] ?? [];
+                if (nestedEntries.Length == 2)
+                {
+                    var nestedKey = nestedEntries[0].ToString();
+                    if (!string.IsNullOrWhiteSpace(nestedKey))
+                    {
+                        dictionary[nestedKey.Trim()] = nestedEntries[1];
+                    }
+                }
+                else if (nestedEntries.Length > 0)
+                {
+                    dictionary["flags"] = entries[index];
+                }
+
+                continue;
+            }
+
+            if (index == entries.Length - 1)
+            {
+                var terminalKey = entries[index].ToString();
+                if (!string.IsNullOrWhiteSpace(terminalKey))
+                {
+                    dictionary[terminalKey.Trim()] = RedisResult.Create(RedisValue.Null);
+                    break;
+                }
+
+                continue;
+            }
+
             var key = entries[index].ToString();
             if (string.IsNullOrWhiteSpace(key))
             {
+                index++;
                 continue;
             }
 
             dictionary[key.Trim()] = entries[index + 1];
+            index++;
         }
 
         return dictionary;
@@ -270,6 +366,11 @@ internal static class SearchIndexSchemaBuilder
 
     private static bool HasFlag(IReadOnlyDictionary<string, RedisResult> attributes, string key)
     {
+        if (HasFlagInFlagsArray(attributes, key))
+        {
+            return true;
+        }
+
         if (!TryGetValue(attributes, key, out var value))
         {
             return false;
@@ -290,6 +391,18 @@ internal static class SearchIndexSchemaBuilder
     private static bool HasFlagValue(IReadOnlyDictionary<string, RedisResult> attributes, string key, string expectedValue) =>
         TryGetValue(attributes, key, out var value)
         && string.Equals(value.ToString(), expectedValue, StringComparison.OrdinalIgnoreCase);
+
+    private static bool HasFlagInFlagsArray(IReadOnlyDictionary<string, RedisResult> attributes, string key)
+    {
+        if (!TryGetValue(attributes, "flags", out var flagsValue) || flagsValue.IsNull || flagsValue.Resp2Type != ResultType.Array)
+        {
+            return false;
+        }
+
+        return ((RedisResult[]?)flagsValue ?? [])
+            .Select(static entry => entry.ToString())
+            .Any(flag => string.Equals(flag?.Trim(), key, StringComparison.OrdinalIgnoreCase));
+    }
 
     private static bool HasNonEmptyValue(IReadOnlyDictionary<string, RedisResult> attributes, string key) =>
         TryGetValue(attributes, key, out var value) && !string.IsNullOrWhiteSpace(value.ToString());

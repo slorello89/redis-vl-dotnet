@@ -34,7 +34,7 @@ public sealed class SearchIndexCommandBuilderTests
         Assert.Equal(
             [
                 "movies-idx", "ON", "HASH", "PREFIX", "1", "movie:", "SCHEMA",
-                "title", "TEXT", "SORTABLE", "NOSTEM", "PHONETIC", "dm:en",
+                "title", "TEXT", "NOSTEM", "PHONETIC", "dm:en", "SORTABLE",
                 "genre", "TAG", "SEPARATOR", ";", "CASESENSITIVE",
                 "rating", "NUMERIC", "SORTABLE",
                 "location", "GEO",
@@ -191,13 +191,13 @@ public sealed class SearchIndexCommandBuilderTests
                 "docs-idx", "ON", "HASH", "PREFIX", "1", "docs:",
                 "MAXTEXTFIELDS", "TEMPORARY", "300", "NOOFFSETS", "NOHL", "NOFIELDS", "NOFREQS", "SKIPINITIALSCAN",
                 "SCHEMA",
-                "title", "TEXT", "WEIGHT", "2.5", "INDEXEMPTY", "INDEXMISSING", "SORTABLE", "UNF", "NOSTEM", "PHONETIC", "dm:en", "WITHSUFFIXTRIE",
-                "genre", "TAG", "SEPARATOR", ";", "CASESENSITIVE", "INDEXEMPTY", "INDEXMISSING", "SORTABLE", "NOINDEX", "WITHSUFFIXTRIE",
+                "title", "TEXT", "WEIGHT", "2.5", "NOSTEM", "PHONETIC", "dm:en", "WITHSUFFIXTRIE", "INDEXEMPTY", "INDEXMISSING", "SORTABLE", "UNF",
+                "genre", "TAG", "SEPARATOR", ";", "CASESENSITIVE", "WITHSUFFIXTRIE", "INDEXEMPTY", "INDEXMISSING", "SORTABLE", "NOINDEX",
                 "rating", "NUMERIC", "INDEXMISSING", "SORTABLE", "UNF", "NOINDEX",
                 "location", "GEO", "INDEXMISSING", "SORTABLE", "NOINDEX",
-                "embedding", "VECTOR", "HNSW", "15",
+                "embedding", "VECTOR", "HNSW", "14",
                 "TYPE", "FLOAT32", "DIM", "3", "DISTANCE_METRIC", "COSINE",
-                "INITIAL_CAP", "1000", "M", "16", "EF_CONSTRUCTION", "200", "EF_RUNTIME", "10", "INDEXMISSING"
+                "INITIAL_CAP", "1000", "M", "16", "EF_CONSTRUCTION", "200", "EF_RUNTIME", "10"
             ],
             arguments.Select(static argument => argument.ToString()!).ToArray());
     }

@@ -320,7 +320,7 @@ public sealed class SearchQueryCommandBuilderTests
                 "PARAMS", "4", "vector", "<binary>", "ef_runtime", "64",
                 "SORTBY", "__mv_score_0", "ASC",
                 "RETURN", "2", "title", "__mv_score_0",
-                "LIMIT", "1", "2",
+                "LIMIT", "0", "3",
                 "DIALECT", "2"
             ],
             arguments[0].Select(RenderArgument).ToArray());
@@ -331,7 +331,7 @@ public sealed class SearchQueryCommandBuilderTests
                 "PARAMS", "4", "vector", "<binary>", "ef_runtime", "64",
                 "SORTBY", "__mv_score_1", "ASC",
                 "RETURN", "2", "title", "__mv_score_1",
-                "LIMIT", "1", "2",
+                "LIMIT", "0", "3",
                 "DIALECT", "2"
             ],
             arguments[1].Select(RenderArgument).ToArray());

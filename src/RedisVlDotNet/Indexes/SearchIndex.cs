@@ -1176,7 +1176,8 @@ public sealed class SearchIndex
 
     private static bool IsUnknownIndexException(RedisServerException exception) =>
         exception.Message.Contains("Unknown Index name", StringComparison.OrdinalIgnoreCase) ||
-        exception.Message.Contains("Unknown index name", StringComparison.OrdinalIgnoreCase);
+        exception.Message.Contains("Unknown index name", StringComparison.OrdinalIgnoreCase) ||
+        exception.Message.Contains("no such index", StringComparison.OrdinalIgnoreCase);
 
     private async Task<bool> JsonDocumentExistsAsync(string key, CancellationToken cancellationToken)
     {
