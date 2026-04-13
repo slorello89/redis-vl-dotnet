@@ -9,7 +9,7 @@
 - `src/RedisVlDotNet.Rerankers.Abstractions`: provider-agnostic reranker contracts for query-plus-candidate reranking flows
 - `src/RedisVlDotNet.Vectorizers.HuggingFace`: Hugging Face `hf-inference` feature-extraction package built on `HttpClient`
 - `src/RedisVlDotNet.Vectorizers.OpenAI`: OpenAI-backed vectorizer package that adds the vendor SDK without flowing it into the core assembly
-- `src/RedisVlDotNet.Rerankers.Cohere`: scaffold package reserved for a Cohere-backed reranker implementation in a follow-up story
+- `src/RedisVlDotNet.Rerankers.Cohere`: Cohere-backed reranker package built on `HttpClient`
 
 ## Contracts
 
@@ -45,8 +45,13 @@ The package supports both single-text and multi-text embedding flows and can be 
 
 The package supports both single-text and multi-text embedding flows and can be plugged directly into APIs like `SemanticCache`, `SemanticRouter`, and `SemanticMessageHistory`.
 
-## Reranker Package Scaffolding
+## Cohere Reranker Package
 
 `RedisVlDotNet.Rerankers.Abstractions` defines the shared reranking boundary outside the core package. Provider packages should accept a search query plus a candidate document set, then return `RerankResult` instances that preserve the original candidate document payload alongside provider scores.
 
-`RedisVlDotNet.Rerankers.Cohere` is currently a scaffold package only. It exists so the provider-specific implementation can be added in the next roadmap story without changing the solution or package layout again.
+`RedisVlDotNet.Rerankers.Cohere` provides:
+
+- `CohereTextReranker`: an `ITextReranker` implementation that posts requests to Cohere's `v2/rerank` API
+- `CohereRerankerOptions`: optional request settings for per-document truncation, request priority, client-name headers, and custom endpoint overrides
+
+The package is designed for reranking Redis candidate sets after an initial `TextQuery`, `FilterQuery`, or vector retrieval step.

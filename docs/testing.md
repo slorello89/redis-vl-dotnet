@@ -15,6 +15,12 @@ dotnet test redis-vl-dotnet.sln --no-restore
 
 The integration tests are guarded by `RedisSearchIntegrationFact` and are skipped unless `REDIS_VL_REDIS_URL` is set.
 
+Provider smoke tests are also guarded by provider-specific environment variables:
+
+- `OPENAI_API_KEY` for OpenAI vectorizer smoke tests
+- `HF_TOKEN` for Hugging Face vectorizer smoke tests
+- `COHERE_API_KEY` for Cohere reranker smoke tests
+
 ## Integration Tests
 
 Start Redis Stack locally:

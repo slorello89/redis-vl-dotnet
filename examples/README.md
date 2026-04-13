@@ -153,6 +153,31 @@ Run it from the repository root:
 dotnet run --project examples/HuggingFaceVectorizerExample/HuggingFaceVectorizerExample.csproj
 ```
 
+### [CohereRerankerExample](/Users/steve.lorello/projects/redis/redis-vl-dotnet/examples/CohereRerankerExample/README.md)
+
+Demonstrates text search plus Cohere reranking:
+
+- create a JSON-backed search index with support articles
+- retrieve an initial candidate set from Redis with `TextQuery`
+- rerank those candidates through the Cohere extension package
+- print the original Redis order alongside the Cohere-adjusted order
+- drop the example index and documents
+
+Redis prerequisites:
+
+- RediSearch
+- RedisJSON
+
+Additional prerequisites:
+
+- `COHERE_API_KEY`
+
+Run it from the repository root:
+
+```bash
+dotnet run --project examples/CohereRerankerExample/CohereRerankerExample.csproj
+```
+
 ## Related Docs
 
 - [Getting started guide](/Users/steve.lorello/projects/redis/redis-vl-dotnet/docs/getting-started.md)

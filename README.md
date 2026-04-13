@@ -9,6 +9,7 @@ Browse [examples/README.md](/Users/steve.lorello/projects/redis/redis-vl-dotnet/
 Read [docs/extensions.md](/Users/steve.lorello/projects/redis/redis-vl-dotnet/docs/extensions.md) for the vectorizer and reranker abstractions package split plus the provider-extension layout.
 See [examples/OpenAiVectorizerExample/README.md](/Users/steve.lorello/projects/redis/redis-vl-dotnet/examples/OpenAiVectorizerExample/README.md) for a provider-backed OpenAI embedding flow with `SemanticCache`.
 See [examples/HuggingFaceVectorizerExample/README.md](/Users/steve.lorello/projects/redis/redis-vl-dotnet/examples/HuggingFaceVectorizerExample/README.md) for the equivalent Hugging Face `hf-inference` flow.
+See [examples/CohereRerankerExample/README.md](/Users/steve.lorello/projects/redis/redis-vl-dotnet/examples/CohereRerankerExample/README.md) for a Redis search plus Cohere reranking flow.
 
 ## Current Workspace
 
@@ -16,13 +17,14 @@ See [examples/HuggingFaceVectorizerExample/README.md](/Users/steve.lorello/proje
 - `docs/getting-started.md`: end-to-end guide for creating an index, loading documents, and running basic queries
 - `docs/extensions.md`: extension package architecture and shared text vectorizer contracts
 - `src/RedisVlDotNet.Rerankers.Abstractions`: provider-agnostic reranker contracts kept outside the core package boundary
-- `src/RedisVlDotNet.Rerankers.Cohere`: scaffold package for the upcoming Cohere reranker provider integration
+- `src/RedisVlDotNet.Rerankers.Cohere`: Cohere-backed reranker package for post-search relevance tuning
 - `docs/testing.md`: local and CI test harness instructions for unit and Redis-backed integration coverage
 - `examples/README.md`: examples index with prerequisites and workflow summaries
 - `examples/JsonStorageExample`: runnable console app for JSON-backed schema, load, fetch, and query flows
 - `examples/VectorSearchExample`: runnable console app for vector-field schema, deterministic seed data, and nearest-neighbor search
 - `examples/OpenAiVectorizerExample`: runnable console app for OpenAI-backed vectorization with `SemanticCache`
 - `examples/HuggingFaceVectorizerExample`: runnable console app for Hugging Face-backed vectorization with `SemanticCache`
+- `examples/CohereRerankerExample`: runnable console app for Redis text search followed by Cohere reranking
 - `redis-vl-dotnet.sln`: minimal solution scaffold so `dotnet build` is a valid repository quality gate from the first iteration
 - `prd.json`: Ralph execution plan
 - `progress.txt`: iteration log and reusable codebase patterns
