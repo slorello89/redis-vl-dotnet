@@ -14,6 +14,7 @@ Started: Mon Apr 13 10:35:34 EDT 2026
 - JSON partial update helpers should accept only absolute JSONPath expressions like `$.field` or `$[0]`, trim and deduplicate paths before issuing Redis commands, and treat missing root documents as a `false` return instead of implicitly creating new JSON keys.
 - HASH partial update helpers should reuse a hash-exists probe plus a single `HSET` batch, accept only trimmed top-level field names, and reject `null` values because HASH writes preserve omitted fields rather than expressing field deletion.
 - New FT.SEARCH query types should reuse the shared return-field normalization and the standard `RETURN`/`LIMIT`/`DIALECT 2` argument layout, which keeps query-specific additions isolated to the search string or extra clauses.
+- FT.AGGREGATE query builders should normalize schema-backed property references to the runtime query field name while still allowing APPLY and REDUCE aliases to flow through as plain `@alias` references in later pipeline stages.
 - Redis-backed query integration tests should seed tiny HASH datasets with intentionally different match strength, wait on `num_docs` before asserting, and verify projected-field omission explicitly when a query narrows `RETURN` fields.
 
 ---
@@ -124,5 +125,14 @@ Started: Mon Apr 13 10:35:34 EDT 2026
 - Learnings for future iterations:
   - Patterns discovered: deterministic `TextQuery` ranking tests are easiest to keep stable when seed titles use clearly different term frequency and the query projects only the fields each assertion needs.
   - Gotchas encountered: this environment still does not expose `REDIS_VL_REDIS_URL`, so new Redis-backed tests are discovered and compiled but cannot execute end-to-end locally until that variable points at a RediSearch-capable instance.
+  - Useful context: there are still no `AGENTS.md` files under the edited paths, so reusable area guidance remains centralized in `progress.txt`.
+---
+## 2026-04-13 12:21:39 EDT - US-013
+- Implemented a first-class `AggregationQuery` model with typed `APPLY`, `GROUPBY`, `REDUCE`, `SORTBY`, and `LOAD` pipeline components, added `FT.AGGREGATE` command generation, and exposed raw aggregation execution methods on `SearchIndex`.
+- Files changed: `src/RedisVlDotNet/Queries/AggregationApply.cs`, `src/RedisVlDotNet/Queries/AggregationGroupBy.cs`, `src/RedisVlDotNet/Queries/AggregationQuery.cs`, `src/RedisVlDotNet/Queries/AggregationReducer.cs`, `src/RedisVlDotNet/Queries/AggregationReducerArgument.cs`, `src/RedisVlDotNet/Queries/AggregationSortBy.cs`, `src/RedisVlDotNet/Queries/AggregationSortField.cs`, `src/RedisVlDotNet/Indexes/SearchQueryCommandBuilder.cs`, `src/RedisVlDotNet/Indexes/SearchIndex.cs`, `tests/RedisVlDotNet.Tests/Indexes/SearchQueryCommandBuilderTests.cs`, `tests/RedisVlDotNet.Tests/Indexes/SearchIndexAsyncTests.cs`, `prd.json`, `progress.txt`
+- Quality checks run and result: `dotnet test tests/RedisVlDotNet.Tests/RedisVlDotNet.Tests.csproj --filter "FullyQualifiedName~SearchQueryCommandBuilderTests|FullyQualifiedName~SearchIndexAsyncTests"` passed. `dotnet build redis-vl-dotnet.sln --no-restore` passed. `dotnet test redis-vl-dotnet.sln --no-restore` passed with 25 Redis-backed integration tests skipped because `REDIS_VL_REDIS_URL` was not configured locally.
+- Learnings for future iterations:
+  - Patterns discovered: aggregation pipeline property references should resolve through the schema when they target indexed fields, but aliases created by `APPLY` or `REDUCE` need to remain usable in later `GROUPBY` and `SORTBY` stages without schema lookups.
+  - Gotchas encountered: aggregation `LOAD` fields need `@field` and `field` inputs to dedupe to the same runtime property, otherwise command generation emits duplicate load arguments.
   - Useful context: there are still no `AGENTS.md` files under the edited paths, so reusable area guidance remains centralized in `progress.txt`.
 ---

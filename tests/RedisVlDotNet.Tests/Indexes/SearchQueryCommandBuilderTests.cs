@@ -72,6 +72,76 @@ public sealed class SearchQueryCommandBuilderTests
     }
 
     [Fact]
+    public void BuildsAggregateArgumentsWithLoadApplyGroupBySortAndPaging()
+    {
+        var schema = new SearchSchema(
+            new IndexDefinition("movies-idx", "movie:", StorageType.Hash),
+            [
+                new TextFieldDefinition("title"),
+                new TagFieldDefinition("genre"),
+                new NumericFieldDefinition("year")
+            ]);
+        var query = new AggregationQuery(
+            queryString: "@genre:{crime}",
+            loadFields: ["title", "@title"],
+            applyClauses: [new AggregationApply("@year - (@year % 10)", "decade")],
+            groupBy: new AggregationGroupBy(
+                ["genre", "decade"],
+                [
+                    AggregationReducer.Count("movie_count"),
+                    AggregationReducer.Average("year", "avg_year")
+                ]),
+            sortBy: new AggregationSortBy([new AggregationSortField("avg_year", descending: true)]),
+            offset: 1,
+            limit: 5);
+
+        var arguments = SearchQueryCommandBuilder.BuildAggregateArguments(schema, query);
+        var rendered = arguments.Select(RenderArgument).ToArray();
+
+        Assert.Equal(
+            [
+                "movies-idx",
+                "@genre:{crime}",
+                "LOAD", "1", "@title",
+                "APPLY", "@year - (@year % 10)", "AS", "decade",
+                "GROUPBY", "2", "@genre", "@decade",
+                "REDUCE", "COUNT", "0", "AS", "movie_count",
+                "REDUCE", "AVG", "1", "@year", "AS", "avg_year",
+                "SORTBY", "2", "@avg_year", "DESC",
+                "LIMIT", "1", "5",
+                "DIALECT", "2"
+            ],
+            rendered);
+    }
+
+    [Fact]
+    public void BuildsAggregateArgumentsAgainstJsonAliases()
+    {
+        var schema = new SearchSchema(
+            new IndexDefinition("movies-idx", "movie:", StorageType.Json),
+            [
+                new TagFieldDefinition("$.genre", alias: "genre"),
+                new NumericFieldDefinition("$.year", alias: "year")
+            ]);
+        var query = new AggregationQuery(
+            groupBy: new AggregationGroupBy(["$.genre"], [AggregationReducer.Max("$.year", "latest_year")]));
+
+        var arguments = SearchQueryCommandBuilder.BuildAggregateArguments(schema, query);
+        var rendered = arguments.Select(RenderArgument).ToArray();
+
+        Assert.Equal(
+            [
+                "movies-idx",
+                "*",
+                "GROUPBY", "1", "@genre",
+                "REDUCE", "MAX", "1", "@year", "AS", "latest_year",
+                "LIMIT", "0", "10",
+                "DIALECT", "2"
+            ],
+            rendered);
+    }
+
+    [Fact]
     public void BuildsVectorSearchArgumentsWithFilterProjectionAndAlias()
     {
         var schema = new SearchSchema(
@@ -387,6 +457,31 @@ public sealed class SearchQueryCommandBuilderTests
     public void TextQueryRejectsBlankText()
     {
         Assert.Throws<ArgumentException>(() => new TextQuery(" "));
+    }
+
+    [Fact]
+    public void AggregationQueryRejectsBlankQueryString()
+    {
+        Assert.Throws<ArgumentException>(() => new AggregationQuery(" "));
+    }
+
+    [Fact]
+    public void AggregationGroupByRequiresAPropertyOrReducer()
+    {
+        Assert.Throws<ArgumentException>(() => new AggregationGroupBy());
+    }
+
+    [Fact]
+    public void AggregationSortByRequiresAtLeastOneField()
+    {
+        Assert.Throws<ArgumentException>(() => new AggregationSortBy([]));
+    }
+
+    [Fact]
+    public void AggregationReducerQuantileRejectsInvalidPercentiles()
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() => AggregationReducer.Quantile("year", -0.1d, "p10"));
+        Assert.Throws<ArgumentOutOfRangeException>(() => AggregationReducer.Quantile("year", 1.1d, "p10"));
     }
 
     [Fact]

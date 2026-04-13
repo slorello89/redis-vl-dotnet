@@ -388,6 +388,9 @@ public sealed class SearchIndex
     public SearchResults<TDocument> Search<TDocument>(TextQuery query, JsonSerializerOptions? serializerOptions = null) =>
         SearchAsync<TDocument>(query, serializerOptions).GetAwaiter().GetResult();
 
+    public RedisResult Aggregate(AggregationQuery query) =>
+        AggregateAsync(query).GetAwaiter().GetResult();
+
     public SearchResults Search(HybridQuery query) =>
         SearchAsync(query).GetAwaiter().GetResult();
 
@@ -488,6 +491,16 @@ public sealed class SearchIndex
             cancellationToken).ConfigureAwait(false);
 
         return SearchResultsParser.Parse(result);
+    }
+
+    public async Task<RedisResult> AggregateAsync(AggregationQuery query, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(query);
+
+        return await ExecuteAsync(
+            "FT.AGGREGATE",
+            SearchQueryCommandBuilder.BuildAggregateArguments(Schema, query),
+            cancellationToken).ConfigureAwait(false);
     }
 
     public async Task<SearchResults<TDocument>> SearchAsync<TDocument>(

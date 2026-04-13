@@ -51,6 +51,20 @@ public sealed class SearchIndexAsyncTests
     }
 
     [Fact]
+    public async Task AggregateAsync_WithCancelledToken_DoesNotExecuteRedisCommand()
+    {
+        var (database, recorder) = RecordingDatabaseProxy.CreatePair();
+        var index = new SearchIndex(database, CreateHashSchema("cancel-aggregate"));
+        var query = new AggregationQuery(groupBy: new AggregationGroupBy(reducers: [AggregationReducer.Count("total")]));
+
+        using var cancellationTokenSource = new CancellationTokenSource();
+        await cancellationTokenSource.CancelAsync();
+
+        await Assert.ThrowsAsync<OperationCanceledException>(() => index.AggregateAsync(query, cancellationToken: cancellationTokenSource.Token));
+        Assert.Equal(0, recorder.ExecuteAsyncCallCount);
+    }
+
+    [Fact]
     public async Task ClearAsync_WithCancelledToken_DoesNotExecuteRedisCommand()
     {
         var (database, recorder) = RecordingDatabaseProxy.CreatePair();
@@ -449,6 +463,52 @@ public sealed class SearchIndexAsyncTests
         Assert.Equal("Heat", document.Title);
         Assert.Equal(1995, document.Year);
         Assert.Equal("crime", document.Genre);
+    }
+
+    [Fact]
+    public async Task AggregateAsync_ExecutesFtAggregateWithAggregationArguments()
+    {
+        var (database, recorder) = RecordingDatabaseProxy.CreatePair();
+        var index = new SearchIndex(database, CreateHashSchema("aggregate-movies"));
+        var rawResult = RedisResult.Create(
+            [
+                RedisResult.Create(1),
+                RedisResult.Create(
+                    [
+                        RedisResult.Create((RedisValue)"genre"),
+                        RedisResult.Create((RedisValue)"crime"),
+                        RedisResult.Create((RedisValue)"movie_count"),
+                        RedisResult.Create((RedisValue)"2")
+                    ])
+            ]);
+        recorder.ExecuteAsyncResponses.Enqueue(rawResult);
+
+        var result = await index.AggregateAsync(
+            new AggregationQuery(
+                queryString: "@genre:{crime}",
+                groupBy: new AggregationGroupBy(
+                    ["genre"],
+                    [AggregationReducer.Count("movie_count")])));
+
+        Assert.Equal("FT.AGGREGATE", recorder.ExecuteAsyncCalls[0].Command);
+        Assert.Equal(
+            [
+                "hash-aggregate-movies",
+                "@genre:{crime}",
+                "GROUPBY", "1", "@genre",
+                "REDUCE", "COUNT", "0", "AS", "movie_count",
+                "LIMIT", "0", "10",
+                "DIALECT", "2"
+            ],
+            recorder.ExecuteAsyncCalls[0].Arguments.Select(static argument => argument?.ToString() ?? string.Empty).ToArray());
+
+        var rows = (RedisResult[])result!;
+        Assert.Equal(1, (long)rows[0]!);
+        var values = (RedisResult[])rows[1]!;
+        Assert.Equal("genre", values[0].ToString());
+        Assert.Equal("crime", values[1].ToString());
+        Assert.Equal("movie_count", values[2].ToString());
+        Assert.Equal("2", values[3].ToString());
     }
 
     private static SearchSchema CreateHashSchema(string token) =>

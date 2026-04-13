@@ -78,6 +78,70 @@ internal static class SearchQueryCommandBuilder
         ];
     }
 
+    public static object[] BuildAggregateArguments(SearchSchema schema, AggregationQuery query)
+    {
+        ArgumentNullException.ThrowIfNull(schema);
+        ArgumentNullException.ThrowIfNull(query);
+
+        var arguments = new List<object>
+        {
+            schema.Index.Name,
+            query.QueryString
+        };
+
+        if (query.LoadFields.Count > 0)
+        {
+            arguments.Add("LOAD");
+            arguments.Add(query.LoadFields.Count.ToString(CultureInfo.InvariantCulture));
+            arguments.AddRange(query.LoadFields.Select(field => (object)FormatAggregationPropertyReference(schema, field)));
+        }
+
+        foreach (var apply in query.ApplyClauses)
+        {
+            arguments.Add("APPLY");
+            arguments.Add(apply.Expression);
+            arguments.Add("AS");
+            arguments.Add(apply.Alias);
+        }
+
+        if (query.GroupBy is not null)
+        {
+            arguments.Add("GROUPBY");
+            arguments.Add(query.GroupBy.Properties.Count.ToString(CultureInfo.InvariantCulture));
+            arguments.AddRange(query.GroupBy.Properties.Select(property => (object)FormatAggregationPropertyReference(schema, property)));
+
+            foreach (var reducer in query.GroupBy.Reducers)
+            {
+                arguments.Add("REDUCE");
+                arguments.Add(reducer.FunctionName);
+                arguments.Add(reducer.Arguments.Count.ToString(CultureInfo.InvariantCulture));
+                arguments.AddRange(reducer.Arguments.Select(argument => (object)FormatReducerArgument(schema, argument)));
+                arguments.Add("AS");
+                arguments.Add(reducer.Alias);
+            }
+        }
+
+        if (query.SortBy is not null)
+        {
+            arguments.Add("SORTBY");
+            arguments.Add((query.SortBy.Fields.Count * 2).ToString(CultureInfo.InvariantCulture));
+
+            foreach (var field in query.SortBy.Fields)
+            {
+                arguments.Add(FormatAggregationPropertyReference(schema, field.Property));
+                arguments.Add(field.Descending ? "DESC" : "ASC");
+            }
+        }
+
+        arguments.Add("LIMIT");
+        arguments.Add(query.Offset.ToString(CultureInfo.InvariantCulture));
+        arguments.Add(query.Limit.ToString(CultureInfo.InvariantCulture));
+        arguments.Add("DIALECT");
+        arguments.Add("2");
+
+        return arguments.ToArray();
+    }
+
     public static object[] BuildVectorSearchArguments(SearchSchema schema, VectorQuery query)
     {
         ArgumentNullException.ThrowIfNull(schema);
@@ -247,6 +311,29 @@ internal static class SearchQueryCommandBuilder
         }
 
         return field.Alias ?? field.Name;
+    }
+
+    private static string FormatReducerArgument(SearchSchema schema, AggregationReducerArgument argument) =>
+        argument.IsPropertyReference
+            ? FormatAggregationPropertyReference(schema, argument.Value)
+            : argument.Value;
+
+    private static string FormatAggregationPropertyReference(SearchSchema schema, string property)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(property);
+
+        var trimmed = property.Trim();
+        var normalized = trimmed.TrimStart('@');
+
+        foreach (var field in schema.Fields)
+        {
+            if (MatchesQueryField(schema, field, normalized) || MatchesQueryField(schema, field, trimmed))
+            {
+                return $"@{GetQueryFieldName(schema, field)}";
+            }
+        }
+
+        return $"@{normalized}";
     }
 
     private static void ValidateVectorPayload(VectorFieldDefinition field, VectorQuery query)
