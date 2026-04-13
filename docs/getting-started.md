@@ -330,6 +330,21 @@ dotnet run --project src/RedisVlDotNet.Cli -- index create \
   --field tag:genre
 ```
 
+Validate or inspect a YAML schema file before creating anything in Redis:
+
+```bash
+dotnet run --project src/RedisVlDotNet.Cli -- schema validate --file examples/JsonStorageExample/schema.yaml
+dotnet run --project src/RedisVlDotNet.Cli -- schema show --file examples/JsonStorageExample/schema.yaml
+```
+
+Create the same index directly from the YAML schema file instead of inline options:
+
+```bash
+dotnet run --project src/RedisVlDotNet.Cli -- index create \
+  --redis localhost:6379 \
+  --schema examples/JsonStorageExample/schema.yaml
+```
+
 Inspect or clean up the same index:
 
 ```bash
@@ -337,8 +352,6 @@ dotnet run --project src/RedisVlDotNet.Cli -- index info --redis localhost:6379 
 dotnet run --project src/RedisVlDotNet.Cli -- index clear --redis localhost:6379 --name movies-cli-idx
 dotnet run --project src/RedisVlDotNet.Cli -- index delete --redis localhost:6379 --name movies-cli-idx
 ```
-
-The current CLI create flow is intentionally inline-schema only. YAML-backed schema commands are tracked separately from this initial scaffold.
 
 ## Run the Flow Locally
 

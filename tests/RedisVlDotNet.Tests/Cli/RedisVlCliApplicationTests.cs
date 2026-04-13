@@ -6,6 +6,8 @@ namespace RedisVlDotNet.Tests.Cli;
 
 public sealed class RedisVlCliApplicationTests
 {
+    private static readonly string SchemaFixtureDirectory = Path.Combine(AppContext.BaseDirectory, "Schema", "Fixtures");
+
     [Fact]
     public async Task WritesRootHelpWhenNoArgumentsAreProvided()
     {
@@ -16,7 +18,8 @@ public sealed class RedisVlCliApplicationTests
         var exitCode = await application.RunAsync([], output, error);
 
         Assert.Equal(0, exitCode);
-        Assert.Contains("redisvl index <command>", output.ToString(), StringComparison.Ordinal);
+        Assert.Contains("redisvl <command>", output.ToString(), StringComparison.Ordinal);
+        Assert.Contains("schema", output.ToString(), StringComparison.Ordinal);
         Assert.Equal(string.Empty, error.ToString());
     }
 
@@ -44,12 +47,40 @@ public sealed class RedisVlCliApplicationTests
             error);
 
         Assert.Equal(0, exitCode);
-        Assert.Equal("movies-idx", service.LastCreateRequest!.IndexName);
-        Assert.Equal(StorageType.Hash, service.LastCreateRequest.StorageType);
-        Assert.Equal(["movie:"], service.LastCreateRequest.Prefixes);
-        Assert.Equal(["text", "tag"], service.LastCreateRequest.Fields.Select(static field => field.Type).ToArray());
+        Assert.Equal("movies-idx", service.LastCreateRequest!.Schema.Index.Name);
+        Assert.Equal(StorageType.Hash, service.LastCreateRequest.Schema.Index.StorageType);
+        Assert.Equal(["movie:"], service.LastCreateRequest.Schema.Index.Prefixes);
+        Assert.Equal(["title", "genre"], service.LastCreateRequest.Schema.Fields.Select(static field => field.Name).ToArray());
         Assert.True(service.LastCreateRequest.SkipIfExists);
         Assert.Contains("Created index 'movies-idx'.", output.ToString(), StringComparison.Ordinal);
+        Assert.Equal(string.Empty, error.ToString());
+    }
+
+    [Fact]
+    public async Task CreatesIndexFromSchemaFileAndPrintsConfirmation()
+    {
+        var service = new FakeCliService();
+        var application = new RedisVlCliApplication(service);
+        using var output = new StringWriter();
+        using var error = new StringWriter();
+        var schemaPath = Path.Combine(SchemaFixtureDirectory, "advanced-schema.yaml");
+
+        var exitCode = await application.RunAsync(
+            [
+                "index",
+                "create",
+                "--redis", "localhost:6379",
+                "--schema", schemaPath,
+                "--skip-if-exists"
+            ],
+            output,
+            error);
+
+        Assert.Equal(0, exitCode);
+        Assert.Equal(schemaPath, service.LastCreateRequest!.SchemaFilePath);
+        Assert.Equal("advanced-docs-idx", service.LastCreateRequest.Schema.Index.Name);
+        Assert.True(service.LastCreateRequest.SkipIfExists);
+        Assert.Contains("Created index 'advanced-docs-idx'.", output.ToString(), StringComparison.Ordinal);
         Assert.Equal(string.Empty, error.ToString());
     }
 
@@ -112,6 +143,38 @@ public sealed class RedisVlCliApplicationTests
     }
 
     [Fact]
+    public async Task ValidatesSchemaFileAndPrintsConfirmation()
+    {
+        var application = new RedisVlCliApplication(new FakeCliService());
+        using var output = new StringWriter();
+        using var error = new StringWriter();
+        var schemaPath = Path.Combine(SchemaFixtureDirectory, "basic-schema.yaml");
+
+        var exitCode = await application.RunAsync(["schema", "validate", "--file", schemaPath], output, error);
+
+        Assert.Equal(0, exitCode);
+        Assert.Contains($"Schema '{schemaPath}' is valid for index 'media-idx'.", output.ToString(), StringComparison.Ordinal);
+        Assert.Equal(string.Empty, error.ToString());
+    }
+
+    [Fact]
+    public async Task PrintsSchemaJsonSummary()
+    {
+        var application = new RedisVlCliApplication(new FakeCliService());
+        using var output = new StringWriter();
+        using var error = new StringWriter();
+        var schemaPath = Path.Combine(SchemaFixtureDirectory, "advanced-schema.yaml");
+
+        var exitCode = await application.RunAsync(["schema", "show", "--file", schemaPath], output, error);
+
+        Assert.Equal(0, exitCode);
+        Assert.Contains("\"name\": \"advanced-docs-idx\"", output.ToString(), StringComparison.Ordinal);
+        Assert.Contains("\"storageType\": \"Json\"", output.ToString(), StringComparison.Ordinal);
+        Assert.Contains("\"fields\": [", output.ToString(), StringComparison.Ordinal);
+        Assert.Equal(string.Empty, error.ToString());
+    }
+
+    [Fact]
     public async Task RejectsInvalidFieldDefinition()
     {
         var application = new RedisVlCliApplication(new FakeCliService());
@@ -133,6 +196,43 @@ public sealed class RedisVlCliApplicationTests
 
         Assert.Equal(1, exitCode);
         Assert.Contains("Invalid field definition 'title'.", error.ToString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task RejectsCombiningSchemaAndInlineCreateOptions()
+    {
+        var application = new RedisVlCliApplication(new FakeCliService());
+        using var output = new StringWriter();
+        using var error = new StringWriter();
+        var schemaPath = Path.Combine(SchemaFixtureDirectory, "basic-schema.yaml");
+
+        var exitCode = await application.RunAsync(
+            [
+                "index",
+                "create",
+                "--redis", "localhost:6379",
+                "--schema", schemaPath,
+                "--name", "movies-idx"
+            ],
+            output,
+            error);
+
+        Assert.Equal(1, exitCode);
+        Assert.Contains("cannot be combined", error.ToString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task RejectsInvalidSchemaFile()
+    {
+        var application = new RedisVlCliApplication(new FakeCliService());
+        using var output = new StringWriter();
+        using var error = new StringWriter();
+        var schemaPath = Path.Combine(SchemaFixtureDirectory, "unsupported-schema.yaml");
+
+        var exitCode = await application.RunAsync(["schema", "validate", "--file", schemaPath], output, error);
+
+        Assert.Equal(1, exitCode);
+        Assert.Contains("could not be parsed", error.ToString(), StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -204,5 +304,8 @@ public sealed class RedisVlCliApplicationTests
             LastDeleteRequest = (indexName, dropDocuments);
             return Task.CompletedTask;
         }
+
+        public Task<SearchSchema> LoadSchemaAsync(string schemaFilePath, CancellationToken cancellationToken = default) =>
+            Task.FromResult(SearchSchema.FromYamlFile(schemaFilePath));
     }
 }

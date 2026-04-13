@@ -65,6 +65,20 @@ public sealed class RedisVlCliApplication
     {
         switch (request)
         {
+            case ValidateSchemaRequest validateRequest:
+            {
+                var schema = await _service.LoadSchemaAsync(validateRequest.SchemaFilePath, cancellationToken).ConfigureAwait(false);
+                await output.WriteLineAsync(
+                    $"Schema '{validateRequest.SchemaFilePath}' is valid for index '{schema.Index.Name}'.").ConfigureAwait(false);
+                break;
+            }
+            case ShowSchemaRequest showRequest:
+            {
+                var schema = await _service.LoadSchemaAsync(showRequest.SchemaFilePath, cancellationToken).ConfigureAwait(false);
+                await output.WriteLineAsync(
+                    JsonSerializer.Serialize(SchemaView.FromSchema(schema), JsonOptions)).ConfigureAwait(false);
+                break;
+            }
             case ListIndexesRequest listRequest:
             {
                 var indexes = await _service.ListIndexesAsync(listRequest.RedisConnectionString, cancellationToken).ConfigureAwait(false);
@@ -87,7 +101,7 @@ public sealed class RedisVlCliApplication
                 var created = await _service.CreateIndexAsync(createRequest.RedisConnectionString, createRequest, cancellationToken)
                     .ConfigureAwait(false);
                 var action = created ? "Created" : "Skipped";
-                await output.WriteLineAsync($"{action} index '{createRequest.IndexName}'.").ConfigureAwait(false);
+                await output.WriteLineAsync($"{action} index '{createRequest.Schema.Index.Name}'.").ConfigureAwait(false);
                 break;
             }
             case ClearIndexRequest clearRequest:
@@ -130,9 +144,15 @@ public sealed class RedisVlCliApplication
                 return CliParseResult.Help(HelpText.Root);
             }
 
-            if (!string.Equals(args[0], "index", StringComparison.OrdinalIgnoreCase))
+            var group = args[0];
+            if (string.Equals(group, "schema", StringComparison.OrdinalIgnoreCase))
             {
-                return CliParseResult.Error($"Unknown command '{args[0]}'.", HelpText.Root);
+                return ParseSchema(args.Skip(1).ToArray());
+            }
+
+            if (!string.Equals(group, "index", StringComparison.OrdinalIgnoreCase))
+            {
+                return CliParseResult.Error($"Unknown command '{group}'.", HelpText.Root);
             }
 
             if (args.Count == 1 || IsHelpToken(args[1]))
@@ -151,6 +171,24 @@ public sealed class RedisVlCliApplication
                 "clear" => ParseClear(tokens, fallbackRedisConnectionString),
                 "delete" => ParseDelete(tokens, fallbackRedisConnectionString),
                 _ => CliParseResult.Error($"Unknown index command '{command}'.", HelpText.Index)
+            };
+        }
+
+        private static CliParseResult ParseSchema(IReadOnlyList<string> args)
+        {
+            if (args.Count == 0 || IsHelpToken(args[0]))
+            {
+                return CliParseResult.Help(HelpText.Schema);
+            }
+
+            var command = args[0];
+            var tokens = args.Skip(1).ToArray();
+
+            return command.ToLowerInvariant() switch
+            {
+                "validate" => ParseSchemaValidate(tokens),
+                "show" => ParseSchemaShow(tokens),
+                _ => CliParseResult.Error($"Unknown schema command '{command}'.", HelpText.Schema)
             };
         }
 
@@ -204,7 +242,45 @@ public sealed class RedisVlCliApplication
                 return options;
             }
 
-            if (!TryReadRequired(options, "--name", out var indexName, out var error))
+            var redis = ReadRedisConnectionString(options, fallbackRedisConnectionString, HelpText.Create, out var error);
+            if (error is not null)
+            {
+                return CliParseResult.Error(error, HelpText.Create);
+            }
+
+            if (options.Values.TryGetValue("--schema", out var schemaPathValues))
+            {
+                if (schemaPathValues.Count > 1)
+                {
+                    return CliParseResult.Error("The '--schema' option can only be provided once.", HelpText.Create);
+                }
+
+                var conflictingOptions = new[] { "--name", "--prefix", "--storage", "--field" }
+                    .Where(options.Values.ContainsKey)
+                    .ToArray();
+                if (conflictingOptions.Length > 0)
+                {
+                    return CliParseResult.Error(
+                        $"The '--schema' option cannot be combined with {string.Join(", ", conflictingOptions)}.",
+                        HelpText.Create);
+                }
+
+                if (!TryLoadSchema(schemaPathValues[0], HelpText.Create, out var loadedSchema, out var schemaError))
+                {
+                    return schemaError!;
+                }
+
+                return CliParseResult.Success(
+                    new CreateIndexRequest(
+                        redis!,
+                        loadedSchema!,
+                        schemaPathValues[0].Trim(),
+                        Overwrite: options.Flags.Contains("--overwrite"),
+                        DropDocuments: options.Flags.Contains("--drop-documents"),
+                        SkipIfExists: options.Flags.Contains("--skip-if-exists")));
+            }
+
+            if (!TryReadRequired(options, "--name", out var indexName, out error))
             {
                 return CliParseResult.Error(error!, HelpText.Create);
             }
@@ -246,19 +322,34 @@ public sealed class RedisVlCliApplication
                 parsedFields.Add(field!);
             }
 
-            var redis = ReadRedisConnectionString(options, fallbackRedisConnectionString, HelpText.Create, out error);
-            return error is null
-                ? CliParseResult.Success(
-                    new CreateIndexRequest(
-                        redis!,
-                        indexName!,
-                        prefixes,
-                        storageType,
-                        parsedFields,
-                        Overwrite: options.Flags.Contains("--overwrite"),
-                        DropDocuments: options.Flags.Contains("--drop-documents"),
-                        SkipIfExists: options.Flags.Contains("--skip-if-exists")))
-                : CliParseResult.Error(error, HelpText.Create);
+            return CliParseResult.Success(
+                new CreateIndexRequest(
+                    redis!,
+                    BuildInlineSchema(indexName!, prefixes, storageType, parsedFields),
+                    null,
+                    Overwrite: options.Flags.Contains("--overwrite"),
+                    DropDocuments: options.Flags.Contains("--drop-documents"),
+                    SkipIfExists: options.Flags.Contains("--skip-if-exists")));
+        }
+
+        private static CliParseResult ParseSchemaValidate(IReadOnlyList<string> tokens)
+        {
+            if (ContainsHelp(tokens))
+            {
+                return CliParseResult.Help(HelpText.SchemaValidate);
+            }
+
+            return TryParseSchemaFileRequest(tokens, HelpText.SchemaValidate, static path => new ValidateSchemaRequest(path));
+        }
+
+        private static CliParseResult ParseSchemaShow(IReadOnlyList<string> tokens)
+        {
+            if (ContainsHelp(tokens))
+            {
+                return CliParseResult.Help(HelpText.SchemaShow);
+            }
+
+            return TryParseSchemaFileRequest(tokens, HelpText.SchemaShow, static path => new ShowSchemaRequest(path));
         }
 
         private static CliParseResult ParseClear(IReadOnlyList<string> tokens, string? fallbackRedisConnectionString)
@@ -413,6 +504,72 @@ public sealed class RedisVlCliApplication
             return true;
         }
 
+        private static CliParseResult TryParseSchemaFileRequest(
+            IReadOnlyList<string> tokens,
+            string helpText,
+            Func<string, CliRequest> factory)
+        {
+            var options = ParseOptions(tokens, new HashSet<string>(StringComparer.OrdinalIgnoreCase));
+            if (options.ErrorText is not null)
+            {
+                return CliParseResult.Error(options.ErrorText, helpText);
+            }
+
+            if (!TryReadRequired(options, "--file", out var schemaPath, out var error))
+            {
+                return CliParseResult.Error(error!, helpText);
+            }
+
+            return TryLoadSchema(schemaPath!, helpText, out _, out var schemaError)
+                ? CliParseResult.Success(factory(schemaPath!))
+                : schemaError!;
+        }
+
+        private static bool TryLoadSchema(
+            string rawPath,
+            string helpText,
+            out SearchSchema? schema,
+            out CliParseResult? error)
+        {
+            try
+            {
+                schema = SearchSchema.FromYamlFile(rawPath.Trim());
+                error = null;
+                return true;
+            }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException)
+            {
+                schema = null;
+                error = CliParseResult.Error(exception.Message, helpText);
+                return false;
+            }
+        }
+
+        private static SearchSchema BuildInlineSchema(
+            string indexName,
+            IReadOnlyList<string> prefixes,
+            StorageType storageType,
+            IReadOnlyList<CliFieldDefinition> fields)
+        {
+            return new SearchSchema(
+                new IndexDefinition(indexName, prefixes, storageType),
+                fields.Select(MapFieldDefinition));
+        }
+
+        private static FieldDefinition MapFieldDefinition(CliFieldDefinition field)
+        {
+            return field.Type switch
+            {
+                "text" => new TextFieldDefinition(field.Name),
+                "tag" => new TagFieldDefinition(field.Name),
+                "numeric" => new NumericFieldDefinition(field.Name),
+                "geo" => new GeoFieldDefinition(field.Name),
+                _ => throw new ArgumentException(
+                    $"Unsupported field type '{field.Type}'. Supported types: text, tag, numeric, geo.",
+                    nameof(field))
+            };
+        }
+
         private static bool ContainsHelp(IReadOnlyList<string> tokens) =>
             tokens.Any(IsHelpToken);
 
@@ -435,16 +592,13 @@ public sealed class RedisVlCliApplication
             redisvl
 
             Usage:
-              redisvl index <command> [options]
+              redisvl <command> [options]
 
             Commands:
-              create  Create an index from inline schema options.
-              info    Print a JSON summary for an existing index.
-              list    List existing index names.
-              clear   Delete indexed documents while keeping the index.
-              delete  Drop an index and optionally its indexed documents.
+              index   Manage Redis search indexes.
+              schema  Validate or inspect YAML schema files.
 
-            Use 'redisvl index <command> --help' for command-specific details.
+            Use 'redisvl <command> --help' for command-specific details.
             """;
 
         public const string Index =
@@ -460,6 +614,40 @@ public sealed class RedisVlCliApplication
               list
               clear
               delete
+            """;
+
+        public const string Schema =
+            """
+            redisvl schema
+
+            Usage:
+              redisvl schema <command> [options]
+
+            Commands:
+              validate
+              show
+            """;
+
+        public const string SchemaValidate =
+            """
+            redisvl schema validate
+
+            Usage:
+              redisvl schema validate --file <schema-path>
+
+            Options:
+              --file <schema-path>  Path to a YAML schema file to validate.
+            """;
+
+        public const string SchemaShow =
+            """
+            redisvl schema show
+
+            Usage:
+              redisvl schema show --file <schema-path>
+
+            Options:
+              --file <schema-path>  Path to a YAML schema file to load and print as JSON.
             """;
 
         public const string List =
@@ -490,9 +678,10 @@ public sealed class RedisVlCliApplication
             redisvl index create
 
             Usage:
-              redisvl index create --name <index-name> --prefix <key-prefix> --storage <hash|json> --field <type:name> [options]
+              redisvl index create (--schema <schema-path> | --name <index-name> --prefix <key-prefix> --storage <hash|json> --field <type:name>) [options]
 
             Options:
+              --schema <schema-path>       YAML schema file to load for index creation.
               --name <index-name>          Index name to create.
               --prefix <key-prefix>        Key prefix to index. Repeat for multiple prefixes.
               --storage <hash|json>        Redis storage type for indexed documents.
@@ -542,29 +731,33 @@ public interface IRedisVlCliService
     Task<long> ClearIndexAsync(string redisConnectionString, string indexName, int batchSize, CancellationToken cancellationToken = default);
 
     Task DeleteIndexAsync(string redisConnectionString, string indexName, bool dropDocuments, CancellationToken cancellationToken = default);
+
+    Task<SearchSchema> LoadSchemaAsync(string schemaFilePath, CancellationToken cancellationToken = default);
 }
 
-public abstract record CliRequest(string RedisConnectionString);
+public abstract record CliRequest;
 
-public sealed record ListIndexesRequest(string RedisConnectionString) : CliRequest(RedisConnectionString);
+public sealed record ValidateSchemaRequest(string SchemaFilePath) : CliRequest;
 
-public sealed record GetIndexInfoRequest(string RedisConnectionString, string IndexName) : CliRequest(RedisConnectionString);
+public sealed record ShowSchemaRequest(string SchemaFilePath) : CliRequest;
+
+public sealed record ListIndexesRequest(string RedisConnectionString) : CliRequest;
+
+public sealed record GetIndexInfoRequest(string RedisConnectionString, string IndexName) : CliRequest;
 
 public sealed record CreateIndexRequest(
     string RedisConnectionString,
-    string IndexName,
-    IReadOnlyList<string> Prefixes,
-    StorageType StorageType,
-    IReadOnlyList<CliFieldDefinition> Fields,
+    SearchSchema Schema,
+    string? SchemaFilePath,
     bool Overwrite,
     bool DropDocuments,
-    bool SkipIfExists) : CliRequest(RedisConnectionString);
+    bool SkipIfExists) : CliRequest;
 
 public sealed record ClearIndexRequest(string RedisConnectionString, string IndexName, int BatchSize)
-    : CliRequest(RedisConnectionString);
+    : CliRequest;
 
 public sealed record DeleteIndexRequest(string RedisConnectionString, string IndexName, bool DropDocuments)
-    : CliRequest(RedisConnectionString);
+    : CliRequest;
 
 public sealed record CliFieldDefinition(string Type, string Name)
 {
@@ -602,6 +795,37 @@ public sealed record IndexInfoView(
     IReadOnlyDictionary<string, string> Scalars);
 
 public sealed record IndexFieldView(string Type, string Name, string? Alias, bool Sortable);
+
+public sealed record SchemaView(
+    string Name,
+    string StorageType,
+    IReadOnlyList<string> Prefixes,
+    string KeySeparator,
+    IReadOnlyList<string>? Stopwords,
+    IReadOnlyList<IndexFieldView> Fields)
+{
+    public static SchemaView FromSchema(SearchSchema schema) =>
+        new(
+            schema.Index.Name,
+            schema.Index.StorageType.ToString(),
+            schema.Index.Prefixes.ToArray(),
+            schema.Index.KeySeparator.ToString(CultureInfo.InvariantCulture),
+            schema.Index.Stopwords?.ToArray(),
+            schema.Fields.Select(
+                static field => new IndexFieldView(
+                    field switch
+                    {
+                        TextFieldDefinition => "text",
+                        TagFieldDefinition => "tag",
+                        NumericFieldDefinition => "numeric",
+                        GeoFieldDefinition => "geo",
+                        VectorFieldDefinition => "vector",
+                        _ => field.GetType().Name
+                    },
+                    field.Name,
+                    field.Alias,
+                    field.Sortable)).ToArray());
+}
 
 public sealed class CliParseResult
 {

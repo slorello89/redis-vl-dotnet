@@ -15,7 +15,7 @@ public sealed class RedisVlCliService : IRedisVlCliService
     {
         await using var connection = await ConnectionMultiplexer.ConnectAsync(redisConnectionString).ConfigureAwait(false);
         var database = connection.GetDatabase();
-        var index = new SearchIndex(database, BuildSchema(request));
+        var index = new SearchIndex(database, request.Schema);
 
         return await index.CreateAsync(
             new CreateIndexOptions(
@@ -80,26 +80,10 @@ public sealed class RedisVlCliService : IRedisVlCliService
         await index.DropAsync(dropDocuments, cancellationToken).ConfigureAwait(false);
     }
 
-    private static SearchSchema BuildSchema(CreateIndexRequest request)
+    public Task<SearchSchema> LoadSchemaAsync(string schemaFilePath, CancellationToken cancellationToken = default)
     {
-        var fields = request.Fields.Select(MapFieldDefinition).ToArray();
-        return new SearchSchema(
-            new IndexDefinition(request.IndexName, request.Prefixes, request.StorageType),
-            fields);
-    }
-
-    private static FieldDefinition MapFieldDefinition(CliFieldDefinition field)
-    {
-        return field.Type switch
-        {
-            "text" => new TextFieldDefinition(field.Name),
-            "tag" => new TagFieldDefinition(field.Name),
-            "numeric" => new NumericFieldDefinition(field.Name),
-            "geo" => new GeoFieldDefinition(field.Name),
-            _ => throw new ArgumentException(
-                $"Unsupported field type '{field.Type}'. Supported types: text, tag, numeric, geo.",
-                nameof(field))
-        };
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.FromResult(SearchSchema.FromYamlFile(schemaFilePath));
     }
 
     private static IndexFieldView ToFieldView(FieldDefinition field) =>

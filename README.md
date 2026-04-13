@@ -87,3 +87,18 @@ dotnet run --project src/RedisVlDotNet.Cli -- index create \
   --field tag:genre \
   --field numeric:year
 ```
+
+Validate or inspect a YAML schema file:
+
+```bash
+dotnet run --project src/RedisVlDotNet.Cli -- schema validate --file tests/RedisVlDotNet.Tests/Schema/Fixtures/basic-schema.yaml
+dotnet run --project src/RedisVlDotNet.Cli -- schema show --file tests/RedisVlDotNet.Tests/Schema/Fixtures/advanced-schema.yaml
+```
+
+Create an index directly from a YAML schema file:
+
+```bash
+dotnet run --project src/RedisVlDotNet.Cli -- index create \
+  --redis localhost:6379 \
+  --schema examples/JsonStorageExample/schema.yaml
+```

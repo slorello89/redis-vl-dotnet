@@ -33,7 +33,17 @@ Started: Mon Apr 13 10:35:34 EDT 2026
 - Redis topology helpers should stay outside `SearchIndex` and return plain `ConfigurationOptions` or `IConnectionMultiplexer`, so cluster and Sentinel support can evolve independently while the rest of the library continues to consume `IDatabase`.
 - Sentinel helpers should build one reusable `ConfigurationOptions` object with `CommandMap.Sentinel`, a required `ServiceName`, default host-only node port `26379`, and a separate primary-connection helper that reuses that same option shape for failover-aware discovery.
 - CLI workflows stay easiest to test when argument parsing produces immutable request records and one Redis-backed service layer handles the actual `SearchIndex` calls, so command help/output can be unit-tested in-process while Redis integration coverage reuses the existing env-gated harness.
+- For YAML-backed CLI flows, validate schema files while constructing the immutable request and pass the realized `SearchSchema` through the service layer, so `schema` commands and `index create --schema` stay on one parsing path.
 
+---
+## 2026-04-13 14:14:32 EDT - US-031
+- Implemented `redisvl schema validate` and `redisvl schema show`, added `index create --schema <path>` support for YAML-backed index creation, and reused `SearchSchema.FromYamlFile` so CLI schema validation and create flows share the same parsing path.
+- Files changed: `src/RedisVlDotNet.Cli/RedisVlCliApplication.cs`, `src/RedisVlDotNet.Cli/RedisVlCliService.cs`, `tests/RedisVlDotNet.Tests/Cli/RedisVlCliApplicationTests.cs`, `tests/RedisVlDotNet.Tests/Cli/RedisVlCliIntegrationTests.cs`, `README.md`, `docs/getting-started.md`, `prd.json`, `progress.txt`
+- Quality checks run and result: `dotnet build src/RedisVlDotNet.Cli/RedisVlDotNet.Cli.csproj --no-restore` passed. `dotnet test tests/RedisVlDotNet.Tests/RedisVlDotNet.Tests.csproj --no-restore --filter FullyQualifiedName~RedisVlCli` passed with 2 Redis-backed CLI integration tests skipped because `REDIS_VL_REDIS_URL` was not configured locally. `dotnet build redis-vl-dotnet.sln --no-restore` passed. `dotnet test redis-vl-dotnet.sln --no-build` passed with 47 env-gated integration and provider smoke tests skipped because local Redis/provider settings were not configured.
+- Learnings for future iterations:
+  - Patterns discovered: schema-backed CLI commands stay consistent when request parsing eagerly materializes `SearchSchema` instances, because both `schema` inspection commands and Redis-backed create flows can then reuse the same immutable request contract.
+  - Gotchas encountered: collection expressions do not directly construct `IReadOnlySet<T>` targets in this CLI parser, so empty multi-value option sets still need a concrete `HashSet<string>` instance.
+  - Useful context: there are still no `AGENTS.md` files anywhere under this repository, so reusable CLI guidance remains centralized in `progress.txt`.
 ---
 ## 2026-04-13 13:49:55 EDT - US-027
 - Implemented a `RedisVlDotNet.Rerankers.Cohere` package with `CohereTextReranker`, typed request options for truncation, priority, client-name, and endpoint overrides, plus response parsing that maps Cohere result indexes back to the original rerank documents.
