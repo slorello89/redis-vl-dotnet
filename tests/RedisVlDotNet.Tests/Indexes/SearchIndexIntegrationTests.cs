@@ -846,6 +846,75 @@ public sealed class SearchIndexIntegrationTests
     }
 
     [RedisSearchIntegrationFact]
+    public async Task ExecutesAggregationQueriesWithGroupedRowsAndTypedReducers()
+    {
+        await using var connection = await RedisSearchTestEnvironment.ConnectAsync();
+        var database = connection.GetDatabase();
+
+        var token = Guid.NewGuid().ToString("N");
+        var schema = new SearchSchema(
+            new IndexDefinition($"aggregate-idx-{token}", $"aggregate:{token}:", StorageType.Hash),
+            [
+                new TextFieldDefinition("title"),
+                new NumericFieldDefinition("year"),
+                new TagFieldDefinition("genre")
+            ]);
+        var index = new SearchIndex(database, schema);
+
+        try
+        {
+            await index.CreateAsync();
+            await SeedHashDocumentsAsync(database, schema, SearchIndexSeedData.AggregationMovies);
+            await RedisSearchTestEnvironment.WaitForIndexDocumentCountAsync(index, SearchIndexSeedData.AggregationMovies.Count);
+
+            var query = new AggregationQuery(
+                groupBy: new AggregationGroupBy(
+                    ["genre"],
+                    [
+                        AggregationReducer.Count("movieCount"),
+                        AggregationReducer.Average("year", "averageYear")
+                    ]),
+                sortBy: new AggregationSortBy(
+                    [
+                        new AggregationSortField("movieCount", descending: true),
+                        new AggregationSortField("averageYear", descending: true)
+                    ]),
+                limit: 10);
+
+            var rawResults = await index.AggregateAsync(query);
+            var typedResults = await index.AggregateAsync<GenreAggregationRow>(query);
+
+            Assert.Equal(2, rawResults.TotalCount);
+            Assert.Equal(["crime", "science-fiction"], rawResults.Rows.Select(static row => row.Values["genre"].ToString()).ToArray());
+            Assert.Equal(["2", "1"], rawResults.Rows.Select(static row => row.Values["movieCount"].ToString()).ToArray());
+            Assert.Equal(["1988", "2016"], rawResults.Rows.Select(static row => row.Values["averageYear"].ToString()).ToArray());
+
+            Assert.Equal(2, typedResults.TotalCount);
+            Assert.Collection(
+                typedResults.Rows,
+                row =>
+                {
+                    Assert.Equal("crime", row.Genre);
+                    Assert.Equal(2, row.MovieCount);
+                    Assert.Equal(1988d, row.AverageYear);
+                },
+                row =>
+                {
+                    Assert.Equal("science-fiction", row.Genre);
+                    Assert.Equal(1, row.MovieCount);
+                    Assert.Equal(2016d, row.AverageYear);
+                });
+        }
+        finally
+        {
+            if (await index.ExistsAsync())
+            {
+                await index.DropAsync(deleteDocuments: true);
+            }
+        }
+    }
+
+    [RedisSearchIntegrationFact]
     public async Task ExecutesVectorQueriesWithDeterministicRanking()
     {
         await using var connection = await RedisSearchTestEnvironment.ConnectAsync();
@@ -1023,6 +1092,8 @@ public sealed class SearchIndexIntegrationTests
     private sealed record HashMovieDocument(string Id, string Title, int Year, string Genre);
 
     private sealed record HashMovieEnvelope(string ExternalId, string Title, int Year, string Genre);
+
+    private sealed record GenreAggregationRow(string Genre, int MovieCount, double AverageYear);
 
     private static IReadOnlyDictionary<string, string> ToFlatStringDictionary(RedisResult result)
     {

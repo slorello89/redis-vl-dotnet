@@ -9,7 +9,8 @@ This guide walks through the smallest end-to-end `redis-vl-dotnet` flow for v1:
 5. load documents
 6. fetch and query documents
 7. run full-text search with `TextQuery`
-8. optionally clear indexed documents without dropping the index
+8. run grouped aggregations with typed reducer output
+9. optionally clear indexed documents without dropping the index
 
 The current repository does not publish a NuGet package yet, so local development uses a project reference.
 
@@ -86,12 +87,23 @@ var query = new FilterQuery(
 var results = await index.SearchAsync<Movie>(query);
 var textResults = await index.SearchAsync<Movie>(
     new TextQuery("Alien|Arrival", ["title", "year", "genre"], limit: 2));
+var aggregationResults = await index.AggregateAsync<GenreSummary>(
+    new AggregationQuery(
+        groupBy: new AggregationGroupBy(
+            ["genre"],
+            [
+                AggregationReducer.Count("movieCount"),
+                AggregationReducer.Average("year", "averageYear")
+            ]),
+        sortBy: new AggregationSortBy([new AggregationSortField("movieCount", descending: true)]),
+        limit: 10));
 var count = await index.CountAsync(new CountQuery(Filter.Tag("genre").Eq("science-fiction")));
 var cleared = await index.ClearAsync();
 
 Console.WriteLine($"Fetched: {fetched?.Title}");
 Console.WriteLine($"Search matches: {results.TotalCount}");
 Console.WriteLine($"Text matches: {textResults.TotalCount}");
+Console.WriteLine($"Aggregation rows: {aggregationResults.TotalCount}");
 Console.WriteLine($"Genre count: {count}");
 Console.WriteLine($"Cleared documents: {cleared}");
 
@@ -105,9 +117,15 @@ foreach (var movie in textResults.Documents)
     Console.WriteLine($"Text search: {movie.Title} ({movie.Year})");
 }
 
+foreach (var row in aggregationResults.Rows)
+{
+    Console.WriteLine($"Aggregation: {row.Genre} => {row.MovieCount} movies, average year {row.AverageYear:F0}");
+}
+
 await index.DropAsync();
 
 public sealed record Movie(string Id, string Title, int Year, string Genre);
+public sealed record GenreSummary(string Genre, int MovieCount, double AverageYear);
 ```
 
 ## What the Example Does
@@ -118,6 +136,7 @@ public sealed record Movie(string Id, string Title, int Year, string Genre);
 - `LoadJsonAsync(...)` stores JSON documents under keys derived from the schema prefix and document `Id`
 - `FetchJsonByIdAsync<T>(...)` round-trips a typed document from Redis JSON
 - `FilterQuery`, `TextQuery`, and `CountQuery` run `FT.SEARCH`-based retrieval and counting through typed query objects
+- `AggregateAsync<T>(...)` runs `FT.AGGREGATE` and maps grouped rows into typed reducer projections
 - `ClearAsync(...)` deletes Redis keys matched by the schema prefixes and preserves the index definition for both JSON and HASH storage
 
 ## Run Full-Text Search With `TextQuery`
@@ -136,6 +155,29 @@ var textResults = await index.SearchAsync<Movie>(
 - `SearchAsync<T>(...)` maps those projected fields into a typed result document
 - `offset` and `limit` control pagination
 
+## Run Aggregations With Typed Results
+
+Use `AggregationQuery` when you want RediSearch grouping and reducer pipelines without parsing raw Redis arrays yourself:
+
+```csharp
+var aggregationResults = await index.AggregateAsync<GenreSummary>(
+    new AggregationQuery(
+        groupBy: new AggregationGroupBy(
+            ["genre"],
+            [
+                AggregationReducer.Count("movieCount"),
+                AggregationReducer.Average("year", "averageYear")
+            ]),
+        sortBy: new AggregationSortBy([new AggregationSortField("movieCount", descending: true)]),
+        limit: 10));
+```
+
+`AggregationQuery` uses the RediSearch aggregation pipeline concepts directly:
+
+- `groupBy` defines the grouping keys and reducer functions
+- reducer aliases such as `movieCount` and `averageYear` become the field names used for typed mapping
+- `AggregateAsync(...)` returns parsed `AggregationResults`, and `AggregateAsync<T>(...)` maps each row into your projection type
+
 ## Run the Flow Locally
 
 From the console app directory:
@@ -151,6 +193,7 @@ Expected behavior:
 - one document is fetched directly by id
 - a filtered search returns `Arrival`
 - a `TextQuery` returns `Arrival` and `Alien`
+- an aggregation groups the results by genre and returns typed reducer rows
 - a count query returns `2` for the `science-fiction` genre
 - the sample clears the prefixed documents, then drops the now-empty index before exiting
 

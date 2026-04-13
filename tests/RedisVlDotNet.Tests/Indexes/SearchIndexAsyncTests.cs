@@ -470,18 +470,18 @@ public sealed class SearchIndexAsyncTests
     {
         var (database, recorder) = RecordingDatabaseProxy.CreatePair();
         var index = new SearchIndex(database, CreateHashSchema("aggregate-movies"));
-        var rawResult = RedisResult.Create(
-            [
-                RedisResult.Create(1),
-                RedisResult.Create(
-                    [
-                        RedisResult.Create((RedisValue)"genre"),
-                        RedisResult.Create((RedisValue)"crime"),
-                        RedisResult.Create((RedisValue)"movie_count"),
-                        RedisResult.Create((RedisValue)"2")
-                    ])
-            ]);
-        recorder.ExecuteAsyncResponses.Enqueue(rawResult);
+        recorder.ExecuteAsyncResponses.Enqueue(
+            RedisResult.Create(
+                [
+                    RedisResult.Create(1),
+                    RedisResult.Create(
+                        [
+                            RedisResult.Create((RedisValue)"genre"),
+                            RedisResult.Create((RedisValue)"crime"),
+                            RedisResult.Create((RedisValue)"movie_count"),
+                            RedisResult.Create((RedisValue)"2")
+                        ])
+                ]));
 
         var result = await index.AggregateAsync(
             new AggregationQuery(
@@ -502,13 +502,46 @@ public sealed class SearchIndexAsyncTests
             ],
             recorder.ExecuteAsyncCalls[0].Arguments.Select(static argument => argument?.ToString() ?? string.Empty).ToArray());
 
-        var rows = (RedisResult[])result!;
-        Assert.Equal(1, (long)rows[0]!);
-        var values = (RedisResult[])rows[1]!;
-        Assert.Equal("genre", values[0].ToString());
-        Assert.Equal("crime", values[1].ToString());
-        Assert.Equal("movie_count", values[2].ToString());
-        Assert.Equal("2", values[3].ToString());
+        Assert.Equal(1, result.TotalCount);
+        var row = Assert.Single(result.Rows);
+        Assert.Equal("crime", row.Values["genre"]);
+        Assert.Equal("2", row.Values["movie_count"]);
+    }
+
+    [Fact]
+    public async Task AggregateAsync_TypedResults_MapReturnedRows()
+    {
+        var (database, recorder) = RecordingDatabaseProxy.CreatePair();
+        var index = new SearchIndex(database, CreateHashSchema("typed-aggregate"));
+        recorder.ExecuteAsyncResponses.Enqueue(
+            RedisResult.Create(
+                [
+                    RedisResult.Create(1),
+                    RedisResult.Create(
+                        [
+                            RedisResult.Create((RedisValue)"genre"),
+                            RedisResult.Create((RedisValue)"crime"),
+                            RedisResult.Create((RedisValue)"movieCount"),
+                            RedisResult.Create((RedisValue)"2"),
+                            RedisResult.Create((RedisValue)"avgYear"),
+                            RedisResult.Create((RedisValue)"1988")
+                        ])
+                ]));
+
+        var results = await index.AggregateAsync<GenreAggregateRow>(
+            new AggregationQuery(
+                queryString: "@genre:{crime}",
+                groupBy: new AggregationGroupBy(
+                    ["genre"],
+                    [
+                        AggregationReducer.Count("movieCount"),
+                        AggregationReducer.Average("year", "avgYear")
+                    ])));
+
+        var row = Assert.Single(results.Rows);
+        Assert.Equal("crime", row.Genre);
+        Assert.Equal(2, row.MovieCount);
+        Assert.Equal(1988d, row.AvgYear);
     }
 
     private static SearchSchema CreateHashSchema(string token) =>
@@ -658,6 +691,8 @@ public sealed class SearchIndexAsyncTests
         entries.SelectMany(static entry => new[] { RedisResult.Create((RedisValue)entry.Key), entry.Value }).ToArray();
 
     private sealed record HashMovieDocument(string Id, string Title, int Year, string Genre);
+
+    private sealed record GenreAggregateRow(string Genre, int MovieCount, double AvgYear);
 
     private class RecordingDatabaseProxy : DispatchProxy
     {

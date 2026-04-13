@@ -9,7 +9,7 @@ This example is a runnable .NET 9 console app that demonstrates a JSON-backed `r
 - load sample documents
 - fetch one document by id
 - partially update JSON fields by id and by key
-- run filter, text, and count queries
+- run filter, text, aggregation, and count queries
 - clear indexed documents while keeping the index
 - drop the example index
 

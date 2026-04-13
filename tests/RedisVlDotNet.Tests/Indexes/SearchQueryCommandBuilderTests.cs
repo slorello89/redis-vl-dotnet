@@ -514,6 +514,45 @@ public sealed class SearchQueryCommandBuilderTests
         Assert.Empty(results.Documents);
     }
 
+    [Fact]
+    public void ParsesAggregationResultsFromRedisResponse()
+    {
+        var rawResult = RedisResult.Create(
+            [
+                RedisResult.Create(2),
+                RedisResult.Create(
+                    [
+                        RedisResult.Create((RedisValue)"genre"),
+                        RedisResult.Create((RedisValue)"crime"),
+                        RedisResult.Create((RedisValue)"movie_count"),
+                        RedisResult.Create((RedisValue)"2")
+                    ]),
+                RedisResult.Create(
+                    [
+                        RedisResult.Create((RedisValue)"genre"),
+                        RedisResult.Create((RedisValue)"science-fiction"),
+                        RedisResult.Create((RedisValue)"movie_count"),
+                        RedisResult.Create((RedisValue)"1")
+                    ])
+            ]);
+
+        var results = AggregationResultsParser.Parse(rawResult);
+
+        Assert.Equal(2, results.TotalCount);
+        Assert.Collection(
+            results.Rows,
+            row =>
+            {
+                Assert.Equal("crime", row.Values["genre"]);
+                Assert.Equal("2", row.Values["movie_count"]);
+            },
+            row =>
+            {
+                Assert.Equal("science-fiction", row.Values["genre"]);
+                Assert.Equal("1", row.Values["movie_count"]);
+            });
+    }
+
     private static string RenderArgument(object argument) =>
         argument is byte[] ? "<binary>" : argument.ToString()!;
 }

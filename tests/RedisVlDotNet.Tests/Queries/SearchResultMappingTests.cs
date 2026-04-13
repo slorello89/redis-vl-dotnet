@@ -121,6 +121,62 @@ public sealed class SearchResultMappingTests
         Assert.Contains("Year", exception.Message, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void MapsAggregationRowsIntoTypedResults()
+    {
+        var results = new AggregationResults(
+            2,
+            [
+                new AggregationResultRow(
+                    new Dictionary<string, RedisValue>(StringComparer.Ordinal)
+                    {
+                        ["genre"] = "crime",
+                        ["movieCount"] = "2",
+                        ["averageYear"] = "1988"
+                    }),
+                new AggregationResultRow(
+                    new Dictionary<string, RedisValue>(StringComparer.Ordinal)
+                    {
+                        ["genre"] = "science-fiction",
+                        ["movieCount"] = "1",
+                        ["averageYear"] = "2016"
+                    })
+            ]);
+
+        var mapped = results.Map<GenreAggregationRow>();
+
+        Assert.Equal(2, mapped.TotalCount);
+        Assert.Collection(
+            mapped.Rows,
+            row =>
+            {
+                Assert.Equal("crime", row.Genre);
+                Assert.Equal(2, row.MovieCount);
+                Assert.Equal(1988d, row.AverageYear);
+            },
+            row =>
+            {
+                Assert.Equal("science-fiction", row.Genre);
+                Assert.Equal(1, row.MovieCount);
+                Assert.Equal(2016d, row.AverageYear);
+            });
+    }
+
+    [Fact]
+    public void ThrowsClearExceptionWhenRequiredAggregationFieldIsMissing()
+    {
+        var row = new AggregationResultRow(
+            new Dictionary<string, RedisValue>(StringComparer.Ordinal)
+            {
+                ["genre"] = "crime"
+            });
+
+        var exception = Assert.Throws<SearchResultMappingException>(() => row.Map<GenreAggregationRow>());
+
+        Assert.Contains("Required field 'MovieCount'", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("aggregation result", exception.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
     private sealed record MovieProjection(
         string Id,
         string Title,
@@ -132,4 +188,6 @@ public sealed class SearchResultMappingTests
     private sealed record MovieMetadata(string Director, int RuntimeMinutes);
 
     private sealed record VectorProjection(float[] Embedding);
+
+    private sealed record GenreAggregationRow(string Genre, int MovieCount, double AverageYear);
 }

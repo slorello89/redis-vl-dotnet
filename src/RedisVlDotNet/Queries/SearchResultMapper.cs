@@ -16,9 +16,19 @@ internal static class SearchResultMapper
     {
         ArgumentNullException.ThrowIfNull(document);
 
+        return Map<TDocument>(document.Values, document.Id, serializerOptions);
+    }
+
+    public static TDocument Map<TDocument>(
+        IReadOnlyDictionary<string, RedisValue> values,
+        string? documentId,
+        JsonSerializerOptions? serializerOptions = null)
+    {
+        ArgumentNullException.ThrowIfNull(values);
+
         var options = serializerOptions ?? DefaultSerializerOptions;
         var metadata = GetPropertyMetadata(typeof(TDocument), options);
-        EnsureRequiredFields(document, metadata);
+        EnsureRequiredFields(values, documentId, metadata);
 
         using var stream = new MemoryStream();
         using var writer = new Utf8JsonWriter(stream);
@@ -26,13 +36,13 @@ internal static class SearchResultMapper
         writer.WriteStartObject();
         foreach (var property in metadata)
         {
-            if (!TryGetDocumentValue(document, property, out var value))
+            if (!TryGetValue(values, documentId, property, out var value))
             {
                 continue;
             }
 
             writer.WritePropertyName(property.JsonName);
-            WriteRedisValue(writer, property, value, options);
+            WriteRedisValue(writer, property, value, documentId, options);
         }
 
         writer.WriteEndObject();
@@ -41,7 +51,7 @@ internal static class SearchResultMapper
         try
         {
             return JsonSerializer.Deserialize<TDocument>(stream.ToArray(), options)
-                ?? throw new SearchResultMappingException(typeof(TDocument), document.Id, "Search result materialized to null.");
+                ?? throw new SearchResultMappingException(typeof(TDocument), documentId, "Search result materialized to null.");
         }
         catch (SearchResultMappingException)
         {
@@ -51,39 +61,49 @@ internal static class SearchResultMapper
         {
             throw new SearchResultMappingException(
                 typeof(TDocument),
-                document.Id,
+                documentId,
                 $"Failed to materialize search result into '{typeof(TDocument).Name}'.",
                 exception);
         }
     }
 
-    private static void EnsureRequiredFields(SearchDocument document, IReadOnlyList<PropertyMetadata> properties)
+    private static void EnsureRequiredFields(
+        IReadOnlyDictionary<string, RedisValue> values,
+        string? documentId,
+        IReadOnlyList<PropertyMetadata> properties)
     {
         foreach (var property in properties)
         {
-            if (!property.IsRequired || TryGetDocumentValue(document, property, out _))
+            if (!property.IsRequired || TryGetValue(values, documentId, property, out _))
             {
                 continue;
             }
 
             throw new SearchResultMappingException(
                 property.PropertyType,
-                document.Id,
-                $"Required field '{property.DisplayName}' was not present in the search result for document '{document.Id}'.");
+                documentId,
+                BuildMissingFieldMessage(property.DisplayName, documentId));
         }
     }
 
-    private static bool TryGetDocumentValue(SearchDocument document, PropertyMetadata property, out RedisValue value)
+    private static bool TryGetValue(
+        IReadOnlyDictionary<string, RedisValue> values,
+        string? documentId,
+        PropertyMetadata property,
+        out RedisValue value)
     {
         foreach (var candidate in property.SourceNames)
         {
             if (string.Equals(candidate, "id", StringComparison.OrdinalIgnoreCase))
             {
-                value = document.Id;
-                return true;
+                if (!string.IsNullOrWhiteSpace(documentId))
+                {
+                    value = documentId;
+                    return true;
+                }
             }
 
-            if (document.Values.TryGetValue(candidate, out value))
+            if (values.TryGetValue(candidate, out value))
             {
                 return true;
             }
@@ -97,6 +117,7 @@ internal static class SearchResultMapper
         Utf8JsonWriter writer,
         PropertyMetadata property,
         RedisValue value,
+        string? documentId,
         JsonSerializerOptions serializerOptions)
     {
         if (value.IsNull)
@@ -117,7 +138,7 @@ internal static class SearchResultMapper
         {
             var bytes = (byte[]?)value ?? throw new SearchResultMappingException(
                 property.PropertyType,
-                null,
+                documentId,
                 $"Field '{property.DisplayName}' did not contain a binary payload.");
             writer.WriteBase64StringValue(bytes);
             return;
@@ -184,7 +205,7 @@ internal static class SearchResultMapper
 
         throw new SearchResultMappingException(
             property.PropertyType,
-            null,
+            documentId,
             $"Field '{property.DisplayName}' could not be mapped into '{property.PropertyType.Name}'.");
     }
 
@@ -288,6 +309,11 @@ internal static class SearchResultMapper
 
         return nullability.WriteState == NullabilityState.NotNull || nullability.ReadState == NullabilityState.NotNull;
     }
+
+    private static string BuildMissingFieldMessage(string fieldName, string? documentId) =>
+        string.IsNullOrWhiteSpace(documentId)
+            ? $"Required field '{fieldName}' was not present in the aggregation result."
+            : $"Required field '{fieldName}' was not present in the search result for document '{documentId}'.";
 
     private sealed record PropertyMetadata(
         Type PropertyType,

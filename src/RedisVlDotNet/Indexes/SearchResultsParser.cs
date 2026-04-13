@@ -24,14 +24,14 @@ internal static class SearchResultsParser
         for (var index = 1; index < entries.Length; index += 2)
         {
             var id = entries[index].ToString() ?? throw new InvalidOperationException("Search result document id cannot be null.");
-            var values = ParseValues(entries[index + 1]);
+            var values = ParseValues(entries[index + 1], "Search result field name cannot be null.");
             documents.Add(new SearchDocument(id, values));
         }
 
         return new SearchResults(totalCount, documents);
     }
 
-    private static IReadOnlyDictionary<string, RedisValue> ParseValues(RedisResult result)
+    internal static IReadOnlyDictionary<string, RedisValue> ParseValues(RedisResult result, string nullFieldNameMessage)
     {
         if (result.IsNull)
         {
@@ -42,7 +42,7 @@ internal static class SearchResultsParser
         var values = new Dictionary<string, RedisValue>(entries.Length / 2, StringComparer.Ordinal);
         for (var index = 0; index < entries.Length; index += 2)
         {
-            var key = entries[index].ToString() ?? throw new InvalidOperationException("Search result field name cannot be null.");
+            var key = entries[index].ToString() ?? throw new InvalidOperationException(nullFieldNameMessage);
             values[key] = (RedisValue)entries[index + 1];
         }
 

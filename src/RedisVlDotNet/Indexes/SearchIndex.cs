@@ -388,8 +388,11 @@ public sealed class SearchIndex
     public SearchResults<TDocument> Search<TDocument>(TextQuery query, JsonSerializerOptions? serializerOptions = null) =>
         SearchAsync<TDocument>(query, serializerOptions).GetAwaiter().GetResult();
 
-    public RedisResult Aggregate(AggregationQuery query) =>
+    public AggregationResults Aggregate(AggregationQuery query) =>
         AggregateAsync(query).GetAwaiter().GetResult();
+
+    public AggregationResults<TDocument> Aggregate<TDocument>(AggregationQuery query, JsonSerializerOptions? serializerOptions = null) =>
+        AggregateAsync<TDocument>(query, serializerOptions).GetAwaiter().GetResult();
 
     public SearchResults Search(HybridQuery query) =>
         SearchAsync(query).GetAwaiter().GetResult();
@@ -493,14 +496,26 @@ public sealed class SearchIndex
         return SearchResultsParser.Parse(result);
     }
 
-    public async Task<RedisResult> AggregateAsync(AggregationQuery query, CancellationToken cancellationToken = default)
+    public async Task<AggregationResults> AggregateAsync(AggregationQuery query, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(query);
 
-        return await ExecuteAsync(
+        var result = await ExecuteAsync(
             "FT.AGGREGATE",
             SearchQueryCommandBuilder.BuildAggregateArguments(Schema, query),
             cancellationToken).ConfigureAwait(false);
+
+        return AggregationResultsParser.Parse(result);
+    }
+
+    public async Task<AggregationResults<TDocument>> AggregateAsync<TDocument>(
+        AggregationQuery query,
+        JsonSerializerOptions? serializerOptions = null,
+        CancellationToken cancellationToken = default)
+    {
+        var results = await AggregateAsync(query, cancellationToken).ConfigureAwait(false);
+        cancellationToken.ThrowIfCancellationRequested();
+        return results.Map<TDocument>(serializerOptions);
     }
 
     public async Task<SearchResults<TDocument>> SearchAsync<TDocument>(
