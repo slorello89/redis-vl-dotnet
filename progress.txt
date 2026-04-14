@@ -9,6 +9,7 @@ Started: Tue Apr 14 14:01:44 EDT 2026
 - When adding more `EmbeddingsCache` read variants, route them through a shared hash-to-entry parser so semantic lookups can keep validating input/model identity while direct-key APIs reuse the same decode path.
 - Single-entry `EmbeddingsCache` lifecycle methods should keep returning `bool` hit/miss semantics from Redis single-key commands (`KeyExistsAsync`, `KeyDeleteAsync`) so future batch APIs can reserve count-based returns for multi-key operations.
 - Batch `EmbeddingsCache` APIs should preserve caller order and represent misses in-place (`null` for reads, `false` for existence) so mixed hit/miss workflows do not need an additional join step.
+- `EmbeddingsCache` docs in this repo should keep the Antora page, example `Program.cs`, and example `README.md` in sync so API parity changes are reflected in both narrative docs and runnable usage.
 
 ---
 
@@ -88,4 +89,17 @@ Started: Tue Apr 14 14:01:44 EDT 2026
   - This repository currently has no `AGENTS.md` files in the edited cache/docs/example paths, so reusable notes for this area still need to be captured in `progress.txt`.
   - Useful context
   - `EmbeddingsCacheWriteRequest` is a cleaner place for per-entry TTL overrides than trying to bolt batch TTL state onto `EmbeddingsCacheEntry`, which represents persisted results instead of write intent.
+---
+
+## 2026-04-14 14:21:03 EDT - US-007
+- Updated the EmbeddingsCache docs to cover model-aware keys, hash-backed rich entry payloads, TTL precedence, lifecycle operations, and a fuller Python-to-.NET parity mapping.
+- Files changed: `docs-site/modules/ROOT/pages/core-features/embeddings-cache.adoc`, `examples/EmbeddingsCacheExample/Program.cs`, `examples/EmbeddingsCacheExample/README.md`, `prd.json`, `progress.txt`
+- Quality checks run and result: `dotnet build examples/EmbeddingsCacheExample/EmbeddingsCacheExample.csproj --nologo` passed with 0 warnings and 0 errors; `dotnet test tests/RedisVlDotNet.Tests/RedisVlDotNet.Tests.csproj --filter EmbeddingsCache --nologo` passed with 27 tests passing and 6 Redis integration tests skipped because the integration environment was unavailable.
+- Learnings for future iterations:
+  - Patterns discovered
+  - Keep `EmbeddingsCache` parity documentation synchronized across the Antora page and the runnable example assets so API additions are shown both as reference material and executable usage.
+  - Gotchas encountered
+  - Older docs text still described string-backed storage even though the cache now persists Redis hashes, so parity doc work should re-check implementation details instead of assuming earlier wording is still correct.
+  - Useful context
+  - There are still no `AGENTS.md` files in the edited docs/example directories, so reusable notes for this area belong in `progress.txt` until that changes.
 ---

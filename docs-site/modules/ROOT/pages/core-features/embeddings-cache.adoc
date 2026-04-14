@@ -8,7 +8,7 @@ Use `EmbeddingsCache` when:
 
 * embedding generation is expensive and you want exact-input reuse
 * you do not need semantic lookup or metadata filtering
-* you want a lightweight cache that only depends on basic Redis string operations
+* you want a lightweight cache that only depends on basic Redis hash operations
 
 If you need nearest-neighbor lookup against previously stored prompts and responses, use xref:core-features/semantic-cache.adoc[`SemanticCache`] instead.
 
@@ -20,7 +20,16 @@ If you need nearest-neighbor lookup against previously stored prompts and respon
 * `KeyNamespace`, which lets multiple callers isolate entries inside one named cache
 * `TimeToLive`, which applies a default Redis TTL to each stored entry
 
-Stored values use keys shaped like `embeddings:<name>:<namespace>:<sha256(input)>` for legacy input-only entries and `embeddings:<name>:<namespace>:<sha256(input + "\n" + model)>` for model-aware entries. The library hashes the original identity before writing, but lookup is still an exact string match because the cache re-hashes the caller-provided input and optional model name.
+Stored values are Redis hashes keyed like `embeddings:<name>:<namespace>:<sha256(input)>` for legacy input-only entries and `embeddings:<name>:<namespace>:<sha256(input + "\n" + model)>` for model-aware entries. The library hashes the original identity before writing, but lookup is still an exact string match because the cache re-hashes the caller-provided input and optional model name.
+
+Each hash stores the same core fields exposed by Python RedisVL parity work:
+
+* `input`
+* `model_name`
+* `embedding`
+* `metadata`
+
+Metadata is returned as the serialized JSON string stored in Redis so callers can inspect or deserialize it however they prefer.
 
 == Core operations
 
@@ -33,6 +42,12 @@ Stored values use keys shaped like `embeddings:<name>:<namespace>:<sha256(input)
 
 | `GetAsync(input, modelName)`
 | Returns the cached `EmbeddingsCacheEntry` for that exact identity, otherwise `null`.
+
+| `GetByKeyAsync(key)` / `ExistsAsync(...)` / `ExistsByKeyAsync(key)`
+| Supports direct Redis-key access plus semantic existence checks for exact input and model identity.
+
+| `DeleteAsync(...)` / `DeleteByKeyAsync(key)`
+| Deletes a single entry by semantic identity or direct Redis key and returns `true` only when Redis removed an entry.
 
 | `SetManyAsync(entries)` / `GetManyAsync(lookups)` / `GetManyByKeyAsync(keys)`
 | Batch operations preserve the caller's input order. Read batches return one result per requested lookup or key, using `null` in-place for misses instead of dropping them.
@@ -48,7 +63,17 @@ Single-entry and batch delete helpers are available for semantic lookups and dir
 
 == TTL behavior
 
-When `TimeToLive` is configured, each write resets the Redis expiration for that entry. `SetAsync` and the new `StoreAsync` overloads can also accept a per-call `timeToLive`, which overrides the cache default for that write only. Once the key expires, `GetAsync` and `LookupAsync` return `null`.
+When `TimeToLive` is configured, each write resets the Redis expiration for that entry. `SetAsync`, `StoreAsync`, and `EmbeddingsCacheWriteRequest` can also accept a per-call `timeToLive`, which overrides the cache default for that write only. Once the key expires, `GetAsync` and `LookupAsync` return `null`, `ExistsAsync` returns `false`, and delete calls behave like a miss.
+
+== Python-parity workflow
+
+The intended translation from Python RedisVL to .NET is:
+
+. Write entries with `SetAsync` when you want the returned `EmbeddingsCacheEntry`, including the generated Redis key.
+. Read exact matches with `GetAsync(input, modelName)` or `GetByKeyAsync(key)` when a prior write returned the key.
+. Use `Exists*` and `Delete*` for cache lifecycle checks and cleanup.
+. Use `SetManyAsync`, `GetManyAsync`, and the other batch methods when callers already have multiple prompts to process.
+. Keep `Store*` and `Lookup*` for legacy input-only usage or for callers migrating incrementally from older .NET examples.
 
 == Python to .NET method mapping
 
@@ -72,6 +97,34 @@ When `TimeToLive` is configured, each write resets the Redis expiration for that
 | `GetManyAsync(lookups)`
 | `GetMany(lookups)`
 
+| `get_by_key(key)`
+| `GetByKeyAsync(key)`
+| `GetByKey(key)`
+
+| `exists(text, model_name)`
+| `ExistsAsync(input, modelName)`
+| `Exists(input, modelName)`
+
+| `exists_by_key(key)`
+| `ExistsByKeyAsync(key)`
+| `ExistsByKey(key)`
+
+| `delete(text, model_name)`
+| `DeleteAsync(input, modelName)`
+| `Delete(input, modelName)`
+
+| `delete_by_key(key)`
+| `DeleteByKeyAsync(key)`
+| `DeleteByKey(key)`
+
+| `mexists([{ text, model_name }])`
+| `ExistsManyAsync(lookups)`
+| `ExistsMany(lookups)`
+
+| `mdelete([{ text, model_name }])`
+| `DeleteManyAsync(lookups)`
+| `DeleteMany(lookups)`
+
 | `set(text, embedding)` legacy input-only usage
 | `StoreAsync(input, embedding)` or `SetAsync(input, embedding)`
 | `Store(input, embedding)` or `Set(input, embedding)`
@@ -85,9 +138,10 @@ It demonstrates:
 
 * creating a namespaced cache with TTL
 * storing an embedding and capturing the returned Redis key
-* looking it up by the same input and model name
+* reading the same entry by semantic identity and by direct Redis key
+* checking existence before and after deletion
 * reading mixed-hit batches while preserving request order
-* overwriting an existing embedding entry
+* overwriting an existing embedding entry and applying a per-call TTL override
 
 The exact behavior is also covered in `tests/RedisVlDotNet.Tests/Caches/EmbeddingsCacheTests.cs` and `tests/RedisVlDotNet.Tests/Caches/EmbeddingsCacheIntegrationTests.cs`.
 

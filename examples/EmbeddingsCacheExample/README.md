@@ -4,10 +4,12 @@ Demonstrates exact-input embedding reuse:
 
 - create an `EmbeddingsCache` with a per-run namespace and TTL
 - store an embedding with Python-style `SetAsync(...)`
-- look up the cached entry with `GetAsync(...)`
+- look up the cached entry with `GetAsync(...)` and `GetByKeyAsync(...)`
+- use `ExistsAsync(...)` and `DeleteByKeyAsync(...)` for lifecycle operations
 - understand that `GetManyAsync(...)` preserves request order and leaves `null` placeholders for misses
 - inspect the Redis key returned from the write call
 - overwrite the cached embedding and confirm the new value is returned
+- write multiple entries with `SetManyAsync(...)` using per-entry TTL overrides
 
 ## Prerequisites
 
@@ -21,7 +23,7 @@ docker compose -f docker-compose.integration.yml up -d redis-stack
 export REDIS_VL_REDIS_URL=localhost:6379
 ```
 
-This example uses plain Redis string operations, so it does not require RediSearch or provider credentials.
+This example uses Redis hashes and basic key operations, so it does not require RediSearch or provider credentials.
 
 ## Run
 
