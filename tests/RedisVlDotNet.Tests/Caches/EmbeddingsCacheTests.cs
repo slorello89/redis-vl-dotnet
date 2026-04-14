@@ -25,6 +25,34 @@ public sealed class EmbeddingsCacheTests
     }
 
     [Fact]
+    public async Task LookupAsync_WithModelName_UsesDistinctKeyForSameInput()
+    {
+        var (database, recorder) = RecordingDatabaseProxy.CreatePair();
+        var cache = new EmbeddingsCache(database, new EmbeddingsCacheOptions("unit-cache", "tests"));
+        var firstEmbedding = new[] { 1f, 2f, 3f };
+        var secondEmbedding = new[] { 4f, 5f, 6f };
+
+        var firstStored = await cache.StoreAsync("hello world", "text-embedding-3-small", firstEmbedding);
+        var firstKey = recorder.LastKey;
+        var secondStored = await cache.StoreAsync("hello world", "text-embedding-3-large", secondEmbedding);
+        var secondKey = recorder.LastKey;
+        var firstHit = await cache.LookupAsync("hello world", "text-embedding-3-small");
+        var firstLookupKey = recorder.LastKey;
+        var secondHit = await cache.LookupAsync("hello world", "text-embedding-3-large");
+        var secondLookupKey = recorder.LastKey;
+        var legacyMiss = await cache.LookupAsync("hello world");
+
+        Assert.True(firstStored);
+        Assert.True(secondStored);
+        Assert.NotEqual(firstKey, secondKey);
+        Assert.Equal(firstKey, firstLookupKey);
+        Assert.Equal(secondKey, secondLookupKey);
+        Assert.Equal(firstEmbedding, firstHit);
+        Assert.Equal(secondEmbedding, secondHit);
+        Assert.Null(legacyMiss);
+    }
+
+    [Fact]
     public async Task LookupAsync_ReturnsMissWhenStoredPayloadInputDoesNotMatch()
     {
         var (database, recorder) = RecordingDatabaseProxy.CreatePair();
@@ -40,6 +68,17 @@ public sealed class EmbeddingsCacheTests
         var cached = await cache.LookupAsync("prompt");
 
         Assert.Null(cached);
+    }
+
+    [Fact]
+    public void CreateKey_WithoutModelName_PreservesLegacyHash()
+    {
+        var (database, _) = RecordingDatabaseProxy.CreatePair();
+        var cache = new EmbeddingsCache(database, new EmbeddingsCacheOptions("unit-cache", "tests"));
+
+        var legacyKey = cache.CreateKey("hello world");
+
+        Assert.Equal("embeddings:unit-cache:tests:b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9", legacyKey);
     }
 
     [Fact]

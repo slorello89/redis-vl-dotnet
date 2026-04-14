@@ -1,0 +1,118 @@
+{
+  "project": "redis-vl-dotnet",
+  "branchName": "ralph/embeddings-cache-api-parity",
+  "description": "Reduce the API gap between the RedisVL Python embeddings cache and the .NET EmbeddingsCache so .NET supports the same cache identity, richer entry payloads, and core lifecycle operations with a .NET-native surface.",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Align cache identity with Python embeddings cache",
+      "description": "As a .NET developer, I want EmbeddingsCache keys to incorporate model identity in addition to input content so that cached embeddings do not collide across embedding models.",
+      "acceptanceCriteria": [
+        "Add API support for model-aware cache identity on EmbeddingsCache writes and lookups",
+        "Generate distinct Redis keys for the same input when different model names are provided",
+        "Preserve a clear migration or compatibility story for existing input-only cache usage",
+        "Add unit tests covering same-input different-model key generation and lookup behavior",
+        "Typecheck passes",
+        "Tests pass"
+      ],
+      "priority": 1,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-002",
+      "title": "Store and return rich cache entries",
+      "description": "As a .NET developer, I want EmbeddingsCache to store and return the same core entry fields as Python so that cache consumers can inspect more than just the raw embedding vector.",
+      "acceptanceCriteria": [
+        "Store hash fields for input content, model name, embedding payload, and optional metadata",
+        "Add a public .NET result model for cache entry reads instead of returning only float arrays",
+        "Lookup APIs return null for misses and a populated entry model for hits",
+        "Add unit tests covering round-trip persistence of entry fields and metadata",
+        "Typecheck passes",
+        "Tests pass"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-003",
+      "title": "Align single-entry read and write API surface",
+      "description": "As a .NET developer, I want the primary read and write methods to mirror the Python embeddings cache semantics so that moving between the two libraries requires minimal translation.",
+      "acceptanceCriteria": [
+        "Add .NET read and write overloads that accept input content, model name, embedding, and optional metadata",
+        "Return the Redis cache key from write operations or expose an equivalent first-class result that includes it",
+        "Support per-call TTL override in addition to cache-level defaults",
+        "Document the intended sync and async method mapping from Python to .NET",
+        "Add unit tests for cache-level TTL and per-call TTL precedence",
+        "Typecheck passes",
+        "Tests pass"
+      ],
+      "priority": 3,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-004",
+      "title": "Add key-based and existence APIs",
+      "description": "As a .NET developer, I want key-based retrieval and existence checks so that the .NET cache supports the same operational workflows as the Python cache.",
+      "acceptanceCriteria": [
+        "Add key-based read APIs for retrieving cache entries directly by Redis key",
+        "Add existence-check APIs for content plus model lookups and for direct key checks",
+        "Add unit tests for hit and miss behavior across the new APIs",
+        "Typecheck passes",
+        "Tests pass"
+      ],
+      "priority": 4,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-005",
+      "title": "Add delete APIs for embeddings cache entries",
+      "description": "As a .NET developer, I want to delete cache entries by semantic lookup inputs or direct Redis key so that .NET supports the same cache lifecycle controls as Python.",
+      "acceptanceCriteria": [
+        "Add delete APIs for content plus model identity",
+        "Add delete APIs for direct Redis keys",
+        "Return explicit success or deletion-count information from delete operations",
+        "Add unit tests covering delete hits, misses, and repeated deletes",
+        "Typecheck passes",
+        "Tests pass"
+      ],
+      "priority": 5,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-006",
+      "title": "Add batch embeddings cache operations",
+      "description": "As a .NET developer, I want batch get, set, existence, and delete operations so that high-volume cache workflows can be expressed similarly to the Python library.",
+      "acceptanceCriteria": [
+        "Add batch write APIs for multiple embeddings cache entries",
+        "Add batch read APIs for semantic lookups and direct Redis keys",
+        "Add batch existence and delete APIs",
+        "Document ordering and partial-hit behavior for batch results",
+        "Add unit tests for mixed hit and miss batch scenarios",
+        "Typecheck passes",
+        "Tests pass"
+      ],
+      "priority": 6,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-007",
+      "title": "Document and example the Python-parity embeddings cache workflow",
+      "description": "As a .NET developer, I want docs and examples that explain the aligned EmbeddingsCache API so that I can translate Python RedisVL cache usage into .NET with minimal ambiguity.",
+      "acceptanceCriteria": [
+        "Update EmbeddingsCache docs to describe model-aware keys, rich entry payloads, TTL behavior, and lifecycle operations",
+        "Update the EmbeddingsCache example to demonstrate the aligned API shape",
+        "Add a concise parity table or mapping guide between Python and .NET embeddings cache methods",
+        "Typecheck passes"
+      ],
+      "priority": 7,
+      "passes": false,
+      "notes": ""
+    }
+  ]
+}

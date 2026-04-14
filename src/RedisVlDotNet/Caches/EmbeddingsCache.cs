@@ -8,6 +8,7 @@ public sealed class EmbeddingsCache
 {
     private const string InputFieldName = "input";
     private const string EmbeddingFieldName = "embedding";
+    private const char KeyHashSeparator = '\n';
 
     private readonly IDatabase _database;
 
@@ -31,7 +32,88 @@ public sealed class EmbeddingsCache
     public bool Store(string input, float[] embedding) =>
         StoreAsync(input, embedding).GetAwaiter().GetResult();
 
+    public bool Store(string input, string modelName, float[] embedding) =>
+        StoreAsync(input, modelName, embedding).GetAwaiter().GetResult();
+
     public async Task<bool> StoreAsync(string input, float[] embedding, CancellationToken cancellationToken = default)
+    {
+        return await StoreAsyncCore(input, embedding, modelName: null, cancellationToken).ConfigureAwait(false);
+    }
+
+    public async Task<bool> StoreAsync(
+        string input,
+        string modelName,
+        float[] embedding,
+        CancellationToken cancellationToken = default)
+    {
+        return await StoreAsyncCore(
+            input,
+            embedding,
+            NormalizeModelName(modelName),
+            cancellationToken).ConfigureAwait(false);
+    }
+
+    public float[]? Lookup(string input) =>
+        LookupAsync(input).GetAwaiter().GetResult();
+
+    public float[]? Lookup(string input, string modelName) =>
+        LookupAsync(input, modelName).GetAwaiter().GetResult();
+
+    public async Task<float[]?> LookupAsync(string input, CancellationToken cancellationToken = default)
+    {
+        return await LookupAsyncCore(input, modelName: null, cancellationToken).ConfigureAwait(false);
+    }
+
+    public async Task<float[]?> LookupAsync(
+        string input,
+        string modelName,
+        CancellationToken cancellationToken = default)
+    {
+        return await LookupAsyncCore(
+            input,
+            NormalizeModelName(modelName),
+            cancellationToken).ConfigureAwait(false);
+    }
+
+    internal RedisKey CreateKey(string input) => CreateKey(input, modelName: null);
+
+    internal RedisKey CreateKey(string input, string? modelName)
+    {
+        var identity = string.IsNullOrEmpty(modelName)
+            ? input
+            : string.Concat(input, KeyHashSeparator, modelName);
+        var hash = Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(identity)));
+        return string.IsNullOrEmpty(KeyNamespace)
+            ? $"embeddings:{Name}:{hash}"
+            : $"embeddings:{Name}:{KeyNamespace}:{hash}";
+    }
+
+    internal static byte[] EncodeFloat32(float[] vector)
+    {
+        var bytes = new byte[vector.Length * sizeof(float)];
+        Buffer.BlockCopy(vector, 0, bytes, 0, bytes.Length);
+        return bytes;
+    }
+
+    internal static float[] DecodeFloat32(byte[] payload)
+    {
+        ArgumentNullException.ThrowIfNull(payload);
+
+        if (payload.Length % sizeof(float) != 0)
+        {
+            throw new InvalidOperationException("Cached embedding payload length must align to 32-bit floating point values.");
+        }
+
+        var values = new float[payload.Length / sizeof(float)];
+        Buffer.BlockCopy(payload, 0, values, 0, payload.Length);
+        return values;
+    }
+
+    private async Task<bool> StoreAsyncCore(
+        string input,
+        float[] embedding,
+        string? modelName,
+        CancellationToken cancellationToken)
     {
         var normalizedInput = NormalizeInput(input);
         ArgumentNullException.ThrowIfNull(embedding);
@@ -44,7 +126,7 @@ public sealed class EmbeddingsCache
             new HashEntry(EmbeddingFieldName, EncodeFloat32(embedding))
         ];
 
-        var key = CreateKey(normalizedInput);
+        var key = CreateKey(normalizedInput, modelName);
         await _database.HashSetAsync(key, entries).WaitAsync(cancellationToken).ConfigureAwait(false);
 
         if (TimeToLive.HasValue)
@@ -56,17 +138,17 @@ public sealed class EmbeddingsCache
         return true;
     }
 
-    public float[]? Lookup(string input) =>
-        LookupAsync(input).GetAwaiter().GetResult();
-
-    public async Task<float[]?> LookupAsync(string input, CancellationToken cancellationToken = default)
+    private async Task<float[]?> LookupAsyncCore(
+        string input,
+        string? modelName,
+        CancellationToken cancellationToken)
     {
         var normalizedInput = NormalizeInput(input);
 
         cancellationToken.ThrowIfCancellationRequested();
 
         var entries = await _database
-            .HashGetAllAsync(CreateKey(normalizedInput))
+            .HashGetAllAsync(CreateKey(normalizedInput, modelName))
             .WaitAsync(cancellationToken)
             .ConfigureAwait(false);
 
@@ -100,38 +182,15 @@ public sealed class EmbeddingsCache
         return DecodeFloat32(payload);
     }
 
-    internal RedisKey CreateKey(string input)
-    {
-        var hash = Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(input)));
-        return string.IsNullOrEmpty(KeyNamespace)
-            ? $"embeddings:{Name}:{hash}"
-            : $"embeddings:{Name}:{KeyNamespace}:{hash}";
-    }
-
-    internal static byte[] EncodeFloat32(float[] vector)
-    {
-        var bytes = new byte[vector.Length * sizeof(float)];
-        Buffer.BlockCopy(vector, 0, bytes, 0, bytes.Length);
-        return bytes;
-    }
-
-    internal static float[] DecodeFloat32(byte[] payload)
-    {
-        ArgumentNullException.ThrowIfNull(payload);
-
-        if (payload.Length % sizeof(float) != 0)
-        {
-            throw new InvalidOperationException("Cached embedding payload length must align to 32-bit floating point values.");
-        }
-
-        var values = new float[payload.Length / sizeof(float)];
-        Buffer.BlockCopy(payload, 0, values, 0, payload.Length);
-        return values;
-    }
-
     private static string NormalizeInput(string input)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(input);
         return input;
+    }
+
+    private static string NormalizeModelName(string modelName)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(modelName);
+        return modelName;
     }
 }
