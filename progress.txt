@@ -6,6 +6,7 @@ Started: Tue Apr 14 09:38:40 EDT 2026
 - GitHub Pages docs publishing uses `.github/workflows/docs-pages.yml`; keep the deploy job separate from the Antora build job and publish the `build/site` artifact only after a successful build.
 - Keep docs and example quality gates aligned around repository-root commands: `npm run docs:validate` for Antora validation and `npm run examples:build` for the full example sweep, with CI calling the same entry points instead of duplicating shell one-liners.
 - When Antora replaces legacy repository entry-point docs, move the substantive overview into the Antora section index pages and leave the old Markdown files as short redirect stubs so there is one canonical editing target.
+- Keep connection and credential setup canonical in `docs-site/modules/ROOT/pages/getting-started/index.adoc`; examples can show story-specific overrides, but shared Redis topology and provider env var guidance should live in the getting-started page so links and onboarding stay consistent.
 ---
 
 ## 2026-04-14 09:42:08 EDT - US-001
@@ -43,4 +44,17 @@ Started: Tue Apr 14 09:38:40 EDT 2026
   - Antora section index pages are the right place for repository-level overview content because they give one canonical target per area without needing duplicate Markdown guides.
   - Leave legacy repository docs behind as redirect stubs when links may already exist in issues, PRs, or bookmarks; that keeps old links useful while preventing content drift.
   - Manual browser verification is still required for docs UI changes because no browser-testing tool is available in this environment.
+---
+## 2026-04-14 09:53:28 EDT - US-005
+- Implemented the canonical getting-started setup guide with .NET and Redis prerequisites, default local Redis startup commands, direct/cluster/Sentinel environment-variable coverage, provider credential notes, and copy-paste setup flows that end in a runnable JSON example command.
+- Files changed: `docs-site/modules/ROOT/pages/getting-started/index.adoc`, `prd.json`, `progress.txt`.
+- Quality checks run and result: `npm run docs:validate` passed; `npm run examples:build` passed.
+- Learnings for future iterations:
+  - Patterns discovered
+  - Keep the Antora getting-started page as the single place for shared Redis topology and provider credential setup so examples can stay focused on feature-specific behavior.
+  - Reuse exact environment-variable names from examples and test helpers when documenting setup; this repo already standardizes on `REDIS_VL_REDIS_*` plus provider-specific keys.
+  - Gotchas encountered
+  - The workspace contains unrelated in-flight source changes, so commit only the story files instead of using a blanket `git add .`.
+  - Useful context
+  - There are no `AGENTS.md` files under the edited docs/example paths, so the reusable setup guidance belongs in `progress.txt` for this iteration.
 ---
