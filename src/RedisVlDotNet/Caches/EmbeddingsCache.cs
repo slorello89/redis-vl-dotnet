@@ -1,14 +1,15 @@
 using System.Security.Cryptography;
 using System.Text;
-using System.Text.Json;
 using StackExchange.Redis;
 
-namespace RedisVlDotNet.Caches;
+namespace RedisVl.Caches;
 
 public sealed class EmbeddingsCache
 {
+    private const string InputFieldName = "input";
+    private const string EmbeddingFieldName = "embedding";
+
     private readonly IDatabase _database;
-    private readonly JsonSerializerOptions _serializerOptions;
 
     public EmbeddingsCache(IDatabase database, EmbeddingsCacheOptions options)
     {
@@ -16,7 +17,6 @@ public sealed class EmbeddingsCache
         ArgumentNullException.ThrowIfNull(options);
 
         _database = database;
-        _serializerOptions = new JsonSerializerOptions(JsonSerializerDefaults.Web);
         Options = options;
     }
 
@@ -38,14 +38,22 @@ public sealed class EmbeddingsCache
 
         cancellationToken.ThrowIfCancellationRequested();
 
-        var payload = JsonSerializer.Serialize(
-            new CachePayload(normalizedInput, EncodeFloat32(embedding)),
-            _serializerOptions);
+        HashEntry[] entries =
+        [
+            new HashEntry(InputFieldName, normalizedInput),
+            new HashEntry(EmbeddingFieldName, EncodeFloat32(embedding))
+        ];
 
-        return await _database
-            .StringSetAsync(CreateKey(normalizedInput), payload, TimeToLive, When.Always)
-            .WaitAsync(cancellationToken)
-            .ConfigureAwait(false);
+        var key = CreateKey(normalizedInput);
+        await _database.HashSetAsync(key, entries).WaitAsync(cancellationToken).ConfigureAwait(false);
+
+        if (TimeToLive.HasValue)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            await _database.KeyExpireAsync(key, TimeToLive).WaitAsync(cancellationToken).ConfigureAwait(false);
+        }
+
+        return true;
     }
 
     public float[]? Lookup(string input) =>
@@ -57,23 +65,39 @@ public sealed class EmbeddingsCache
 
         cancellationToken.ThrowIfCancellationRequested();
 
-        var payload = await _database
-            .StringGetAsync(CreateKey(normalizedInput))
+        var entries = await _database
+            .HashGetAllAsync(CreateKey(normalizedInput))
             .WaitAsync(cancellationToken)
             .ConfigureAwait(false);
 
-        if (payload.IsNullOrEmpty)
+        if (entries.Length == 0)
         {
             return null;
         }
 
-        var cachedPayload = JsonSerializer.Deserialize<CachePayload>(payload!, _serializerOptions);
-        if (cachedPayload is null || !string.Equals(cachedPayload.Input, normalizedInput, StringComparison.Ordinal))
+        string? cachedInput = null;
+        byte[]? payload = null;
+
+        foreach (var entry in entries)
+        {
+            if (entry.Name == InputFieldName)
+            {
+                cachedInput = entry.Value;
+                continue;
+            }
+
+            if (entry.Name == EmbeddingFieldName && !entry.Value.IsNull)
+            {
+                payload = (byte[]?)entry.Value;
+            }
+        }
+
+        if (!string.Equals(cachedInput, normalizedInput, StringComparison.Ordinal) || payload is null)
         {
             return null;
         }
 
-        return DecodeFloat32(cachedPayload.Embedding);
+        return DecodeFloat32(payload);
     }
 
     internal RedisKey CreateKey(string input)
@@ -110,6 +134,4 @@ public sealed class EmbeddingsCache
         ArgumentException.ThrowIfNullOrWhiteSpace(input);
         return input;
     }
-
-    private sealed record CachePayload(string Input, byte[] Embedding);
 }

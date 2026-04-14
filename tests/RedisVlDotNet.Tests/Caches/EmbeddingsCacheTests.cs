@@ -1,8 +1,8 @@
 using System.Reflection;
-using RedisVlDotNet.Caches;
+using RedisVl.Caches;
 using StackExchange.Redis;
 
-namespace RedisVlDotNet.Tests.Caches;
+namespace RedisVl.Tests.Caches;
 
 public sealed class EmbeddingsCacheTests
 {
@@ -20,6 +20,8 @@ public sealed class EmbeddingsCacheTests
         Assert.NotNull(cached);
         Assert.Equal(embedding, cached);
         Assert.Equal("embeddings:unit-cache:tests:b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9", recorder.LastKey);
+        Assert.Equal(1, recorder.HashSetAsyncCallCount);
+        Assert.Equal(1, recorder.HashGetAllAsyncCallCount);
     }
 
     [Fact]
@@ -29,7 +31,11 @@ public sealed class EmbeddingsCacheTests
         var cache = new EmbeddingsCache(database, new EmbeddingsCacheOptions("unit-cache"));
         var key = cache.CreateKey("prompt");
 
-        recorder.StoredValues[key] = "{\"input\":\"other\",\"embedding\":\"AACAPwAAAEA=\"}";
+        recorder.StoredValues[key] =
+        [
+            new HashEntry("input", "other"),
+            new HashEntry("embedding", EmbeddingsCache.EncodeFloat32([1f, 2f]))
+        ];
 
         var cached = await cache.LookupAsync("prompt");
 
@@ -47,7 +53,7 @@ public sealed class EmbeddingsCacheTests
 
         await Assert.ThrowsAsync<OperationCanceledException>(() =>
             cache.StoreAsync("prompt", [1f, 2f], cancellationTokenSource.Token));
-        Assert.Equal(0, recorder.StringSetAsyncCallCount);
+        Assert.Equal(0, recorder.HashSetAsyncCallCount);
     }
 
     [Fact]
@@ -61,16 +67,16 @@ public sealed class EmbeddingsCacheTests
 
         await Assert.ThrowsAsync<OperationCanceledException>(() =>
             cache.LookupAsync("prompt", cancellationTokenSource.Token));
-        Assert.Equal(0, recorder.StringGetAsyncCallCount);
+        Assert.Equal(0, recorder.HashGetAllAsyncCallCount);
     }
 
     private class RecordingDatabaseProxy : DispatchProxy
     {
-        public Dictionary<RedisKey, RedisValue> StoredValues { get; } = [];
+        public Dictionary<RedisKey, HashEntry[]> StoredValues { get; } = [];
 
-        public int StringSetAsyncCallCount { get; private set; }
+        public int HashSetAsyncCallCount { get; private set; }
 
-        public int StringGetAsyncCallCount { get; private set; }
+        public int HashGetAllAsyncCallCount { get; private set; }
 
         public RedisKey? LastKey { get; private set; }
 
@@ -87,33 +93,34 @@ public sealed class EmbeddingsCacheTests
 
             return targetMethod.Name switch
             {
-                nameof(IDatabase.StringSetAsync) => HandleStringSetAsync(args),
-                nameof(IDatabase.StringGetAsync) => HandleStringGetAsync(args),
+                nameof(IDatabase.HashSetAsync) => HandleHashSetAsync(args),
+                nameof(IDatabase.HashGetAllAsync) => HandleHashGetAllAsync(args),
+                nameof(IDatabase.KeyExpireAsync) => Task.FromResult(true),
                 nameof(IDatabase.Multiplexer) => throw new NotSupportedException(),
                 nameof(IDatabase.Database) => 0,
                 _ => throw new NotSupportedException($"Method '{targetMethod.Name}' is not configured for this test proxy.")
             };
         }
 
-        private Task<bool> HandleStringSetAsync(object?[]? args)
+        private Task<bool> HandleHashSetAsync(object?[]? args)
         {
-            StringSetAsyncCallCount++;
+            HashSetAsyncCallCount++;
 
             var key = (RedisKey)args![0]!;
-            var value = (RedisValue)args[1]!;
+            var value = (HashEntry[])args[1]!;
 
             LastKey = key;
             StoredValues[key] = value;
             return Task.FromResult(true);
         }
 
-        private Task<RedisValue> HandleStringGetAsync(object?[]? args)
+        private Task<HashEntry[]> HandleHashGetAllAsync(object?[]? args)
         {
-            StringGetAsyncCallCount++;
+            HashGetAllAsyncCallCount++;
 
             var key = (RedisKey)args![0]!;
             LastKey = key;
-            return Task.FromResult(StoredValues.TryGetValue(key, out var value) ? value : RedisValue.Null);
+            return Task.FromResult(StoredValues.TryGetValue(key, out var value) ? value : []);
         }
     }
 }
