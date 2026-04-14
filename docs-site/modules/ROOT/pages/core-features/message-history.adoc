@@ -1,0 +1,51 @@
+= MessageHistory
+
+`MessageHistory` is an append-only, session-scoped chat log stored in Redis hashes. It gives you recency-based retrieval without requiring vectorization.
+
+== Schema and ordering model
+
+Each message history index stores:
+
+* `sessionId`
+* `role`
+* `content`
+* optional metadata JSON
+* `timestamp`
+* `sequence`
+
+Messages are keyed by a hashed session id plus an incrementing sequence number. Retrieval is ordered by descending sequence, which gives you a stable most-recent-first history for one session.
+
+== Core operations
+
+[cols="1,2"]
+|===
+| API | Behavior
+
+| `AppendAsync(sessionId, role, content, metadata, timestamp)`
+| Appends one message and returns the Redis document key.
+
+| `GetRecentAsync(sessionId, limit, role)`
+| Returns the newest messages for one session, optionally narrowed to one role such as `assistant`.
+
+| `CreateAsync`, `ExistsAsync`, `DropAsync`
+| Manage the backing HASH index.
+|===
+
+`limit` must be greater than zero. `sessionId`, `role`, and `content` are trimmed before they are stored.
+
+== Recency behavior
+
+`GetRecentAsync` always scopes the query to one session id. If you pass `role`, the search adds a second TAG filter so you can fetch only assistant replies, only user turns, or another application-specific role.
+
+This API does not do semantic retrieval. Use xref:core-features/semantic-message-history.adoc[`SemanticMessageHistory`] when you need nearest-message lookup inside the same session.
+
+== Example
+
+Use `/examples/MessageHistoryExample` for the runnable history workflow in this repo.
+
+That sample uses `SemanticMessageHistory`, but it demonstrates the same recency retrieval pattern through `GetRecentAsync` and the same session-oriented append model. For the exact non-vector API contract, use `tests/RedisVlDotNet.Tests/Workflows/MessageHistoryTests.cs` and `tests/RedisVlDotNet.Tests/Workflows/MessageHistoryIntegrationTests.cs`.
+
+== Related sections
+
+* xref:core-features/semantic-message-history.adoc[SemanticMessageHistory] for semantic retrieval inside a session
+* xref:../examples/index.adoc[Examples] for runnable samples

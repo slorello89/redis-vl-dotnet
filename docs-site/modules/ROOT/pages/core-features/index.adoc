@@ -11,6 +11,7 @@ The core package centers on these feature groups:
 * xref:core-features/index-lifecycle.adoc[`SearchIndex`] for index creation, inspection, listing, clearing, rediscovery, and dropping
 * xref:core-features/document-lifecycle.adoc[document lifecycle] and xref:core-features/partial-updates.adoc[partial updates] for JSON and HASH CRUD flows
 * structured query objects for filter, text, count, vector, hybrid, multi-vector, and aggregation workflows
+* higher-level caches and workflows for embeddings reuse, semantic response reuse, semantic routing, and chat-history retrieval
 
 == Schema and index docs
 
@@ -74,6 +75,28 @@ The core package centers on these feature groups:
 | `AggregationQuery`, `AggregationApply`, `AggregationGroupBy`, reducers, pagination, typed row mapping, and aggregate batching.
 |===
 
+== Cache and workflow docs
+
+[cols="1,2"]
+|===
+| Topic | What it covers
+
+| xref:core-features/embeddings-cache.adoc[`EmbeddingsCache`]
+| Exact-input embedding reuse with SHA-256-based keys, optional namespaces, and TTL-driven expiration.
+
+| xref:core-features/semantic-cache.adoc[`SemanticCache`]
+| Semantic response reuse with vector thresholds, optional metadata, filterable fields, and vectorizer-based overloads.
+
+| xref:core-features/semantic-router.adoc[`SemanticRouter`]
+| Route registration and nearest-route lookup for AI-adjacent request routing workflows.
+
+| xref:core-features/message-history.adoc[`MessageHistory`]
+| Session-scoped append-only chat history with recency retrieval and optional role filters.
+
+| xref:core-features/semantic-message-history.adoc[`SemanticMessageHistory`]
+| Recency plus semantic retrieval inside one session with configurable vector thresholds.
+|===
+
 == Primary example
 
 The primary runnable example for this area is `/examples/JsonStorageExample`.
@@ -113,3 +136,8 @@ Query pagination is shared across the search APIs, and typed result mapping is d
 * xref:core-features/aggregation-workflows.adoc[Aggregation workflows] for grouping and typed aggregate results
 * xref:../examples/index.adoc[Examples] for runnable coverage
 * xref:../cli/index.adoc[CLI] for terminal-oriented schema and index operations
+* xref:core-features/embeddings-cache.adoc[EmbeddingsCache] for exact embedding reuse
+* xref:core-features/semantic-cache.adoc[SemanticCache] for semantic response reuse
+* xref:core-features/semantic-router.adoc[SemanticRouter] for nearest-route matching
+* xref:core-features/message-history.adoc[MessageHistory] for recency-only chat history
+* xref:core-features/semantic-message-history.adoc[SemanticMessageHistory] for semantic session retrieval

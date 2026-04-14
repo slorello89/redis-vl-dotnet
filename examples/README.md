@@ -30,8 +30,10 @@ Use this map when you want the fastest path to a parity feature area:
 | --- | --- | --- |
 | Advanced schema options, YAML loading, from-existing index, index listing, JSON partial updates, `TextQuery`, aggregation, clear helper | [JsonStorageExample](/Users/steve.lorello/projects/redis/redis-vl-dotnet/examples/JsonStorageExample/README.md) | Also covers cluster and Sentinel connection environment variables |
 | Vector query basics, runtime vector search tuning, `MultiVectorQuery`, aggregate hybrid search, HASH partial updates | [VectorSearchExample](/Users/steve.lorello/projects/redis/redis-vl-dotnet/examples/VectorSearchExample/README.md) | HASH-backed workflow with deterministic vector seed data |
+| Exact-input embedding reuse with TTL | [EmbeddingsCacheExample](/Users/steve.lorello/projects/redis/redis-vl-dotnet/examples/EmbeddingsCacheExample/README.md) | Uses Redis string storage and does not require RediSearch |
 | Semantic message history with recency and semantic retrieval | [MessageHistoryExample](/Users/steve.lorello/projects/redis/redis-vl-dotnet/examples/MessageHistoryExample/README.md) | Uses an in-process sample vectorizer so no provider credentials are required |
 | Semantic cache filter fields and metadata payloads | [SemanticCacheExample](/Users/steve.lorello/projects/redis/redis-vl-dotnet/examples/SemanticCacheExample/README.md) | Shows tenant/model filter composition |
+| Semantic route registration and nearest-route matching | [SemanticRouterExample](/Users/steve.lorello/projects/redis/redis-vl-dotnet/examples/SemanticRouterExample/README.md) | Uses an in-process sample vectorizer so no provider credentials are required |
 | OpenAI vectorizer package | [OpenAiVectorizerExample](/Users/steve.lorello/projects/redis/redis-vl-dotnet/examples/OpenAiVectorizerExample/README.md) | Requires `OPENAI_API_KEY` |
 | Hugging Face vectorizer package | [HuggingFaceVectorizerExample](/Users/steve.lorello/projects/redis/redis-vl-dotnet/examples/HuggingFaceVectorizerExample/README.md) | Requires `HF_TOKEN` |
 | Cohere reranker package | [CohereRerankerExample](/Users/steve.lorello/projects/redis/redis-vl-dotnet/examples/CohereRerankerExample/README.md) | Requires `COHERE_API_KEY` |
@@ -81,6 +83,21 @@ Run it from the repository root:
 dotnet run --project examples/VectorSearchExample/VectorSearchExample.csproj
 ```
 
+### [EmbeddingsCacheExample](/Users/steve.lorello/projects/redis/redis-vl-dotnet/examples/EmbeddingsCacheExample/README.md)
+
+Demonstrates exact-input embedding reuse:
+
+- create an `EmbeddingsCache` with a per-run namespace
+- store an embedding for one input string
+- look up the cached embedding by the same input
+- overwrite the stored embedding and confirm the new value
+
+Run it from the repository root:
+
+```bash
+dotnet run --project examples/EmbeddingsCacheExample/EmbeddingsCacheExample.csproj
+```
+
 ### [MessageHistoryExample](/Users/steve.lorello/projects/redis/redis-vl-dotnet/examples/MessageHistoryExample/README.md)
 
 Demonstrates semantic message history retrieval:
@@ -119,6 +136,25 @@ Run it from the repository root:
 
 ```bash
 dotnet run --project examples/SemanticCacheExample/SemanticCacheExample.csproj
+```
+
+### [SemanticRouterExample](/Users/steve.lorello/projects/redis/redis-vl-dotnet/examples/SemanticRouterExample/README.md)
+
+Demonstrates nearest-route matching:
+
+- create a `SemanticRouter` with a local sample vectorizer
+- add routes for multiple intent categories
+- route a new utterance to the nearest stored route
+- drop the example index and documents
+
+Redis prerequisites:
+
+- RediSearch with vector similarity support
+
+Run it from the repository root:
+
+```bash
+dotnet run --project examples/SemanticRouterExample/SemanticRouterExample.csproj
 ```
 
 ### [OpenAiVectorizerExample](/Users/steve.lorello/projects/redis/redis-vl-dotnet/examples/OpenAiVectorizerExample/README.md)

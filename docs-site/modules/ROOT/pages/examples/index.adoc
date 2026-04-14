@@ -34,9 +34,17 @@ Examples that use JSON storage also require RedisJSON. Provider-backed examples 
 | `/examples/MessageHistoryExample`
 | Covers recency and semantic retrieval without requiring provider credentials.
 
+| Embeddings cache
+| `/examples/EmbeddingsCacheExample`
+| Covers exact-input embedding reuse and TTL-backed expiration without requiring RediSearch.
+
 | Semantic cache
 | `/examples/SemanticCacheExample`
 | Covers filterable semantic cache entries and metadata payloads.
+
+| Semantic router
+| `/examples/SemanticRouterExample`
+| Covers route registration and nearest-route matching without requiring provider credentials.
 
 | OpenAI vectorization
 | `/examples/OpenAiVectorizerExample`

@@ -10,6 +10,7 @@ Started: Tue Apr 14 09:38:40 EDT 2026
 - For Antora pages under nested folders, use module-relative xref targets such as `xref:core-features/search-schema.adoc[]` instead of sibling-only filenames so local docs validation resolves links consistently.
 - In Antora prose, avoid literal `{name}` placeholders unless they are real AsciiDoc attributes; use inline code like `prefix + id` or escape the braces so local docs validation does not emit missing-attribute warnings.
 - For query and aggregation docs, pair `/examples/JsonStorageExample` and `/examples/VectorSearchExample` with `tests/RedisVlDotNet.Tests/Indexes/SearchQueryCommandBuilderTests.cs`, `tests/RedisVlDotNet.Tests/Indexes/SearchIndexAsyncTests.cs`, and `tests/RedisVlDotNet.Tests/Queries/SearchResultMappingTests.cs`; the examples show canonical flows while the tests capture normalization, paging, typed mapping, and runtime-vector edge cases.
+- For higher-level cache and workflow docs, link runnable samples where they exist and pair them with unit/integration tests for the contract details; these APIs often hide important threshold, filter, TTL, and recency behavior in tests rather than in a single broad example.
 ---
 
 ## 2026-04-14 09:42:08 EDT - US-001
@@ -101,5 +102,19 @@ Started: Tue Apr 14 09:38:40 EDT 2026
   - `HybridQuery` and `AggregateHybridQuery` require at least one text predicate in `textFilter`; a tag-only or numeric-only filter is rejected even if the rest of the query shape is valid.
   - Useful context
   - There are still no `AGENTS.md` files in the edited docs paths, so reusable authoring notes belong in `progress.txt` instead.
+  - Manual browser verification is still required for docs UI changes because no browser-testing tool is available in this environment.
+---
+## 2026-04-14 10:08:00 EDT - US-009
+- Implemented Antora documentation for `EmbeddingsCache`, `SemanticCache`, `SemanticRouter`, `MessageHistory`, and `SemanticMessageHistory`, added the cache/workflow pages to nav and the core-features overview, and expanded the examples indexes to map the higher-level APIs to runnable samples.
+- Files changed: `docs-site/modules/ROOT/nav.adoc`, `docs-site/modules/ROOT/pages/core-features/index.adoc`, `docs-site/modules/ROOT/pages/core-features/embeddings-cache.adoc`, `docs-site/modules/ROOT/pages/core-features/semantic-cache.adoc`, `docs-site/modules/ROOT/pages/core-features/semantic-router.adoc`, `docs-site/modules/ROOT/pages/core-features/message-history.adoc`, `docs-site/modules/ROOT/pages/core-features/semantic-message-history.adoc`, `docs-site/modules/ROOT/pages/examples/index.adoc`, `examples/README.md`, `examples/EmbeddingsCacheExample/EmbeddingsCacheExample.csproj`, `examples/EmbeddingsCacheExample/Program.cs`, `examples/EmbeddingsCacheExample/README.md`, `examples/SemanticRouterExample/SemanticRouterExample.csproj`, `examples/SemanticRouterExample/Program.cs`, `examples/SemanticRouterExample/README.md`, `prd.json`, `progress.txt`.
+- Quality checks run and result: `npm run docs:validate` passed; `npm run examples:build` passed; `dotnet build examples/EmbeddingsCacheExample/EmbeddingsCacheExample.csproj` passed; `dotnet build examples/SemanticRouterExample/SemanticRouterExample.csproj` passed.
+- Learnings for future iterations:
+  - Patterns discovered
+  - Higher-level cache/workflow docs in this repo should pair runnable examples with the matching unit and integration tests because thresholds, filter constraints, TTL behavior, and recency ordering are often clearest in the tests.
+  - When a docs story exposes a sample-coverage gap, adding a minimal example under `examples/` is low-friction because the repo-level `npm run examples:build` sweep automatically picks up any new `.csproj`.
+  - Gotchas encountered
+  - Literal brace syntax in AsciiDoc like `{name}` is treated as an attribute reference, so placeholder key shapes should use angle brackets or escaped braces to avoid validation warnings.
+  - Useful context
+  - There are still no `AGENTS.md` files in the edited docs and examples paths, so the reusable guidance for this area belongs in `progress.txt`.
   - Manual browser verification is still required for docs UI changes because no browser-testing tool is available in this environment.
 ---

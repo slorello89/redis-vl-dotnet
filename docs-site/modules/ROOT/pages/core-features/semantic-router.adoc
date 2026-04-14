@@ -1,0 +1,65 @@
+= SemanticRouter
+
+`SemanticRouter` maps an input embedding to the nearest stored route reference. It is useful when one incoming request needs to be classified into a workflow, intent, or tool category before the application continues.
+
+== Schema and options
+
+Each router instance builds a HASH-backed index with:
+
+* `routeName`
+* `reference`
+* one vector field for the route embedding
+
+`SemanticRouterOptions` configures the router name, vector field attributes, distance threshold, optional namespace, and optional field names.
+
+`DistanceThreshold` is the key routing control. When the nearest route falls outside the threshold, `RouteAsync` returns `null`.
+
+== Add and route flows
+
+[cols="1,2"]
+|===
+| API | Behavior
+
+| `AddRouteAsync(routeName, reference, embedding)`
+| Stores one route document keyed from the route name plus reference text.
+
+| `AddRouteAsync(routeName, reference, vectorizer)`
+| Vectorizes the reference text before storing the route.
+
+| `RouteAsync(input, embedding)`
+| Returns the nearest `SemanticRouteMatch` inside the configured threshold.
+
+| `RouteAsync(input, vectorizer)`
+| Vectorizes the incoming input before matching.
+|===
+
+As with the other higher-level vector workflows, prefer `ITextVectorizer` rather than the obsolete `ITextEmbeddingGenerator` shim.
+
+== Practical routing pattern
+
+A common pattern is:
+
+1. create the router during startup
+2. seed a small route set such as `billing`, `support`, and `sales`
+3. vectorize each incoming utterance
+4. route to the matching workflow only when the distance threshold is acceptable
+
+If you need to keep the original chat transcript and query it later, pair this API with xref:core-features/message-history.adoc[`MessageHistory`] or xref:core-features/semantic-message-history.adoc[`SemanticMessageHistory`].
+
+== Example
+
+The runnable example for this API is `/examples/SemanticRouterExample`.
+
+It demonstrates:
+
+* creating a router with a local sample vectorizer
+* adding routes for multiple intents
+* routing a new utterance to the nearest stored reference
+* cleaning up the router index and documents
+
+The contract details are also covered in `tests/RedisVlDotNet.Tests/Workflows/SemanticRouterTests.cs` and `tests/RedisVlDotNet.Tests/Workflows/SemanticRouterIntegrationTests.cs`.
+
+== Related sections
+
+* xref:core-features/semantic-cache.adoc[SemanticCache] for semantic response reuse
+* xref:core-features/semantic-message-history.adoc[SemanticMessageHistory] for semantic retrieval within a session

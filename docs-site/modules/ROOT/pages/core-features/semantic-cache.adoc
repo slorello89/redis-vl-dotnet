@@ -1,0 +1,89 @@
+= SemanticCache
+
+`SemanticCache` stores prompt/response pairs in a HASH-backed RediSearch index and retrieves the nearest cached response when a new prompt embedding falls within a configured distance threshold.
+
+== When to use it
+
+Use `SemanticCache` when:
+
+* you want semantic reuse rather than exact-string reuse
+* cached responses need optional JSON metadata
+* one cache needs tenant, model, or prompt-template filters
+
+== Schema shape and lifecycle
+
+Each cache instance owns a HASH-backed index with:
+
+* prompt, response, and metadata text fields
+* one vector field for the embedding
+* optional TAG, TEXT, or NUMERIC filter fields
+
+The main lifecycle methods are the familiar `CreateAsync`, `ExistsAsync`, and `DropAsync(deleteDocuments: true)`.
+
+If you call `CreateAsync(new CreateIndexOptions(skipIfExists: true))`, the library validates that the existing index schema still matches the configured cache options and throws when it does not.
+
+== Thresholds, filters, and vectorizers
+
+`SemanticCacheOptions` requires:
+
+* `EmbeddingFieldAttributes`
+* `DistanceThreshold`
+* optional `TimeToLive`
+* optional `FilterableFields`
+
+Important constraints:
+
+* `DistanceThreshold` must be greater than zero
+* vector fields must use `FLOAT32`
+* filterable fields may only be TAG, TEXT, or NUMERIC fields
+* filterable fields cannot use aliases
+* query filters and stored filter values are only allowed when `FilterableFields` are configured
+
+The cache supports both raw embeddings and `ITextVectorizer` overloads. Prefer `RedisVl.Vectorizers.ITextVectorizer`; the legacy `RedisVl.Caches.ITextEmbeddingGenerator` interface remains only as an obsolete compatibility shim.
+
+== Store and check behavior
+
+[cols="1,2"]
+|===
+| API | Behavior
+
+| `StoreAsync(prompt, response, embedding, metadata, filterValues)`
+| Stores a HASH document, optional metadata JSON, optional filter fields, and optional TTL.
+
+| `CheckAsync(prompt, embedding, filter)`
+| Runs a `VectorRangeQuery` and returns the nearest hit inside the configured distance threshold, otherwise `null`.
+
+| `StoreAsync(..., vectorizer, ...)`
+| Vectorizes the prompt before storing the cache entry.
+
+| `CheckAsync(..., vectorizer, ...)`
+| Vectorizes the incoming prompt before lookup.
+|===
+
+Filter values are part of the cache identity. That means the same prompt can produce separate cached entries for different tenants, models, or numeric settings.
+
+`CheckAsync` does not do text matching on the prompt field. The prompt text is useful for traceability and response inspection, but cache hits are driven by vector distance plus any optional filter expression.
+
+== Example
+
+The runnable example for this API is `/examples/SemanticCacheExample`.
+
+It demonstrates:
+
+* creating a cache with TAG and NUMERIC filter fields
+* storing two prompt variants under different tenant filters
+* attaching metadata payloads
+* retrieving a hit through a composed filter expression
+
+Provider-backed vectorizer examples also use this API:
+
+* `/examples/OpenAiVectorizerExample`
+* `/examples/HuggingFaceVectorizerExample`
+
+The detailed edge cases live in `tests/RedisVlDotNet.Tests/Caches/SemanticCacheTests.cs` and `tests/RedisVlDotNet.Tests/Caches/SemanticCacheIntegrationTests.cs`.
+
+== Related sections
+
+* xref:../extensions/index.adoc[Extensions] for provider-backed vectorizers
+* xref:core-features/embeddings-cache.adoc[EmbeddingsCache] for exact-input reuse
+* xref:core-features/semantic-router.adoc[SemanticRouter] for route selection instead of response caching

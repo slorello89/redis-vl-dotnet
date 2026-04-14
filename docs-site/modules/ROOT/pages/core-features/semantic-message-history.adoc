@@ -1,0 +1,73 @@
+= SemanticMessageHistory
+
+`SemanticMessageHistory` extends `MessageHistory` with a vector field so one session can support both recency lookup and semantic retrieval.
+
+== What it adds over MessageHistory
+
+In addition to the standard session, role, content, metadata, timestamp, and sequence fields, `SemanticMessageHistory` stores one `FLOAT32` embedding per message.
+
+`SemanticMessageHistoryOptions` adds:
+
+* `EmbeddingFieldAttributes`
+* `DistanceThreshold`
+* `EmbeddingFieldName`
+
+The default threshold comes from the options object, but each semantic lookup can override it.
+
+== Append, recency, and relevant-match flows
+
+[cols="1,2"]
+|===
+| API | Behavior
+
+| `AppendAsync(sessionId, role, content, embedding, metadata, timestamp)`
+| Appends one message with a caller-supplied embedding.
+
+| `AppendAsync(sessionId, role, content, vectorizer, metadata, timestamp)`
+| Vectorizes the content before storing it.
+
+| `GetRecentAsync(sessionId, limit, role)`
+| Returns the newest messages for the session, just like `MessageHistory`.
+
+| `GetRelevantAsync(sessionId, embedding, limit, role, distanceThreshold)`
+| Returns the closest semantic matches inside the same session and optional role filter.
+
+| `GetRelevantAsync(sessionId, prompt, vectorizer, ...)`
+| Vectorizes the query text before running the semantic search.
+|===
+
+Important behavior details:
+
+* all semantic lookup stays inside one session id
+* role filters apply to both recency and relevant-message retrieval
+* matches are returned by ascending distance, then by newest sequence when distances tie
+* the effective threshold must be greater than zero
+
+As elsewhere in the repo, prefer `ITextVectorizer`. The old `ITextEmbeddingGenerator` surface is only an obsolete migration shim.
+
+== Recency plus semantic retrieval
+
+This type is intended for workflows where an LLM or agent needs both:
+
+* the last `n` messages for immediate conversation context
+* the most semantically relevant earlier turns from the same session
+
+That combination lets you keep recent turns small while still recovering older but relevant context on demand.
+
+== Example
+
+The runnable example for this API is `/examples/MessageHistoryExample`.
+
+It demonstrates:
+
+* creating a semantic message history index
+* appending user and assistant turns with a local vectorizer
+* retrieving the newest turns with `GetRecentAsync`
+* retrieving relevant turns with `GetRelevantAsync`
+
+The API contract and edge cases are covered in `tests/RedisVlDotNet.Tests/Workflows/SemanticMessageHistoryTests.cs` and `tests/RedisVlDotNet.Tests/Workflows/SemanticMessageHistoryIntegrationTests.cs`.
+
+== Related sections
+
+* xref:core-features/message-history.adoc[MessageHistory] for recency-only history
+* xref:core-features/semantic-router.adoc[SemanticRouter] for route selection

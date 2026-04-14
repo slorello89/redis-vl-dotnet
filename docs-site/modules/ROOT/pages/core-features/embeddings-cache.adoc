@@ -1,0 +1,60 @@
+= EmbeddingsCache
+
+`EmbeddingsCache` is the simplest cache surface in the library. It stores one embedding per exact input string and retrieves it later without creating a RediSearch index.
+
+== When to use it
+
+Use `EmbeddingsCache` when:
+
+* embedding generation is expensive and you want exact-input reuse
+* you do not need semantic lookup or metadata filtering
+* you want a lightweight cache that only depends on basic Redis string operations
+
+If you need nearest-neighbor lookup against previously stored prompts and responses, use xref:core-features/semantic-cache.adoc[`SemanticCache`] instead.
+
+== Options and key layout
+
+`EmbeddingsCacheOptions` controls three things:
+
+* `Name`, which becomes part of the Redis key prefix
+* `KeyNamespace`, which lets multiple callers isolate entries inside one named cache
+* `TimeToLive`, which applies a Redis TTL to each stored entry
+
+Stored values use keys shaped like `embeddings:<name>:<namespace>:<sha256(input)>`. The library hashes the original input before writing, but lookup is still an exact string match because the cache re-hashes the caller-provided input.
+
+== Core operations
+
+[cols="1,2"]
+|===
+| API | Behavior
+
+| `StoreAsync(input, embedding)`
+| Writes or overwrites the cached embedding for that exact input.
+
+| `LookupAsync(input)`
+| Returns the cached `float[]` when the input matches an existing entry, otherwise `null`.
+|===
+
+The cache does not expose delete or drop helpers. Use short-lived namespaces or TTLs when you want ephemeral entries.
+
+== TTL behavior
+
+When `TimeToLive` is configured, each `StoreAsync` call resets the Redis expiration for that entry. Once the key expires, `LookupAsync` returns `null`.
+
+== Example
+
+The runnable example for this API is `/examples/EmbeddingsCacheExample`.
+
+It demonstrates:
+
+* creating a namespaced cache with TTL
+* storing an embedding
+* looking it up by the same input
+* overwriting an existing embedding entry
+
+The exact behavior is also covered in `tests/RedisVlDotNet.Tests/Caches/EmbeddingsCacheTests.cs` and `tests/RedisVlDotNet.Tests/Caches/EmbeddingsCacheIntegrationTests.cs`.
+
+== Related sections
+
+* xref:core-features/semantic-cache.adoc[SemanticCache] for semantic response reuse
+* xref:../examples/index.adoc[Examples] for the runnable sample map
