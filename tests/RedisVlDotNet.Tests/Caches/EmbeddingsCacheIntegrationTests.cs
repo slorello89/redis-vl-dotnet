@@ -28,9 +28,10 @@ public sealed class EmbeddingsCacheIntegrationTests
 
         Assert.Null(missing);
         Assert.True(stored);
-        Assert.Equal(firstEmbedding, hit);
+        Assert.Equal("prompt", hit!.Input);
+        Assert.Equal(firstEmbedding, hit.Embedding);
         Assert.True(overwritten);
-        Assert.Equal(updatedEmbedding, overwrittenHit);
+        Assert.Equal(updatedEmbedding, overwrittenHit!.Embedding);
 
         await Task.Delay(TimeSpan.FromMilliseconds(400));
 
@@ -58,8 +59,32 @@ public sealed class EmbeddingsCacheIntegrationTests
 
         Assert.True(smallStored);
         Assert.True(largeStored);
-        Assert.Equal(smallEmbedding, smallHit);
-        Assert.Equal(largeEmbedding, largeHit);
+        Assert.Equal("text-embedding-3-small", smallHit!.ModelName);
+        Assert.Equal(smallEmbedding, smallHit.Embedding);
+        Assert.Equal("text-embedding-3-large", largeHit!.ModelName);
+        Assert.Equal(largeEmbedding, largeHit.Embedding);
         Assert.Null(legacyMiss);
+    }
+
+    [RedisSearchIntegrationFact]
+    public async Task StoresAndReturnsMetadataPayload()
+    {
+        await using var connection = await ConnectionMultiplexer.ConnectAsync(RedisSearchTestEnvironment.ConnectionString!);
+        var database = connection.GetDatabase();
+
+        var token = Guid.NewGuid().ToString("N");
+        var cache = new EmbeddingsCache(database, new EmbeddingsCacheOptions("integration-cache", token));
+
+        var stored = await cache.StoreAsync(
+            "prompt",
+            "text-embedding-3-small",
+            [1f, 2f, 3f],
+            metadata: new { source = "faq", tenant = "team-a" });
+        var hit = await cache.LookupAsync("prompt", "text-embedding-3-small");
+
+        Assert.True(stored);
+        Assert.NotNull(hit);
+        Assert.Equal("{\"source\":\"faq\",\"tenant\":\"team-a\"}", hit!.Metadata);
+        Assert.Equal([1f, 2f, 3f], hit.Embedding);
     }
 }

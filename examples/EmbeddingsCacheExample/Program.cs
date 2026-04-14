@@ -13,18 +13,19 @@ var cache = new EmbeddingsCache(
         timeToLive: TimeSpan.FromMinutes(10)));
 
 var input = "Summarize the quarterly support backlog";
+var modelName = "text-embedding-3-small";
 var firstEmbedding = new[] { 0.10f, 0.20f, 0.30f };
 var updatedEmbedding = new[] { 0.90f, 0.10f, 0.05f };
 
-var initialMiss = await cache.LookupAsync(input);
+var initialMiss = await cache.LookupAsync(input, modelName);
 Console.WriteLine(initialMiss is null ? "Initial lookup: miss" : "Initial lookup: unexpected hit");
 
-await cache.StoreAsync(input, firstEmbedding);
-var stored = await cache.LookupAsync(input);
-Console.WriteLine($"Stored embedding: [{string.Join(", ", stored ?? [])}]");
+await cache.StoreAsync(input, modelName, firstEmbedding, metadata: new { source = "backlog-summary" });
+var stored = await cache.LookupAsync(input, modelName);
+Console.WriteLine($"Stored entry: model={stored?.ModelName}, metadata={stored?.Metadata}, embedding=[{string.Join(", ", stored?.Embedding ?? [])}]");
 
-await cache.StoreAsync(input, updatedEmbedding);
-var overwritten = await cache.LookupAsync(input);
-Console.WriteLine($"Overwritten embedding: [{string.Join(", ", overwritten ?? [])}]");
+await cache.StoreAsync(input, modelName, updatedEmbedding, metadata: new { source = "backlog-summary", revision = 2 });
+var overwritten = await cache.LookupAsync(input, modelName);
+Console.WriteLine($"Overwritten entry: model={overwritten?.ModelName}, metadata={overwritten?.Metadata}, embedding=[{string.Join(", ", overwritten?.Embedding ?? [])}]");
 
 Console.WriteLine("Entries are isolated by namespace and expire automatically after the configured TTL.");

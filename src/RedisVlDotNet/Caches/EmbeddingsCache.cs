@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 using StackExchange.Redis;
 
 namespace RedisVl.Caches;
@@ -7,10 +8,13 @@ namespace RedisVl.Caches;
 public sealed class EmbeddingsCache
 {
     private const string InputFieldName = "input";
+    private const string ModelNameFieldName = "model_name";
     private const string EmbeddingFieldName = "embedding";
+    private const string MetadataFieldName = "metadata";
     private const char KeyHashSeparator = '\n';
 
     private readonly IDatabase _database;
+    private readonly JsonSerializerOptions _serializerOptions;
 
     public EmbeddingsCache(IDatabase database, EmbeddingsCacheOptions options)
     {
@@ -18,6 +22,7 @@ public sealed class EmbeddingsCache
         ArgumentNullException.ThrowIfNull(options);
 
         _database = database;
+        _serializerOptions = new JsonSerializerOptions(JsonSerializerDefaults.Web);
         Options = options;
     }
 
@@ -32,12 +37,27 @@ public sealed class EmbeddingsCache
     public bool Store(string input, float[] embedding) =>
         StoreAsync(input, embedding).GetAwaiter().GetResult();
 
+    public bool Store(string input, float[] embedding, object? metadata) =>
+        StoreAsync(input, embedding, metadata).GetAwaiter().GetResult();
+
     public bool Store(string input, string modelName, float[] embedding) =>
         StoreAsync(input, modelName, embedding).GetAwaiter().GetResult();
 
+    public bool Store(string input, string modelName, float[] embedding, object? metadata) =>
+        StoreAsync(input, modelName, embedding, metadata).GetAwaiter().GetResult();
+
     public async Task<bool> StoreAsync(string input, float[] embedding, CancellationToken cancellationToken = default)
     {
-        return await StoreAsyncCore(input, embedding, modelName: null, cancellationToken).ConfigureAwait(false);
+        return await StoreAsyncCore(input, embedding, modelName: null, metadata: null, cancellationToken).ConfigureAwait(false);
+    }
+
+    public async Task<bool> StoreAsync(
+        string input,
+        float[] embedding,
+        object? metadata,
+        CancellationToken cancellationToken = default)
+    {
+        return await StoreAsyncCore(input, embedding, modelName: null, metadata, cancellationToken).ConfigureAwait(false);
     }
 
     public async Task<bool> StoreAsync(
@@ -50,21 +70,43 @@ public sealed class EmbeddingsCache
             input,
             embedding,
             NormalizeModelName(modelName),
+            metadata: null,
             cancellationToken).ConfigureAwait(false);
     }
 
-    public float[]? Lookup(string input) =>
+    public async Task<bool> StoreAsync(
+        string input,
+        string modelName,
+        float[] embedding,
+        object? metadata,
+        CancellationToken cancellationToken = default)
+    {
+        return await StoreAsyncCore(
+            input,
+            embedding,
+            NormalizeModelName(modelName),
+            metadata,
+            cancellationToken).ConfigureAwait(false);
+    }
+
+    public EmbeddingsCacheEntry? Lookup(string input) =>
         LookupAsync(input).GetAwaiter().GetResult();
 
-    public float[]? Lookup(string input, string modelName) =>
+    public EmbeddingsCacheEntry? Lookup(string input, string modelName) =>
         LookupAsync(input, modelName).GetAwaiter().GetResult();
 
-    public async Task<float[]?> LookupAsync(string input, CancellationToken cancellationToken = default)
+    public float[]? LookupEmbedding(string input) =>
+        Lookup(input)?.Embedding;
+
+    public float[]? LookupEmbedding(string input, string modelName) =>
+        Lookup(input, modelName)?.Embedding;
+
+    public async Task<EmbeddingsCacheEntry?> LookupAsync(string input, CancellationToken cancellationToken = default)
     {
         return await LookupAsyncCore(input, modelName: null, cancellationToken).ConfigureAwait(false);
     }
 
-    public async Task<float[]?> LookupAsync(
+    public async Task<EmbeddingsCacheEntry?> LookupAsync(
         string input,
         string modelName,
         CancellationToken cancellationToken = default)
@@ -73,6 +115,19 @@ public sealed class EmbeddingsCache
             input,
             NormalizeModelName(modelName),
             cancellationToken).ConfigureAwait(false);
+    }
+
+    public async Task<float[]?> LookupEmbeddingAsync(string input, CancellationToken cancellationToken = default)
+    {
+        return (await LookupAsync(input, cancellationToken).ConfigureAwait(false))?.Embedding;
+    }
+
+    public async Task<float[]?> LookupEmbeddingAsync(
+        string input,
+        string modelName,
+        CancellationToken cancellationToken = default)
+    {
+        return (await LookupAsync(input, modelName, cancellationToken).ConfigureAwait(false))?.Embedding;
     }
 
     internal RedisKey CreateKey(string input) => CreateKey(input, modelName: null);
@@ -113,6 +168,7 @@ public sealed class EmbeddingsCache
         string input,
         float[] embedding,
         string? modelName,
+        object? metadata,
         CancellationToken cancellationToken)
     {
         var normalizedInput = NormalizeInput(input);
@@ -120,14 +176,22 @@ public sealed class EmbeddingsCache
 
         cancellationToken.ThrowIfCancellationRequested();
 
-        HashEntry[] entries =
-        [
-            new HashEntry(InputFieldName, normalizedInput),
-            new HashEntry(EmbeddingFieldName, EncodeFloat32(embedding))
-        ];
+        var normalizedModelName = modelName ?? string.Empty;
+        var entries = new List<HashEntry>
+        {
+            new(InputFieldName, normalizedInput),
+            new(ModelNameFieldName, normalizedModelName),
+            new(EmbeddingFieldName, EncodeFloat32(embedding))
+        };
+
+        var metadataPayload = SerializeMetadata(metadata);
+        if (metadataPayload is not null)
+        {
+            entries.Add(new HashEntry(MetadataFieldName, metadataPayload));
+        }
 
         var key = CreateKey(normalizedInput, modelName);
-        await _database.HashSetAsync(key, entries).WaitAsync(cancellationToken).ConfigureAwait(false);
+        await _database.HashSetAsync(key, entries.ToArray()).WaitAsync(cancellationToken).ConfigureAwait(false);
 
         if (TimeToLive.HasValue)
         {
@@ -138,7 +202,7 @@ public sealed class EmbeddingsCache
         return true;
     }
 
-    private async Task<float[]?> LookupAsyncCore(
+    private async Task<EmbeddingsCacheEntry?> LookupAsyncCore(
         string input,
         string? modelName,
         CancellationToken cancellationToken)
@@ -158,7 +222,9 @@ public sealed class EmbeddingsCache
         }
 
         string? cachedInput = null;
+        string? cachedModelName = null;
         byte[]? payload = null;
+        string? metadata = null;
 
         foreach (var entry in entries)
         {
@@ -168,18 +234,38 @@ public sealed class EmbeddingsCache
                 continue;
             }
 
+            if (entry.Name == ModelNameFieldName)
+            {
+                cachedModelName = entry.Value.IsNull ? null : entry.Value.ToString();
+                continue;
+            }
+
             if (entry.Name == EmbeddingFieldName && !entry.Value.IsNull)
             {
                 payload = (byte[]?)entry.Value;
+                continue;
+            }
+
+            if (entry.Name == MetadataFieldName && !entry.Value.IsNull)
+            {
+                metadata = entry.Value.ToString();
             }
         }
 
-        if (!string.Equals(cachedInput, normalizedInput, StringComparison.Ordinal) || payload is null)
+        var normalizedCachedModelName = string.IsNullOrEmpty(cachedModelName) ? null : cachedModelName;
+        if (!string.Equals(cachedInput, normalizedInput, StringComparison.Ordinal) ||
+            !string.Equals(normalizedCachedModelName, modelName, StringComparison.Ordinal) ||
+            payload is null)
         {
             return null;
         }
 
-        return DecodeFloat32(payload);
+        return new EmbeddingsCacheEntry(
+            normalizedInput,
+            DecodeFloat32(payload),
+            normalizedCachedModelName,
+            metadata,
+            CreateKey(normalizedInput, modelName));
     }
 
     private static string NormalizeInput(string input)
@@ -193,4 +279,7 @@ public sealed class EmbeddingsCache
         ArgumentException.ThrowIfNullOrWhiteSpace(modelName);
         return modelName;
     }
+
+    private string? SerializeMetadata(object? metadata) =>
+        metadata is null ? null : JsonSerializer.Serialize(metadata, _serializerOptions);
 }

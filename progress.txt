@@ -3,6 +3,7 @@ Started: Tue Apr 14 14:01:44 EDT 2026
 
 ## Codebase Patterns
 - `EmbeddingsCache` compatibility depends on leaving the legacy input-only key path unchanged; add parity features through new overloads or optional identity components rather than altering `CreateKey(input)` behavior.
+- Hash-backed cache metadata in this repo is stored as a JSON string serialized with `JsonSerializerDefaults.Web`; richer read models should preserve that payload verbatim instead of trying to deserialize it eagerly.
 
 ---
 
@@ -17,4 +18,17 @@ Started: Tue Apr 14 14:01:44 EDT 2026
   - This repo can be dirty across Ralph iterations, so isolate story commits to the files you changed instead of assuming the full worktree is safe to include.
   - Useful context
   - Redis-backed cache integration tests are guarded by `RedisSearchIntegrationFact` and will skip unless the Redis Search test environment is configured.
+---
+
+## 2026-04-14 14:19:10 EDT - US-002
+- Implemented rich `EmbeddingsCache` entries with persisted `input`, `model_name`, `embedding`, and optional JSON metadata fields, updated lookups to return the new entry model, and added embedding-only compatibility helpers plus an updated example.
+- Files changed: `src/RedisVlDotNet/Caches/EmbeddingsCache.cs`, `src/RedisVlDotNet/Caches/EmbeddingsCacheEntry.cs`, `tests/RedisVlDotNet.Tests/Caches/EmbeddingsCacheTests.cs`, `tests/RedisVlDotNet.Tests/Caches/EmbeddingsCacheIntegrationTests.cs`, `examples/EmbeddingsCacheExample/Program.cs`, `prd.json`, `progress.txt`
+- Quality checks run and result: `dotnet test tests/RedisVlDotNet.Tests/RedisVlDotNet.Tests.csproj --filter EmbeddingsCache --nologo` passed with 7 tests passing and 3 Redis integration tests skipped because the integration environment was unavailable; `dotnet build examples/EmbeddingsCacheExample/EmbeddingsCacheExample.csproj --nologo` passed.
+- Learnings for future iterations:
+  - Patterns discovered
+  - `EmbeddingsCache` parity fields are stored as plain Redis hash entries using snake_case names (`input`, `model_name`, `embedding`, `metadata`) and returned through a dedicated result model.
+  - Gotchas encountered
+  - Returning a richer cache entry model changes the public `Lookup*` surface, so example code and any compatibility helpers need to move in lockstep.
+  - Useful context
+  - Redis integration coverage for this cache area still runs under `RedisSearchIntegrationFact` even though the cache itself only uses hashes, so those tests may skip in local environments without the shared integration setup.
 ---
