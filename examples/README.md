@@ -37,7 +37,7 @@ Use this map when you want the fastest path to a parity feature area:
 | OpenAI vectorizer package | [OpenAiVectorizerExample](/Users/steve.lorello/projects/redis/redis-vl-dotnet/examples/OpenAiVectorizerExample/README.md) | Requires `OPENAI_API_KEY` |
 | Hugging Face vectorizer package | [HuggingFaceVectorizerExample](/Users/steve.lorello/projects/redis/redis-vl-dotnet/examples/HuggingFaceVectorizerExample/README.md) | Requires `HF_TOKEN` |
 | Cohere reranker package | [CohereRerankerExample](/Users/steve.lorello/projects/redis/redis-vl-dotnet/examples/CohereRerankerExample/README.md) | Requires `COHERE_API_KEY` |
-| CLI index and schema commands | [README.md](/Users/steve.lorello/projects/redis/redis-vl-dotnet/README.md) and [docs/getting-started.md](/Users/steve.lorello/projects/redis/redis-vl-dotnet/docs/getting-started.md) | Covers `index create`, `index list`, `schema validate`, and `schema show` |
+| CLI index and schema commands | [CLI docs](/Users/steve.lorello/projects/redis/redis-vl-dotnet/docs-site/modules/ROOT/pages/cli/index.adoc) | Covers build/install, command discovery, `index create/list/info/clear/delete`, and `schema validate/show` |
 
 ### [JsonStorageExample](/Users/steve.lorello/projects/redis/redis-vl-dotnet/examples/JsonStorageExample/README.md)
 

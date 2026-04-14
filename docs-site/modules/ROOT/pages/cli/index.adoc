@@ -1,33 +1,120 @@
 = CLI
 
-This section is the canonical overview for the `redis-vl-dotnet` command-line workflows.
+This section is the canonical guide for the `redis-vl-dotnet` command-line workflows. Use it when you want to validate schemas, inspect existing indexes, and create or remove indexes from a terminal session.
 
-== Build and discover commands
+== Build and install
 
-Build the CLI from the repository root:
+Build the CLI project from the repository root:
 
 [source,bash]
 ----
 dotnet build src/RedisVlDotNet.Cli/RedisVlDotNet.Cli.csproj
 ----
 
-Show the command tree:
+Run commands directly from source during local development:
 
 [source,bash]
 ----
 dotnet run --project src/RedisVlDotNet.Cli -- --help
 ----
 
-== Common workflows
+If you want a reusable local executable, publish the CLI into a local folder and invoke the generated `RedisVlDotNet.Cli.dll` with `dotnet`:
 
-List indexes:
+[source,bash]
+----
+dotnet publish src/RedisVlDotNet.Cli/RedisVlDotNet.Cli.csproj -c Release -o .artifacts/redisvl-cli
+dotnet .artifacts/redisvl-cli/RedisVlDotNet.Cli.dll --help
+----
+
+== Discover commands
+
+The CLI has two command groups:
+
+* `index` for index lifecycle commands such as `list`, `info`, `create`, `clear`, and `delete`
+* `schema` for offline schema file commands such as `validate` and `show`
+
+Show the top-level command tree:
+
+[source,bash]
+----
+dotnet run --project src/RedisVlDotNet.Cli -- --help
+----
+
+Inspect a command group before running it:
+
+[source,bash]
+----
+dotnet run --project src/RedisVlDotNet.Cli -- index --help
+dotnet run --project src/RedisVlDotNet.Cli -- schema --help
+----
+
+== Connection arguments
+
+All `index` commands need a Redis connection string. Pass it explicitly with `--redis`:
 
 [source,bash]
 ----
 dotnet run --project src/RedisVlDotNet.Cli -- index list --redis localhost:6379
 ----
 
-Create an index from inline field definitions:
+Or set `REDIS_VL_REDIS_URL` once for the shell session and let the CLI reuse it:
+
+[source,bash]
+----
+export REDIS_VL_REDIS_URL=localhost:6379
+dotnet run --project src/RedisVlDotNet.Cli -- index list
+----
+
+When neither `--redis` nor `REDIS_VL_REDIS_URL` is set, the CLI exits with an error before connecting.
+
+== Schema workflows
+
+Validate a YAML schema file before using it to create an index:
+
+[source,bash]
+----
+dotnet run --project src/RedisVlDotNet.Cli -- schema validate \
+  --file examples/JsonStorageExample/schema.yaml
+----
+
+Show the parsed schema as JSON when you want to inspect the normalized index and field definitions:
+
+[source,bash]
+----
+dotnet run --project src/RedisVlDotNet.Cli -- schema show \
+  --file examples/JsonStorageExample/schema.yaml
+----
+
+These commands do not contact Redis. They only load and parse the YAML file on disk.
+
+== Index lifecycle workflows
+
+List the current RediSearch indexes:
+
+[source,bash]
+----
+dotnet run --project src/RedisVlDotNet.Cli -- index list --redis localhost:6379
+----
+
+Inspect one index and print the discovered schema plus scalar `FT.INFO` attributes as JSON:
+
+[source,bash]
+----
+dotnet run --project src/RedisVlDotNet.Cli -- index info \
+  --redis localhost:6379 \
+  --name movies-cli-idx
+----
+
+Create an index from a YAML schema file:
+
+[source,bash]
+----
+dotnet run --project src/RedisVlDotNet.Cli -- index create \
+  --redis localhost:6379 \
+  --schema examples/JsonStorageExample/schema.yaml
+----
+
+Create an index inline when you want a quick HASH- or JSON-backed shape without a separate schema file:
 
 [source,bash]
 ----
@@ -41,24 +128,59 @@ dotnet run --project src/RedisVlDotNet.Cli -- index create \
   --field numeric:year
 ----
 
-Validate or inspect a YAML schema file:
+The inline `--field` syntax supports `text`, `tag`, `numeric`, and `geo`. Repeat `--prefix` or `--field` when you need more than one entry.
+
+Use the create flags to control existing indexes:
+
+* `--skip-if-exists` returns success without replacing an existing index
+* `--overwrite` drops the existing index definition first
+* `--drop-documents` only applies together with `--overwrite` and removes indexed documents too
+
+Clear documents from an index while keeping the index definition:
 
 [source,bash]
 ----
-dotnet run --project src/RedisVlDotNet.Cli -- schema validate --file tests/RedisVlDotNet.Tests/Schema/Fixtures/basic-schema.yaml
-dotnet run --project src/RedisVlDotNet.Cli -- schema show --file tests/RedisVlDotNet.Tests/Schema/Fixtures/advanced-schema.yaml
-----
-
-Create an index from a YAML schema file:
-
-[source,bash]
-----
-dotnet run --project src/RedisVlDotNet.Cli -- index create \
+dotnet run --project src/RedisVlDotNet.Cli -- index clear \
   --redis localhost:6379 \
-  --schema examples/JsonStorageExample/schema.yaml
+  --name movies-cli-idx \
+  --batch-size 500
 ----
+
+Delete an index definition:
+
+[source,bash]
+----
+dotnet run --project src/RedisVlDotNet.Cli -- index delete \
+  --redis localhost:6379 \
+  --name movies-cli-idx
+----
+
+Delete the index and the indexed documents in one step:
+
+[source,bash]
+----
+dotnet run --project src/RedisVlDotNet.Cli -- index delete \
+  --redis localhost:6379 \
+  --name movies-cli-idx \
+  --drop-documents
+----
+
+== Troubleshooting
+
+Connection failures usually fall into one of these cases:
+
+* `The '--redis' option is required when REDIS_VL_REDIS_URL is not set.` means no connection string was provided by flag or environment variable.
+* `It was not possible to connect...` from StackExchange.Redis usually means Redis is not reachable on the host or port you passed. Recheck the container, local service, firewall, or forwarded port.
+* Authentication or TLS errors come from the connection string itself; use the same endpoint, password, and SSL parameters that work for your application code.
+
+Module-related failures typically show up during `index` commands:
+
+* Errors mentioning `FT._LIST`, `FT.INFO`, or `FT.CREATE` usually mean Redis Search is not available on the target server.
+* JSON-backed schemas also need RedisJSON support. If you create a JSON index against a server without RedisJSON, use Redis Stack locally or switch the schema to HASH storage.
+* `schema validate` and `schema show` can still succeed against an environment that cannot run the index commands, because those schema commands only parse YAML locally.
 
 == Related sections
 
 * xref:../core-features/index.adoc[Core Features] for the underlying schema and index model
+* xref:../examples/index.adoc[Examples] for runnable feature-area samples that pair with CLI-managed indexes
 * xref:../testing/index.adoc[Testing] for CLI-focused test coverage
