@@ -1,3 +1,35 @@
 = Core Features
 
-This section will document schemas, indexes, documents, search queries, and aggregation workflows.
+This section is the canonical overview for the core Redis-backed library surface.
+
+== Main workflow areas
+
+The core package centers on these feature groups:
+
+* `SearchSchema` and `IndexDefinition` for defining index names, prefixes, storage type, and fields
+* field definitions for text, tag, numeric, geo, and vector indexing
+* `SearchIndex` for index creation, inspection, listing, clearing, and dropping
+* JSON and HASH document load, fetch, delete, and partial update flows
+* structured query objects for filter, text, count, vector, hybrid, and aggregation workflows
+
+== Current coverage map
+
+Use these repository entry points while the deeper pages are being filled in:
+
+* `/examples/JsonStorageExample` for JSON-backed schema, document lifecycle, `TextQuery`, aggregation, and count flows
+* `/examples/VectorSearchExample` for HASH-backed vector search, runtime vector options, and aggregate hybrid search
+* `src/RedisVlDotNet/Schema` for field-definition and schema-building types
+* `src/RedisVlDotNet/Indexes` for index lifecycle operations and command builders
+* `src/RedisVlDotNet/Queries` for the typed query models and aggregation pipeline types
+
+== Behavior notes
+
+The library supports both JSON and HASH storage models. JSON workflows require RedisJSON alongside RediSearch, while HASH workflows rely on RediSearch only.
+
+Query pagination is shared across the search APIs, and typed result mapping is designed to let callers work with strongly typed documents or projections instead of parsing raw Redis arrays directly.
+
+== Related sections
+
+* xref:../getting-started/index.adoc[Getting Started] for the first local setup flow
+* xref:../examples/index.adoc[Examples] for runnable coverage
+* xref:../cli/index.adoc[CLI] for terminal-oriented schema and index operations

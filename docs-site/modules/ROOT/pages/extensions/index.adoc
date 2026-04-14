@@ -1,3 +1,40 @@
 = Extensions
 
-This section will document optional vectorizer and reranker packages plus provider-specific setup.
+This section is the canonical overview for optional vectorizer and reranker packages.
+
+== Package layout
+
+The repository keeps provider contracts and implementations outside the core package boundary:
+
+* `src/RedisVlDotNet.Vectorizers.Abstractions` for provider-agnostic text vectorizer contracts
+* `src/RedisVlDotNet.Rerankers.Abstractions` for provider-agnostic reranker contracts
+* `src/RedisVlDotNet.Vectorizers.OpenAI` for OpenAI embeddings
+* `src/RedisVlDotNet.Vectorizers.HuggingFace` for Hugging Face `hf-inference` embeddings
+* `src/RedisVlDotNet.Rerankers.Cohere` for Cohere reranking
+
+== Shared contracts
+
+The current abstractions surface includes:
+
+* `ITextVectorizer` for single-input embedding generation
+* `IBatchTextVectorizer` for providers that can embed multiple inputs in one request
+* `TextVectorizerExtensions.VectorizeManyAsync(...)` for batch-friendly fallback behavior
+* `ITextReranker` for query-plus-candidate reranking
+* `RerankRequest`, `RerankDocument`, and `RerankResult` for provider-neutral reranking payloads
+
+The legacy `RedisVl.Caches.ITextEmbeddingGenerator` interface remains as an obsolete shim over `ITextVectorizer` for incremental migration.
+
+== Provider-backed examples
+
+Use these examples when you want runnable package coverage:
+
+* `/examples/OpenAiVectorizerExample` requires `OPENAI_API_KEY`
+* `/examples/HuggingFaceVectorizerExample` requires `HF_TOKEN`
+* `/examples/CohereRerankerExample` requires `COHERE_API_KEY`
+
+These examples show how the provider packages plug into higher-level workflows such as `SemanticCache`.
+
+== Related sections
+
+* xref:../examples/index.adoc[Examples] for the full runnable sample map
+* xref:../testing/index.adoc[Testing] for provider-specific smoke-test gates

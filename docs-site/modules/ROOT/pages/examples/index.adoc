@@ -1,3 +1,69 @@
 = Examples
 
-This section will map each major feature area to a runnable example project.
+This section maps the main feature areas to runnable sample projects.
+
+== Prerequisites
+
+All current examples assume:
+
+* .NET 9 SDK
+* Redis Stack or another RediSearch-capable Redis deployment
+* `REDIS_VL_REDIS_URL` when Redis is not reachable at `localhost:6379`
+
+Examples that use JSON storage also require RedisJSON. Provider-backed examples additionally require:
+
+* `OPENAI_API_KEY`
+* `HF_TOKEN`
+* `COHERE_API_KEY`
+
+== Coverage map
+
+[cols="1,1,2"]
+|===
+| Feature area | Example | Notes
+
+| Core JSON workflows
+| `/examples/JsonStorageExample`
+| Covers schema creation, document load and fetch, filter and text queries, aggregations, count, clear, and drop flows.
+
+| Core vector workflows
+| `/examples/VectorSearchExample`
+| Covers HASH-backed vector search, runtime vector tuning, multi-vector search, and aggregate hybrid flows.
+
+| Semantic message history
+| `/examples/MessageHistoryExample`
+| Covers recency and semantic retrieval without requiring provider credentials.
+
+| Semantic cache
+| `/examples/SemanticCacheExample`
+| Covers filterable semantic cache entries and metadata payloads.
+
+| OpenAI vectorization
+| `/examples/OpenAiVectorizerExample`
+| Uses the OpenAI extension package and requires `OPENAI_API_KEY`.
+
+| Hugging Face vectorization
+| `/examples/HuggingFaceVectorizerExample`
+| Uses the Hugging Face extension package and requires `HF_TOKEN`.
+
+| Cohere reranking
+| `/examples/CohereRerankerExample`
+| Uses the Cohere extension package and requires `COHERE_API_KEY`.
+|===
+
+== Build validation
+
+Validate all example projects from the repository root:
+
+[source,bash]
+----
+npm run examples:build
+----
+
+This sweep is also used by CI so documented samples fail fast when they drift from the codebase.
+
+== Related sections
+
+* xref:../getting-started/index.adoc[Getting Started] for local Redis setup
+* xref:../extensions/index.adoc[Extensions] for provider package context
+* xref:../testing/index.adoc[Testing] for the example validation gate

@@ -1,3 +1,64 @@
 = CLI
 
-This section will document the redis-vl-dotnet command-line workflows for schema and index operations.
+This section is the canonical overview for the `redis-vl-dotnet` command-line workflows.
+
+== Build and discover commands
+
+Build the CLI from the repository root:
+
+[source,bash]
+----
+dotnet build src/RedisVlDotNet.Cli/RedisVlDotNet.Cli.csproj
+----
+
+Show the command tree:
+
+[source,bash]
+----
+dotnet run --project src/RedisVlDotNet.Cli -- --help
+----
+
+== Common workflows
+
+List indexes:
+
+[source,bash]
+----
+dotnet run --project src/RedisVlDotNet.Cli -- index list --redis localhost:6379
+----
+
+Create an index from inline field definitions:
+
+[source,bash]
+----
+dotnet run --project src/RedisVlDotNet.Cli -- index create \
+  --redis localhost:6379 \
+  --name movies-cli-idx \
+  --prefix movie: \
+  --storage hash \
+  --field text:title \
+  --field tag:genre \
+  --field numeric:year
+----
+
+Validate or inspect a YAML schema file:
+
+[source,bash]
+----
+dotnet run --project src/RedisVlDotNet.Cli -- schema validate --file tests/RedisVlDotNet.Tests/Schema/Fixtures/basic-schema.yaml
+dotnet run --project src/RedisVlDotNet.Cli -- schema show --file tests/RedisVlDotNet.Tests/Schema/Fixtures/advanced-schema.yaml
+----
+
+Create an index from a YAML schema file:
+
+[source,bash]
+----
+dotnet run --project src/RedisVlDotNet.Cli -- index create \
+  --redis localhost:6379 \
+  --schema examples/JsonStorageExample/schema.yaml
+----
+
+== Related sections
+
+* xref:../core-features/index.adoc[Core Features] for the underlying schema and index model
+* xref:../testing/index.adoc[Testing] for CLI-focused test coverage

@@ -1,3 +1,53 @@
 = Getting Started
 
-This section will cover installation, local Redis setup, and first-run workflows for redis-vl-dotnet.
+This section is the canonical entry point for installation, local Redis setup, and the first end-to-end workflow.
+
+== Prerequisites
+
+The current local development flow assumes:
+
+* .NET 9 SDK
+* Redis Stack or another Redis deployment with RediSearch enabled
+* RedisJSON support for JSON-backed examples and document workflows
+* A reachable Redis connection string such as `localhost:6379`
+
+Start Redis Stack locally from the repository root when needed:
+
+[source,bash]
+----
+docker compose -f docker-compose.integration.yml up -d redis-stack
+export REDIS_VL_REDIS_URL=localhost:6379
+----
+
+== First workflow
+
+The minimal library flow is:
+
+. Add the library to an app
+. Connect to Redis
+. Define a schema
+. Create an index
+. Load documents
+. Fetch and query documents
+. Clear or drop the index when finished
+
+The current canonical walkthrough for that sequence still starts from the JSON example and the runnable examples catalog:
+
+* xref:../examples/index.adoc[Examples] maps the main feature areas to concrete sample projects
+* `/examples/JsonStorageExample` demonstrates schema creation, document loading, fetch, filter search, text search, aggregations, count, clear, and drop flows
+
+== Connection topologies
+
+Use `RedisConnectionFactory` when you need StackExchange.Redis `ConfigurationOptions` helpers for more than a direct endpoint:
+
+* cluster discovery through `ConnectClusterAsync(...)`
+* Sentinel discovery through `ConnectSentinelPrimaryAsync(...)`
+* parsed option creation through `CreateClusterOptions(...)` and `CreateSentinelOptions(...)`
+
+These helpers normalize seed-node lists, reject unsupported configuration early, and keep the rest of the library on the same `IDatabase`-based APIs.
+
+== Related sections
+
+* xref:../core-features/index.adoc[Core Features] for schema, index, document, and query coverage
+* xref:../testing/index.adoc[Testing] for local validation commands and Redis-backed test setup
+* xref:../examples/index.adoc[Examples] for runnable sample projects

@@ -1,3 +1,26 @@
 = Reference
 
-This section will hold API-oriented and behavior-oriented reference material for redis-vl-dotnet.
+This section holds repository-oriented reference pointers until the API and behavior pages are filled in.
+
+== Repository layout
+
+Use these locations when navigating the codebase:
+
+* `src/RedisVlDotNet` for the core library
+* `src/RedisVlDotNet.Cli` for the command-line app
+* `src/RedisVlDotNet.Vectorizers.*` for vectorizer abstractions and providers
+* `src/RedisVlDotNet.Rerankers.*` for reranker abstractions and providers
+* `tests/RedisVlDotNet.Tests` for unit and integration coverage
+* `examples/` for runnable samples
+* `docs-site/` for the canonical Antora docs source
+
+== Planning and validation pointers
+
+* `docs/parity-roadmap.md` captures the current parity matrix and roadmap
+* `progress.txt` records Ralph iteration history and reusable codebase patterns
+* `prd.json` tracks the active Ralph execution plan
+
+== Related sections
+
+* xref:../testing/index.adoc[Testing] for validation commands
+* xref:../examples/index.adoc[Examples] for runnable sample entry points

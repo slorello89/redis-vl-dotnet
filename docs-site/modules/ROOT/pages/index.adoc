@@ -5,7 +5,41 @@ This site is the canonical home for redis-vl-dotnet documentation.
 
 Documentation publishing is automated through GitHub Pages. See xref:testing/index.adoc[Testing] for the repository Pages settings and workflow requirements.
 
-Use the navigation to browse the major documentation areas:
+`redis-vl-dotnet` is a .NET-native Redis Vector Library for Redis Search, vector search, semantic caches, reranking flows, and related Redis-backed application workflows.
+
+Use this landing page when you need the fastest path into the repository:
+
+* xref:getting-started/index.adoc[Getting Started] for SDK prerequisites, local Redis setup, topology options, and the first schema-to-query workflow
+* xref:core-features/index.adoc[Core Features] for schemas, indexes, document lifecycle operations, query types, and aggregation workflows
+* xref:extensions/index.adoc[Extensions] for vectorizer and reranker packages plus provider-backed examples
+* xref:examples/index.adoc[Examples] for runnable sample coverage across each major feature area
+* xref:cli/index.adoc[CLI] for terminal-oriented schema and index management
+* xref:testing/index.adoc[Testing] for local validation commands, CI gates, and GitHub Pages publishing details
+* xref:reference/index.adoc[Reference] for repository layout and roadmap pointers
+
+== Repository highlights
+
+The current workspace is organized around a few primary entry points:
+
+* `src/RedisVlDotNet` contains the core library surface for schema definitions, index operations, queries, caches, and workflow APIs
+* `src/RedisVlDotNet.Cli` contains the command-line app for index and schema lifecycle commands
+* `src/RedisVlDotNet.Vectorizers.*` and `src/RedisVlDotNet.Rerankers.*` contain optional provider abstractions and implementations
+* `examples/` contains runnable sample projects for JSON, vector, semantic workflow, and provider-backed scenarios
+* `docs/parity-roadmap.md` tracks cross-language parity scope, intentional .NET differences, and the current roadmap contract
+
+== Local docs workflow
+
+Build and validate this site from the repository root:
+
+[source,bash]
+----
+npm install
+npm run docs:validate
+----
+
+The generated static site is written to `build/site`.
+
+== Section index
 
 * xref:getting-started/index.adoc[Getting Started]
 * xref:core-features/index.adoc[Core Features]
