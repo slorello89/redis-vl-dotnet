@@ -2,6 +2,7 @@
 Started: Tue Apr 14 09:38:40 EDT 2026
 
 ## Codebase Patterns
+- Keep the active Ralph planning document under `tasks/`; when a planning stream is completed, move the finished root `prd.json` and superseded planning markdown into `completed-prds/`, adding a date-prefixed filename when needed to avoid collisions with older artifacts.
 - Antora docs live under `docs-site/`, use the local UI bundle in `docs-ui/`, and build the site from the repo root with `npm run docs:build`.
 - GitHub Pages docs publishing uses `.github/workflows/docs-pages.yml`; keep the deploy job separate from the Antora build job and publish the `build/site` artifact only after a successful build.
 - Keep docs and example quality gates aligned around repository-root commands: `npm run docs:validate` for Antora validation and `npm run examples:build` for the full example sweep, with CI calling the same entry points instead of duplicating shell one-liners.
@@ -162,4 +163,17 @@ Started: Tue Apr 14 09:38:40 EDT 2026
   - Useful context
   - There are still no `AGENTS.md` files anywhere in this repository, so reusable docs-authoring knowledge for this repo should continue to live in `progress.txt`.
   - Manual browser verification is still required for docs UI changes because no browser-testing tool is available in this environment.
+---
+## 2026-04-14 10:19:02 EDT - US-013
+- Organized completed planning artifacts by moving the finished docs PRD JSON and superseded planning markdown out of the repo root and `docs/` into `completed-prds/`, leaving the active Antora PRD under `tasks/`.
+- Files changed: `completed-prds/2026-04-14-antora-docs-and-gh-pages-prd.json`, `completed-prds/2026-04-13-feature-analysis.md`, `progress.txt`.
+- Quality checks run and result: `dotnet build src/RedisVlDotNet/RedisVlDotNet.csproj --no-restore` passed; planning-artifact location checks for `tasks/` and `completed-prds/` passed.
+- Learnings for future iterations:
+  - Patterns discovered
+  - Keep completed Ralph planning artifacts out of the repo root; `tasks/` is the active planning area and `completed-prds/` is the long-term history area.
+  - When `completed-prds/` already contains a `prd.json`, rename later completed PRD JSON files with a date and topic instead of overwriting older history.
+  - Gotchas encountered
+  - This workspace already contains unrelated user changes, so planning-artifact cleanup should be staged by explicit path only.
+  - Useful context
+  - There are still no `AGENTS.md` files anywhere in this repository, so the reusable planning-artifact convention belongs in `progress.txt`.
 ---
