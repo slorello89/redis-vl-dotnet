@@ -115,4 +115,31 @@ public sealed class EmbeddingsCacheIntegrationTests
         Assert.True(directExists);
         Assert.False(directMissing);
     }
+
+    [RedisSearchIntegrationFact]
+    public async Task DeletesEntriesBySemanticLookupAndDirectKey()
+    {
+        await using var connection = await ConnectionMultiplexer.ConnectAsync(RedisSearchTestEnvironment.ConnectionString!);
+        var database = connection.GetDatabase();
+
+        var token = Guid.NewGuid().ToString("N");
+        var cache = new EmbeddingsCache(database, new EmbeddingsCacheOptions("integration-cache", token));
+
+        var semanticEntry = await cache.SetAsync("prompt", "text-embedding-3-small", [1f, 2f, 3f]);
+        var directEntry = await cache.SetAsync("other prompt", "text-embedding-3-small", [4f, 5f, 6f]);
+
+        var semanticDeleted = await cache.DeleteAsync("prompt", "text-embedding-3-small");
+        var semanticRepeatDelete = await cache.DeleteAsync("prompt", "text-embedding-3-small");
+        var directDeleted = await cache.DeleteByKeyAsync(directEntry.Key!);
+        var directRepeatDelete = await cache.DeleteByKeyAsync(directEntry.Key!);
+
+        Assert.True(semanticDeleted);
+        Assert.False(semanticRepeatDelete);
+        Assert.True(directDeleted);
+        Assert.False(directRepeatDelete);
+        Assert.Null(await cache.GetAsync("prompt", "text-embedding-3-small"));
+        Assert.Null(await cache.GetByKeyAsync(directEntry.Key!));
+        Assert.False(await cache.ExistsByKeyAsync(semanticEntry.Key!));
+        Assert.False(await cache.ExistsByKeyAsync(directEntry.Key!));
+    }
 }

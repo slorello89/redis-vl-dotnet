@@ -214,6 +214,15 @@ public sealed class EmbeddingsCache
     public bool ExistsByKey(string key) =>
         ExistsByKeyAsync(key).GetAwaiter().GetResult();
 
+    public bool Delete(string input) =>
+        DeleteAsync(input).GetAwaiter().GetResult();
+
+    public bool Delete(string input, string modelName) =>
+        DeleteAsync(input, modelName).GetAwaiter().GetResult();
+
+    public bool DeleteByKey(string key) =>
+        DeleteByKeyAsync(key).GetAwaiter().GetResult();
+
     public Task<EmbeddingsCacheEntry?> GetAsync(string input, CancellationToken cancellationToken = default) =>
         LookupAsyncCore(input, modelName: null, cancellationToken);
 
@@ -259,6 +268,18 @@ public sealed class EmbeddingsCache
 
     public Task<bool> ExistsByKeyAsync(string key, CancellationToken cancellationToken = default) =>
         ExistsAsyncCore(NormalizeKey(key), cancellationToken);
+
+    public Task<bool> DeleteAsync(string input, CancellationToken cancellationToken = default) =>
+        DeleteAsyncCore(CreateKey(NormalizeInput(input)), cancellationToken);
+
+    public Task<bool> DeleteAsync(
+        string input,
+        string modelName,
+        CancellationToken cancellationToken = default) =>
+        DeleteAsyncCore(CreateKey(NormalizeInput(input), NormalizeModelName(modelName)), cancellationToken);
+
+    public Task<bool> DeleteByKeyAsync(string key, CancellationToken cancellationToken = default) =>
+        DeleteAsyncCore(NormalizeKey(key), cancellationToken);
 
     internal RedisKey CreateKey(string input) => CreateKey(input, modelName: null);
 
@@ -380,6 +401,18 @@ public sealed class EmbeddingsCache
 
         return await _database
             .KeyExistsAsync(key)
+            .WaitAsync(cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    private async Task<bool> DeleteAsyncCore(
+        RedisKey key,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        return await _database
+            .KeyDeleteAsync(key)
             .WaitAsync(cancellationToken)
             .ConfigureAwait(false);
     }

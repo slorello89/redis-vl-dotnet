@@ -7,6 +7,7 @@ Started: Tue Apr 14 14:01:44 EDT 2026
 - For `EmbeddingsCache` parity work, keep `Store`/`Lookup` as compatibility aliases and layer newer Python-style `Set`/`Get` entry-centric APIs on top so callers can adopt richer results without breaking existing code.
 - `EmbeddingsCache` TTL precedence should be `per-call override ?? cache default`; unit tests can verify this by recording `KeyExpireAsync` arguments in the existing `DispatchProxy` database fake.
 - When adding more `EmbeddingsCache` read variants, route them through a shared hash-to-entry parser so semantic lookups can keep validating input/model identity while direct-key APIs reuse the same decode path.
+- Single-entry `EmbeddingsCache` lifecycle methods should keep returning `bool` hit/miss semantics from Redis single-key commands (`KeyExistsAsync`, `KeyDeleteAsync`) so future batch APIs can reserve count-based returns for multi-key operations.
 
 ---
 
@@ -60,4 +61,17 @@ Started: Tue Apr 14 14:01:44 EDT 2026
   - Running `dotnet build` and `dotnet test` in parallel in this repo can produce harmless file-lock warnings under `obj/Debug`; run them sequentially if you need a warning-free validation pass.
   - Useful context
   - `IDatabase.KeyExistsAsync` is sufficient for the new existence APIs because cache entries are single Redis hashes keyed by the same deterministic identity used for writes and lookups.
+---
+
+## 2026-04-14 14:15:24 EDT - US-005
+- Implemented `EmbeddingsCache` delete APIs for semantic lookups and direct Redis keys, keeping the sync/async parity surface aligned with the existing get and exists methods.
+- Files changed: `src/RedisVlDotNet/Caches/EmbeddingsCache.cs`, `tests/RedisVlDotNet.Tests/Caches/EmbeddingsCacheTests.cs`, `tests/RedisVlDotNet.Tests/Caches/EmbeddingsCacheIntegrationTests.cs`, `prd.json`, `progress.txt`
+- Quality checks run and result: `dotnet test tests/RedisVlDotNet.Tests/RedisVlDotNet.Tests.csproj --filter EmbeddingsCache --nologo` passed with 20 tests passing and 5 Redis integration tests skipped because the integration environment was unavailable.
+- Learnings for future iterations:
+  - Patterns discovered
+  - Single-entry cache lifecycle operations fit the existing API better as `bool` wrappers over Redis single-key commands, leaving count-oriented returns for future batch methods.
+  - Gotchas encountered
+  - The `DispatchProxy`-based `IDatabase` test fake needs explicit `KeyDeleteAsync` handling for single-key deletes; otherwise new lifecycle tests fail with `NotSupportedException`.
+  - Useful context
+  - Repeated deletes should be covered explicitly because Redis returns `false` on the second single-key delete even when the first delete succeeded.
 ---

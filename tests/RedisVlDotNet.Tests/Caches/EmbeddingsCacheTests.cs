@@ -229,6 +229,52 @@ public sealed class EmbeddingsCacheTests
     }
 
     [Fact]
+    public async Task DeleteAsync_ReturnsTrueForStoredSemanticKey()
+    {
+        var (database, recorder) = RecordingDatabaseProxy.CreatePair();
+        var cache = new EmbeddingsCache(database, new EmbeddingsCacheOptions("unit-cache", "tests"));
+
+        await cache.SetAsync("hello world", "text-embedding-3-small", [1f, 2f, 3f]);
+
+        var deleted = await cache.DeleteAsync("hello world", "text-embedding-3-small");
+
+        Assert.True(deleted);
+        Assert.Equal(1, recorder.KeyDeleteAsyncCallCount);
+        Assert.Equal(cache.CreateKey("hello world", "text-embedding-3-small"), recorder.LastKey);
+        Assert.False(recorder.StoredValues.ContainsKey(cache.CreateKey("hello world", "text-embedding-3-small")));
+    }
+
+    [Fact]
+    public async Task DeleteAsync_ReturnsFalseForSemanticMiss()
+    {
+        var (database, recorder) = RecordingDatabaseProxy.CreatePair();
+        var cache = new EmbeddingsCache(database, new EmbeddingsCacheOptions("unit-cache", "tests"));
+
+        await cache.SetAsync("hello world", "text-embedding-3-small", [1f, 2f, 3f]);
+
+        var deleted = await cache.DeleteAsync("hello world", "text-embedding-3-large");
+
+        Assert.False(deleted);
+        Assert.Equal(1, recorder.KeyDeleteAsyncCallCount);
+    }
+
+    [Fact]
+    public async Task DeleteByKeyAsync_ReturnsFalseAfterRepeatedDelete()
+    {
+        var (database, recorder) = RecordingDatabaseProxy.CreatePair();
+        var cache = new EmbeddingsCache(database, new EmbeddingsCacheOptions("unit-cache", "tests"));
+        var stored = await cache.SetAsync("hello world", [1f, 2f, 3f]);
+
+        var firstDelete = await cache.DeleteByKeyAsync(stored.Key!);
+        var secondDelete = await cache.DeleteByKeyAsync(stored.Key!);
+
+        Assert.True(firstDelete);
+        Assert.False(secondDelete);
+        Assert.Equal(2, recorder.KeyDeleteAsyncCallCount);
+        Assert.Equal(stored.Key, recorder.LastKey);
+    }
+
+    [Fact]
     public async Task LookupAsync_ReturnsMissWhenStoredPayloadInputDoesNotMatch()
     {
         var (database, recorder) = RecordingDatabaseProxy.CreatePair();
@@ -298,6 +344,8 @@ public sealed class EmbeddingsCacheTests
 
         public int KeyExistsAsyncCallCount { get; private set; }
 
+        public int KeyDeleteAsyncCallCount { get; private set; }
+
         public RedisKey? LastKey { get; private set; }
 
         public HashEntry[]? LastHashEntries { get; private set; }
@@ -321,6 +369,7 @@ public sealed class EmbeddingsCacheTests
                 nameof(IDatabase.HashGetAllAsync) => HandleHashGetAllAsync(args),
                 nameof(IDatabase.KeyExpireAsync) => HandleKeyExpireAsync(args),
                 nameof(IDatabase.KeyExistsAsync) => HandleKeyExistsAsync(args),
+                nameof(IDatabase.KeyDeleteAsync) => HandleKeyDeleteAsync(args),
                 nameof(IDatabase.Multiplexer) => throw new NotSupportedException(),
                 nameof(IDatabase.Database) => 0,
                 _ => throw new NotSupportedException($"Method '{targetMethod.Name}' is not configured for this test proxy.")
@@ -363,6 +412,14 @@ public sealed class EmbeddingsCacheTests
             var key = (RedisKey)args![0]!;
             LastKey = key;
             return Task.FromResult(StoredValues.ContainsKey(key));
+        }
+
+        private Task<bool> HandleKeyDeleteAsync(object?[]? args)
+        {
+            KeyDeleteAsyncCallCount++;
+            var key = (RedisKey)args![0]!;
+            LastKey = key;
+            return Task.FromResult(StoredValues.Remove(key));
         }
     }
 }
