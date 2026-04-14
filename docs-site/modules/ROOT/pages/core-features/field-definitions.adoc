@@ -1,0 +1,97 @@
+= Field Definitions
+
+RedisVlDotNet supports text, tag, numeric, geo, and vector field definitions. Each field type maps directly onto RediSearch schema capabilities while keeping validation in .NET code.
+
+== Supported field types
+
+[cols="1,2"]
+|===
+| Type | Purpose
+
+| `TextFieldDefinition`
+| Full-text search fields with options such as stemming, phonetics, weighting, suffix tries, and sortable behavior.
+
+| `TagFieldDefinition`
+| Exact-match or set-style categorical fields with configurable separators and case sensitivity.
+
+| `NumericFieldDefinition`
+| Numeric range and sortable fields.
+
+| `GeoFieldDefinition`
+| Geographic coordinates for geo filters.
+
+| `VectorFieldDefinition`
+| Dense vector fields with FLAT or HNSW indexing attributes.
+|===
+
+== Text, tag, numeric, and geo options
+
+Common field options:
+
+* `name` is required for every field
+* `alias` lets Redis index the field under a different name
+* `sortable` is available on text, tag, numeric, and geo fields
+
+Additional options by type:
+
+* text: `noStem`, `phoneticMatch`, `weight`, `withSuffixTrie`, `indexMissing`, `indexEmpty`, `noIndex`, `unNormalizedForm`
+* tag: `separator`, `caseSensitive`, `withSuffixTrie`, `indexMissing`, `indexEmpty`, `noIndex`
+* numeric: `indexMissing`, `noIndex`, `unNormalizedForm`
+* geo: `indexMissing`, `noIndex`
+
+Validation rules enforced by the library:
+
+* `NOINDEX` fields must also be sortable on text, tag, numeric, and geo fields
+* `UNF` can only be enabled on sortable text and numeric fields
+* tag separators must be a single non-whitespace character
+* text weight must be greater than zero
+
+== Vector fields
+
+Vector fields use `VectorFieldDefinition` plus `VectorFieldAttributes`:
+
+[source,csharp]
+----
+new VectorFieldDefinition(
+    "embedding",
+    new VectorFieldAttributes(
+        VectorAlgorithm.Hnsw,
+        VectorDataType.Float32,
+        VectorDistanceMetric.Cosine,
+        dimensions: 1536,
+        initialCapacity: 1000,
+        m: 16,
+        efConstruction: 200,
+        efRuntime: 10))
+----
+
+Supported vector attributes:
+
+* `algorithm`: `Flat` or `Hnsw`
+* `dataType`: `Float32`, `Float64`, `Float16`, `BFloat16`, `UInt8`, or `Int8`
+* `distanceMetric`: `Cosine`, `L2`, or `InnerProduct`
+* `dimensions`: required and must be greater than zero
+* `initialCapacity`, `blockSize`, `m`, `efConstruction`, `efRuntime`: optional tuning knobs
+
+Validation rules:
+
+* all numeric tuning values must be zero or greater
+* `Flat` does not allow HNSW-only settings such as `m`, `efConstruction`, or `efRuntime`
+
+== JSON and HASH document mapping
+
+Field definitions work with both storage types, but the underlying document model differs:
+
+* JSON fields refer to properties inside RedisJSON documents
+* HASH fields refer to hash entries stored on the Redis key
+
+That means the same field list can be expressed in both models, but document-loading and partial-update behavior follow the storage type chosen in `IndexDefinition`.
+
+== Example reference
+
+Use `/examples/JsonStorageExample/schema.yaml` for a YAML-driven JSON example and `/examples/VectorSearchExample` for constructor-based HASH fields, including multiple vector definitions.
+
+== Related pages
+
+* xref:core-features/search-schema.adoc[SearchSchema]
+* xref:core-features/yaml-schema-loading.adoc[YAML schema loading]

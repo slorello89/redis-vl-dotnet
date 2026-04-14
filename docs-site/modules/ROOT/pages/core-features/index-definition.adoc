@@ -1,0 +1,97 @@
+= IndexDefinition
+
+`IndexDefinition` describes the Redis index-level settings that sit above individual fields.
+
+== Required settings
+
+The minimum definition is:
+
+[source,csharp]
+----
+var indexDefinition = new IndexDefinition(
+    name: "movies-idx",
+    prefix: "movie:",
+    storageType: StorageType.Json);
+----
+
+Required values:
+
+* `name`: the RediSearch index name
+* `prefix` or `prefixes`: one or more Redis key prefixes to include in the index
+* `storageType`: `StorageType.Json` or `StorageType.Hash`
+
+== Prefixes and key separator
+
+Use a single prefix for the common case, or multiple prefixes when the same schema should cover several key families:
+
+[source,csharp]
+----
+var indexDefinition = new IndexDefinition(
+    "movies-idx",
+    ["movie:", "movie-archive:"],
+    StorageType.Json,
+    keySeparator: '|');
+----
+
+Behavior to keep in mind:
+
+* prefixes cannot be blank
+* at least one prefix is required
+* `KeySeparator` must be a single non-whitespace character
+* `Prefix` returns the first configured prefix and remains the default prefix used by key-resolution helpers
+
+== Advanced index options
+
+The library exposes these index-level options from the constructor and YAML loader:
+
+[cols="1,2"]
+|===
+| Option | Purpose
+
+| `stopwords`
+| Sets stopwords for the index. Use an empty list in YAML to disable them.
+
+| `maxTextFields`
+| Enables the RediSearch `MAXTEXTFIELDS` flag for large text-heavy schemas.
+
+| `temporarySeconds`
+| Creates a temporary index when greater than zero.
+
+| `noOffsets`
+| Disables term offset storage.
+
+| `noHighlight`
+| Disables highlight support metadata.
+
+| `noFields`
+| Disables field bitmaps in the index.
+
+| `noFrequencies`
+| Disables term frequency storage.
+
+| `skipInitialScan`
+| Skips the initial prefix scan during index creation.
+|===
+
+These options are all supported by `SearchSchema.FromYaml` as well, so a YAML schema can fully describe the same index metadata as a typed definition.
+
+== Storage choice
+
+`storageType` determines which Redis data model backs the index:
+
+* `StorageType.Json` for RedisJSON documents
+* `StorageType.Hash` for Redis hashes
+
+That one value also controls which `SearchIndex` document APIs are valid later. Keep the storage type and your load/fetch/update calls aligned.
+
+== Example reference
+
+`/examples/JsonStorageExample/schema.yaml` shows a JSON-backed definition with multiple prefixes, a custom key separator, disabled stopwords, and several advanced options enabled.
+
+Use `/examples/VectorSearchExample` for the smaller HASH-backed constructor-based version.
+
+== Related pages
+
+* xref:core-features/search-schema.adoc[SearchSchema]
+* xref:core-features/yaml-schema-loading.adoc[YAML schema loading]
+* xref:core-features/index-lifecycle.adoc[Index lifecycle]

@@ -1,0 +1,77 @@
+= Index Lifecycle
+
+`SearchIndex` owns the index lifecycle once you have a `SearchSchema` and a Redis `IDatabase`.
+
+== Constructing an index handle
+
+[source,csharp]
+----
+var schema = SearchSchema.FromYamlFile(schemaPath);
+var index = new SearchIndex(database, schema);
+----
+
+This only creates the client-side handle. Redis index creation happens when you call `Create` or `CreateAsync`.
+
+== Creating an index
+
+The basic flow is:
+
+[source,csharp]
+----
+await index.CreateAsync(new CreateIndexOptions(
+    overwrite: true,
+    dropExistingDocuments: true));
+----
+
+`CreateIndexOptions` supports three behaviors:
+
+* `skipIfExists`: return `false` instead of failing when the index already exists
+* `overwrite`: drop and recreate the index when it already exists
+* `dropExistingDocuments`: when `overwrite` drops an existing index, also delete matching Redis documents
+
+`skipIfExists` and `overwrite` are mutually exclusive.
+
+== Inspecting and rediscovering indexes
+
+Use these APIs after creation:
+
+* `ExistsAsync()` checks whether the current schema index exists
+* `InfoAsync()` returns `SearchIndexInfo`, a key-value view over `FT.INFO`
+* `SearchIndex.ListAsync(database)` returns all index names as `SearchIndexListItem`
+* `SearchIndex.FromExistingAsync(database, indexName)` recreates a `SearchIndex` from Redis metadata instead of a local schema definition
+
+The primary example uses both `ListAsync` and `FromExistingAsync` so you can verify what Redis created before running document operations.
+
+== Clearing versus dropping
+
+Use the right cleanup method for the goal:
+
+* `ClearAsync()` deletes indexed documents by prefix but leaves the index in place
+* `DropAsync()` removes the index itself
+* `DropAsync(deleteDocuments: true)` removes both the index and the underlying documents
+
+`ClearAsync()` is useful in tests or repeatable examples when you want to keep the index definition but wipe data. `DropAsync()` is the final teardown step when you no longer need the index metadata at all.
+
+== Storage-specific document lifecycle
+
+After the index exists, document operations follow the schema storage type:
+
+* JSON: `LoadJsonAsync`, `FetchJsonByIdAsync`, `UpdateJsonByIdAsync`, `DeleteJsonByIdAsync`
+* HASH: `LoadHashAsync`, `FetchHashByIdAsync`, `UpdateHashByIdAsync`, `DeleteHashByIdAsync`
+
+The JSON example demonstrates create, list, rediscover, clear, and drop flows. The HASH vector example shows the same lifecycle with hash-backed documents.
+
+== Example reference
+
+Primary example:
+
+* `/examples/JsonStorageExample`
+
+Supporting HASH example:
+
+* `/examples/VectorSearchExample`
+
+== Related pages
+
+* xref:core-features/search-schema.adoc[SearchSchema]
+* xref:core-features/index-definition.adoc[IndexDefinition]

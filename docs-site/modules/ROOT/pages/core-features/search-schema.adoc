@@ -1,0 +1,63 @@
+= SearchSchema
+
+`SearchSchema` is the top-level model that binds together index metadata and the fields Redis should index.
+
+== What `SearchSchema` contains
+
+Every schema has two parts:
+
+* an xref:core-features/index-definition.adoc[`IndexDefinition`] that describes the Redis index name, prefixes, storage type, and FT.CREATE-level flags
+* a field collection that describes how document properties map to RediSearch field types
+
+[source,csharp]
+----
+var schema = new SearchSchema(
+    new IndexDefinition("movies-idx", "movie:", StorageType.Json),
+    [
+        new TextFieldDefinition("title", sortable: true),
+        new TagFieldDefinition("genre"),
+        new NumericFieldDefinition("year", sortable: true)
+    ]);
+----
+
+Create a `SearchIndex` from that schema:
+
+[source,csharp]
+----
+var index = new SearchIndex(database, schema);
+----
+
+== JSON versus HASH storage
+
+Storage type is defined on `schema.Index.StorageType`:
+
+* `StorageType.Json` indexes RedisJSON documents and works with `LoadJsonAsync`, `FetchJsonByIdAsync`, `UpdateJsonByIdAsync`, and `DeleteJsonByIdAsync`.
+* `StorageType.Hash` indexes Redis hashes and works with `LoadHashAsync`, `FetchHashByIdAsync`, `UpdateHashByIdAsync`, and `DeleteHashByIdAsync`.
+
+That choice affects both index creation and which document APIs are valid at runtime. The library enforces the match between schema storage type and document operation.
+
+== Key derivation
+
+The schema also controls how document ids become Redis keys:
+
+* `IndexDefinition.Prefixes` defines the allowed key prefixes for the index
+* `IndexDefinition.KeySeparator` controls how ids are joined to prefixes when the library resolves keys
+* the first prefix is exposed as `IndexDefinition.Prefix` and is the default prefix used when resolving ids back into keys
+
+If your schema uses multiple prefixes, Redis can index documents from all of them, but library-generated keys still resolve through the schema metadata rather than ad hoc string concatenation.
+
+== Typed construction or YAML
+
+You can build a schema in code or load one from YAML:
+
+* use the constructor when your app owns the schema definition directly
+* use xref:core-features/yaml-schema-loading.adoc[`SearchSchema.FromYaml` or `SearchSchema.FromYamlFile`] when you want a checked-in schema file shared by code, docs, and CLI workflows
+
+The repository’s primary example for this pattern is `/examples/JsonStorageExample`, which loads a YAML file and then creates a `SearchIndex` from it.
+
+== Related pages
+
+* xref:core-features/index-definition.adoc[IndexDefinition]
+* xref:core-features/field-definitions.adoc[Field definitions]
+* xref:core-features/yaml-schema-loading.adoc[YAML schema loading]
+* xref:core-features/index-lifecycle.adoc[Index lifecycle]

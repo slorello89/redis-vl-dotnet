@@ -1,0 +1,103 @@
+= YAML Schema Loading
+
+Use YAML when you want a schema definition that can be checked into the repository, reused by examples, and loaded by the CLI or application code without duplicating constructor logic.
+
+== Loading APIs
+
+`SearchSchema` exposes two entry points:
+
+* `SearchSchema.FromYaml(string yaml)`
+* `SearchSchema.FromYamlFile(string path)`
+
+The JSON storage example uses `FromYamlFile`:
+
+[source,csharp]
+----
+var schemaPath = Path.Combine(AppContext.BaseDirectory, "schema.yaml");
+var schema = SearchSchema.FromYamlFile(schemaPath);
+----
+
+== YAML shape
+
+A schema file has `index` metadata plus a `fields` collection:
+
+[source,yaml]
+----
+index:
+  name: json-storage-example-idx
+  prefixes:
+    - "json-example:"
+    - "json-example-archive:"
+  key_separator: "|"
+  storage_type: json
+  stopwords: []
+  max_text_fields: true
+  no_offsets: true
+  no_highlight: true
+  skip_initial_scan: true
+fields:
+  - name: title
+    type: text
+    sortable: true
+    weight: 2.0
+  - name: genre
+    type: tag
+  - name: year
+    type: numeric
+    sortable: true
+----
+
+Supported index keys include:
+
+* `name`
+* `prefix` or `prefixes`
+* `key_separator`
+* `storage_type`
+* `stopwords`
+* `max_text_fields`
+* `temporary`
+* `no_offsets`
+* `no_highlight`
+* `no_fields`
+* `no_frequencies`
+* `skip_initial_scan`
+
+Supported field `type` values:
+
+* `text`
+* `tag`
+* `numeric`
+* `geo`
+* `vector`
+
+Vector fields must include an `attrs` block with algorithm, data type, dimensions, and distance metric.
+
+== Validation behavior
+
+The loader rejects invalid YAML or unsupported values early with `ArgumentException`.
+
+Common validation failures:
+
+* missing `index` or `fields`
+* defining both `index.prefix` and `index.prefixes`
+* unsupported field or enum values
+* vector definitions without `attrs`
+* invalid combinations such as HNSW-only settings on a FLAT vector field
+
+The repository tests under `tests/RedisVlDotNet.Tests/Schema` cover both accepted and rejected YAML shapes. The fixture `advanced-schema.yaml` is the best reference when you need every supported index-level toggle in one file.
+
+== When to prefer YAML
+
+YAML is the better fit when:
+
+* the schema should be visible without recompiling code
+* examples, docs, and CLI commands should point to the same schema artifact
+* you want to keep index metadata in a declarative file rather than in application startup code
+
+Use constructor-based schema definitions when the field list is generated dynamically or is tightly coupled to application code.
+
+== Related pages
+
+* xref:core-features/search-schema.adoc[SearchSchema]
+* xref:core-features/index-definition.adoc[IndexDefinition]
+* xref:core-features/field-definitions.adoc[Field definitions]

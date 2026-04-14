@@ -7,6 +7,7 @@ Started: Tue Apr 14 09:38:40 EDT 2026
 - Keep docs and example quality gates aligned around repository-root commands: `npm run docs:validate` for Antora validation and `npm run examples:build` for the full example sweep, with CI calling the same entry points instead of duplicating shell one-liners.
 - When Antora replaces legacy repository entry-point docs, move the substantive overview into the Antora section index pages and leave the old Markdown files as short redirect stubs so there is one canonical editing target.
 - Keep connection and credential setup canonical in `docs-site/modules/ROOT/pages/getting-started/index.adoc`; examples can show story-specific overrides, but shared Redis topology and provider env var guidance should live in the getting-started page so links and onboarding stay consistent.
+- For Antora pages under nested folders, use module-relative xref targets such as `xref:core-features/search-schema.adoc[]` instead of sibling-only filenames so local docs validation resolves links consistently.
 ---
 
 ## 2026-04-14 09:42:08 EDT - US-001
@@ -57,4 +58,18 @@ Started: Tue Apr 14 09:38:40 EDT 2026
   - The workspace contains unrelated in-flight source changes, so commit only the story files instead of using a blanket `git add .`.
   - Useful context
   - There are no `AGENTS.md` files under the edited docs/example paths, so the reusable setup guidance belongs in `progress.txt` for this iteration.
+---
+## 2026-04-14 09:56:50 EDT - US-006
+- Implemented a dedicated core schema and index documentation set in Antora covering `SearchSchema`, `IndexDefinition`, field definitions, YAML schema loading, and `SearchIndex` lifecycle workflows, and linked the section landing page plus nav to the new pages and the primary JSON/HASH examples.
+- Files changed: `docs-site/modules/ROOT/nav.adoc`, `docs-site/modules/ROOT/pages/core-features/index.adoc`, `docs-site/modules/ROOT/pages/core-features/search-schema.adoc`, `docs-site/modules/ROOT/pages/core-features/index-definition.adoc`, `docs-site/modules/ROOT/pages/core-features/field-definitions.adoc`, `docs-site/modules/ROOT/pages/core-features/yaml-schema-loading.adoc`, `docs-site/modules/ROOT/pages/core-features/index-lifecycle.adoc`, `prd.json`, `progress.txt`.
+- Quality checks run and result: `npm run docs:validate` passed; `npm run examples:build` passed.
+- Learnings for future iterations:
+  - Patterns discovered
+  - Nested Antora pages in this repo should use full module-relative xrefs like `xref:core-features/...` to avoid broken links during local validation.
+  - The strongest source-backed docs for schema/index behavior come from combining the runnable examples with `tests/RedisVlDotNet.Tests/Schema/SearchSchemaTests.cs`, which captures supported YAML options and validation constraints.
+  - Gotchas encountered
+  - This repo has extensive unrelated in-flight source changes, so stage only the docs-story files before committing.
+  - Useful context
+  - There are still no `AGENTS.md` files in the edited docs paths, so the reusable Antora navigation and xref guidance belongs in `progress.txt` instead.
+  - Manual browser verification is still required for docs UI changes because no browser-testing tool is available in this environment.
 ---
