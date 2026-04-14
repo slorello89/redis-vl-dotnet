@@ -4,8 +4,9 @@
 
 The active implementation roadmap is defined in [docs/parity-roadmap.md](/Users/steve.lorello/projects/redis/redis-vl-dotnet/docs/parity-roadmap.md). That document is the current contract for cross-language parity scope, intentional .NET-native differences, and feature priority across future Ralph iterations.
 
-The Antora docs scaffold lives under `docs-site/`. Build it locally with `npm install` followed by `npm run docs:build`.
+The Antora docs scaffold lives under `docs-site/`. Validate it locally with `npm install` followed by `npm run docs:validate`.
 GitHub Pages publishing runs from `.github/workflows/docs-pages.yml` on pushes to `main`; set the repository Pages source to `GitHub Actions` before expecting deployments.
+CI also runs `npm run docs:validate` and `npm run examples:build` from `.github/workflows/ci.yml` so docs navigation and example projects fail fast before merge.
 
 Start with [docs/getting-started.md](/Users/steve.lorello/projects/redis/redis-vl-dotnet/docs/getting-started.md) for the core install, connection, schema, index, document, and query flow.
 Browse [examples/README.md](/Users/steve.lorello/projects/redis/redis-vl-dotnet/examples/README.md) for the runnable sample index, Redis prerequisites, and links to each example's local run instructions.
@@ -59,7 +60,7 @@ dotnet test tests/RedisVlDotNet.Tests/RedisVlDotNet.Tests.csproj --no-restore
 Build every runnable example project:
 
 ```bash
-find examples -name '*.csproj' -print0 | xargs -0 -n1 dotnet build --no-restore
+npm run examples:build
 ```
 
 The full local and CI workflow, including the parity test matrix and provider-specific gates, is documented in [docs/testing.md](/Users/steve.lorello/projects/redis/redis-vl-dotnet/docs/testing.md).

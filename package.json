@@ -2,7 +2,9 @@
   "name": "redis-vl-dotnet",
   "private": true,
   "scripts": {
-    "docs:build": "antora antora-playbook.yml"
+    "docs:build": "antora antora-playbook.yml",
+    "docs:validate": "npm run docs:build",
+    "examples:build": "./scripts/build-examples.sh"
   },
   "devDependencies": {
     "@antora/cli": "3.1.14",

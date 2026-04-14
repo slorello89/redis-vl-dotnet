@@ -31,6 +31,7 @@ Use these tiers to validate the parity surface locally and in CI:
 | --- | --- | --- | --- |
 | Solution build | All library, CLI, and test projects compile | `dotnet build redis-vl-dotnet.sln --no-restore` | None |
 | Default test suite | Unit tests plus any Redis/provider tests whose env vars are present | `dotnet test redis-vl-dotnet.sln --no-build --verbosity normal` | None required; gated tests skip themselves |
+| Docs validation | Confirms the Antora playbook, navigation, and page references still build | `npm run docs:validate` | Node.js 22-compatible environment and `npm install` or `npm ci` |
 | Redis integration suite | Search index, schema, workflow, cache, and CLI integration coverage against one Redis deployment | `dotnet test tests/RedisVlDotNet.Tests/RedisVlDotNet.Tests.csproj --no-restore` | `REDIS_VL_REDIS_URL` |
 | CLI-focused subset | CLI parser plus Redis-backed CLI lifecycle coverage | `dotnet test tests/RedisVlDotNet.Tests/RedisVlDotNet.Tests.csproj --no-restore --filter FullyQualifiedName~RedisVlCli` | `REDIS_VL_REDIS_URL` for integration cases |
 | Cluster topology subset | Cluster connection helpers | `dotnet test tests/RedisVlDotNet.Tests/RedisVlDotNet.Tests.csproj --no-restore --filter FullyQualifiedName~RedisClusterConnectionIntegrationTests` | `REDIS_VL_REDIS_CLUSTER_NODES` and any auth or TLS vars |
@@ -38,7 +39,7 @@ Use these tiers to validate the parity surface locally and in CI:
 | OpenAI smoke | Provider package request and live embedding flow | `dotnet test tests/RedisVlDotNet.Tests/RedisVlDotNet.Tests.csproj --no-restore --filter FullyQualifiedName~OpenAi` | `OPENAI_API_KEY` |
 | Hugging Face smoke | Provider package request and live embedding flow | `dotnet test tests/RedisVlDotNet.Tests/RedisVlDotNet.Tests.csproj --no-restore --filter FullyQualifiedName~HuggingFace` | `HF_TOKEN` |
 | Cohere smoke | Provider package request and live rerank flow | `dotnet test tests/RedisVlDotNet.Tests/RedisVlDotNet.Tests.csproj --no-restore --filter FullyQualifiedName~Cohere` | `COHERE_API_KEY` |
-| Example build sweep | Confirms all runnable sample projects still compile | `find examples -name '*.csproj' -print0 | xargs -0 -n1 dotnet build --no-restore` | Provider env vars not required for build-only validation |
+| Example build sweep | Confirms all runnable sample projects still compile | `npm run examples:build` | Provider env vars not required for build-only validation |
 
 Provider package prerequisites for the runnable examples match the smoke-test gates:
 
@@ -112,8 +113,15 @@ The Redis-backed tests keep query assertions reproducible by:
 
 GitHub Actions runs:
 
-1. `dotnet build redis-vl-dotnet.sln --no-restore`
-2. `dotnet test redis-vl-dotnet.sln --no-build --verbosity normal`
-3. Example builds should remain green locally before merging parity-surface doc or sample updates, even though they are not yet part of the default CI workflow.
+1. `npm ci`
+2. `npm run docs:validate`
+3. `npm run examples:build`
+4. `dotnet build redis-vl-dotnet.sln --no-restore`
+5. `dotnet test redis-vl-dotnet.sln --no-build --verbosity normal`
+
+The docs validation job fails when Antora navigation or page references break.
+The example validation job fails when any documented example project stops compiling.
+
+The `examples:build` script restores each example project as part of `dotnet build`, so a clean CI checkout does not depend on prior restore state.
 
 The workflow provisions `redis/redis-stack-server` as a service container and sets `REDIS_VL_REDIS_URL=localhost:6379`, so the same integration tests that are opt-in locally run automatically in CI.

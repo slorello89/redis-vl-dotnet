@@ -2,17 +2,36 @@
 
 This section captures the current validation commands and docs publishing requirements.
 
-== Local docs validation
+== Local validation
 
 Build the Antora site from the repository root:
 
 [source,bash]
 ----
 npm install
-npm run docs:build
+npm run docs:validate
 ----
 
 The generated static site is written to `build/site`.
+
+Build every example project from the repository root:
+
+[source,bash]
+----
+npm run examples:build
+----
+
+This sweep restores and builds each `examples/*.csproj` entry so docs-linked samples fail fast when they drift from the current library surface.
+
+== CI validation
+
+`.github/workflows/ci.yml` runs the same repository-root commands used locally:
+
+* `npm run docs:validate`
+* `npm run examples:build`
+
+Because Antora exits on broken navigation or missing page references, the docs validation job blocks CI on docs-site drift.
+Because the example sweep builds every sample project, CI also blocks merges when a documented example stops compiling.
 
 == GitHub Actions publishing
 
@@ -21,7 +40,7 @@ The workflow:
 
 * runs on pushes to `main` and on manual dispatch
 * installs the repository Node.js dependencies with `npm ci`
-* builds the Antora site with `npm run docs:build`
+* builds the Antora site with `npm run docs:validate`
 * uploads `build/site` as the Pages artifact
 * deploys only after the build job succeeds
 
