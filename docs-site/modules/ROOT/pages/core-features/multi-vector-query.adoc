@@ -1,0 +1,53 @@
+= MultiVectorQuery
+
+`MultiVectorQuery` searches multiple vector fields and combines their scores into one result ordering.
+
+== Basic shape
+
+[source,csharp]
+----
+var multiVectorResults = await index.SearchAsync(
+    new MultiVectorQuery(
+        [
+            MultiVectorInput.FromFloat32("plot_embedding", queryVector, weight: 0.7),
+            MultiVectorInput.FromFloat32("poster_embedding", [0f, 1f], weight: 0.3)
+        ],
+        topK: 3,
+        filter: Filter.Tag("genre").Eq("crime"),
+        returnFields: ["title"],
+        scoreAlias: "combined_distance",
+        runtimeOptions: new VectorKnnRuntimeOptions(efRuntime: 120)));
+----
+
+The canonical runnable reference is `/examples/VectorSearchExample`.
+
+== Behavior
+
+Each `MultiVectorInput` requires:
+
+* a non-blank vector field name
+* a non-empty vector payload
+* a finite weight greater than zero
+
+`MultiVectorQuery` itself requires at least one input vector and uses the same `topK` window validation as `VectorQuery`.
+
+== Score combination and projections
+
+The library executes one vector search per input field, keeps only documents that appear in every per-vector result set, and computes the final score as the weighted sum of each per-vector distance.
+
+Projection behavior differs slightly from `VectorQuery`:
+
+* `returnFields` become the projected document fields
+* the combined `scoreAlias` is appended automatically
+* final ordering is deterministic across equal combined scores
+
+That deterministic merge behavior is covered in `tests/RedisVlDotNet.Tests/Indexes/SearchIndexAsyncTests.cs`.
+
+== Batch helpers
+
+`SearchBatchesAsync` also works for multi-vector search and respects the same `topK` window.
+
+== Related pages
+
+* xref:core-features/vector-query.adoc[VectorQuery]
+* xref:core-features/aggregate-hybrid-query.adoc[AggregateHybridQuery]

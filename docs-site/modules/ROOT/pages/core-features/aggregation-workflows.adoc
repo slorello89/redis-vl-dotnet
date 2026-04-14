@@ -1,0 +1,81 @@
+= Aggregation Workflows
+
+Use `AggregationQuery` when you want FT.AGGREGATE pipelines without vector KNN matching.
+
+== Basic shape
+
+[source,csharp]
+----
+var aggregationResults = await index.AggregateAsync<GenreSummary>(
+    new AggregationQuery(
+        groupBy: new AggregationGroupBy(
+            ["genre"],
+            [
+                AggregationReducer.Count("movieCount"),
+                AggregationReducer.Average("year", "averageYear")
+            ]),
+        sortBy: new AggregationSortBy([new AggregationSortField("movieCount", descending: true)]),
+        limit: 10));
+----
+
+The canonical runnable reference is `/examples/JsonStorageExample`.
+
+== Pipeline pieces
+
+`AggregationQuery` exposes the standard pipeline building blocks:
+
+* `queryString` defaults to `*`
+* `loadFields` selects the properties loaded into the pipeline
+* `AggregationApply` adds computed aliases
+* `AggregationGroupBy` defines grouping properties and reducers
+* `AggregationSortBy` defines one or more sort fields
+* `QueryPagination` controls row paging
+
+All aggregation field lists are normalized and deduplicated, and `AggregationGroupBy` requires at least one property or reducer.
+
+== Reducers and aliases
+
+Use the reducer helpers on `AggregationReducer` for the supported function names:
+
+* `Count`
+* `Sum`
+* `Average`
+* `Min`
+* `Max`
+* `CountDistinct`
+* `CountDistinctish`
+* `ToList`
+* `Quantile`
+
+Reducer aliases and `AggregationApply` aliases are normalized by trimming a leading `@`.
+
+== Typed rows and batches
+
+Aggregation results can stay raw:
+
+* `AggregationResults.Rows` exposes `AggregationResultRow`
+* `AggregationResultRow.TryGetValue(...)` lets you read individual fields
+
+Or you can map rows into .NET types:
+
+[source,csharp]
+----
+var typedResults = await index.AggregateAsync<GenreSummary>(query);
+----
+
+Use `AggregateBatchesAsync` and `AggregateBatchesAsync<TDocument>` to stream multi-page aggregate results. The batch helpers clone the original query with updated `QueryPagination`.
+
+== Example and test coverage
+
+Use these sources together when documenting or validating behavior:
+
+* `/examples/JsonStorageExample` for end-to-end grouping and typed aggregate mapping
+* `tests/RedisVlDotNet.Tests/Indexes/SearchQueryCommandBuilderTests.cs` for query-shape and alias normalization
+* `tests/RedisVlDotNet.Tests/Indexes/SearchIndexAsyncTests.cs` for aggregate execution and batching
+* `tests/RedisVlDotNet.Tests/Queries/SearchResultMappingTests.cs` for typed row mapping failures and successes
+
+== Related pages
+
+* xref:core-features/count-query.adoc[CountQuery]
+* xref:core-features/aggregate-hybrid-query.adoc[AggregateHybridQuery]
+* xref:../examples/index.adoc[Examples]

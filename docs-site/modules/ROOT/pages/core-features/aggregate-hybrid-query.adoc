@@ -1,0 +1,50 @@
+= AggregateHybridQuery
+
+`AggregateHybridQuery` applies a hybrid text-plus-vector match and then runs an aggregation pipeline over the matched documents.
+
+== Basic shape
+
+[source,csharp]
+----
+var aggregateHybridResults = await index.AggregateAsync<GenreHybridSummary>(
+    AggregateHybridQuery.FromFloat32(
+        Filter.Text("title").Prefix("He") | Filter.Text("title").Prefix("Ar"),
+        "plot_embedding",
+        queryVector,
+        topK: 3,
+        groupBy: new AggregationGroupBy(
+            ["genre"],
+            [
+                AggregationReducer.Count("matchCount"),
+                AggregationReducer.Average("vector_distance", "avgDistance")
+            ]),
+        sortBy: new AggregationSortBy(
+            [
+                new AggregationSortField("matchCount", descending: true),
+                new AggregationSortField("avgDistance")
+            ]),
+        runtimeOptions: new VectorKnnRuntimeOptions(efRuntime: 90)));
+----
+
+The canonical runnable reference is `/examples/VectorSearchExample`.
+
+== Key behavior
+
+`AggregateHybridQuery` combines the rules from hybrid search and aggregation:
+
+* `textFilter` must contain at least one text predicate
+* `topK` defines the hybrid retrieval window before aggregation runs
+* `loadFields` are normalized and deduplicated, preserving explicit `@field` syntax when provided
+* `scoreAlias` defaults to `vector_distance`
+* `VectorKnnRuntimeOptions` controls the runtime `EF_RUNTIME` parameter
+
+Unlike `HybridQuery`, aggregate paging applies to the aggregation rows through the normal `offset` and `limit` values.
+
+== Typed row mapping and batches
+
+Use `AggregateAsync<TDocument>` to map rows into projection types and `AggregateBatchesAsync<TDocument>` to stream multi-page result sets. Both behaviors are covered in `tests/RedisVlDotNet.Tests/Indexes/SearchIndexAsyncTests.cs`.
+
+== Related pages
+
+* xref:core-features/hybrid-query.adoc[HybridQuery]
+* xref:core-features/aggregation-workflows.adoc[Aggregation workflows]

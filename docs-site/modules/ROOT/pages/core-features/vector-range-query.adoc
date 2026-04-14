@@ -1,0 +1,47 @@
+= VectorRangeQuery
+
+`VectorRangeQuery` performs radius-style vector search instead of KNN ranking.
+
+== When to use it
+
+Use `VectorRangeQuery` when the main constraint is a maximum distance threshold:
+
+[source,csharp]
+----
+var nearbyResults = await index.SearchAsync(
+    VectorRangeQuery.FromFloat32(
+        "embedding",
+        queryVector,
+        distanceThreshold: 0.25,
+        returnFields: ["title", "vector_distance"],
+        runtimeOptions: new VectorRangeRuntimeOptions(epsilon: 0.01)));
+----
+
+This behavior is covered directly in `tests/RedisVlDotNet.Tests/Indexes/SearchQueryCommandBuilderTests.cs` and in the semantic cache/message history workflows that use vector range matching internally.
+
+== Behavior
+
+`VectorRangeQuery` differs from `VectorQuery` in a few important ways:
+
+* it requires `distanceThreshold > 0`
+* it does not use `topK`
+* standard pagination applies with no extra topK-window validation
+* `scoreAlias` still defaults to `vector_distance`
+
+== Runtime range options
+
+Use `VectorRangeRuntimeOptions` for range-specific tuning:
+
+* `epsilon` cannot be negative
+* `epsilon` must be finite when provided
+
+`epsilon` is passed at runtime and is separate from the index schema definition.
+
+== Paging and mapping
+
+`returnFields` are normalized the same way as other search queries, and typed mapping works through the same `SearchAsync<TDocument>` and `SearchBatchesAsync<TDocument>` APIs.
+
+== Related pages
+
+* xref:core-features/vector-query.adoc[VectorQuery]
+* xref:core-features/hybrid-query.adoc[HybridQuery]

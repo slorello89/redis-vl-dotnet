@@ -28,7 +28,7 @@ Examples that use JSON storage also require RedisJSON. Provider-backed examples 
 
 | Core vector workflows
 | `/examples/VectorSearchExample`
-| Covers HASH-backed vector search, hash partial updates, runtime vector tuning, multi-vector search, and aggregate hybrid flows.
+| Covers HASH-backed vector search, vector paging windows, hash partial updates, runtime vector tuning, multi-vector search, and aggregate hybrid flows.
 
 | Semantic message history
 | `/examples/MessageHistoryExample`

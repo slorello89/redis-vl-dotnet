@@ -1,0 +1,68 @@
+= VectorQuery
+
+`VectorQuery` performs KNN search against one vector field.
+
+== Basic shape
+
+[source,csharp]
+----
+var vectorQuery = VectorQuery.FromFloat32(
+    fieldName: "plot_embedding",
+    vector: queryVector,
+    topK: 3,
+    filter: Filter.Tag("genre").Eq("crime"),
+    returnFields: ["title", "summary"],
+    scoreAlias: "distance",
+    runtimeOptions: new VectorKnnRuntimeOptions(efRuntime: 150),
+    pagination: new QueryPagination(limit: 2));
+
+var results = await index.SearchAsync(vectorQuery);
+----
+
+The canonical runnable reference is `/examples/VectorSearchExample`.
+
+== TopK window and paging
+
+`VectorQuery` has two paging constraints:
+
+* `topK` must be greater than zero
+* `pagination.Offset + pagination.Limit` cannot exceed `topK`
+
+That means `topK` defines the maximum retrieval window, and `QueryPagination` selects which slice of that window you want back.
+
+The same example project shows a second-page request by keeping `topK: 3` and changing the pagination to `offset: 2, limit: 1`.
+
+== Return fields, score aliases, and typed mapping
+
+The library normalizes vector query projections:
+
+* leading `@` markers are stripped from the vector field name and score alias
+* duplicate `returnFields` are removed
+* the score alias is automatically included in the returned fields
+
+Map results into projection records when you want strong typing for both domain fields and the vector score:
+
+[source,csharp]
+----
+var typedResults = await index.SearchAsync<MovieVectorHit>(
+    VectorQuery.FromFloat32("plot_embedding", queryVector, 3, returnFields: ["title"], scoreAlias: "distance"));
+----
+
+== Runtime vector options
+
+Use `VectorKnnRuntimeOptions` to pass runtime HNSW tuning:
+
+* `efRuntime` must be greater than zero
+* the option is translated into `EF_RUNTIME` query params
+
+This is a runtime search knob, not schema metadata. Schema construction choices such as `m` and `efConstruction` still live on the vector field definition.
+
+== Batch helpers
+
+`SearchBatchesAsync` works for vector search too. When `batchSize` is larger than the remaining `topK` window, the final batch is automatically shrunk to stay inside `topK`.
+
+== Related pages
+
+* xref:core-features/vector-range-query.adoc[VectorRangeQuery]
+* xref:core-features/hybrid-query.adoc[HybridQuery]
+* xref:core-features/multi-vector-query.adoc[MultiVectorQuery]

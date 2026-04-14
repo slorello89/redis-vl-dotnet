@@ -1,0 +1,75 @@
+= FilterQuery
+
+`FilterQuery` is the general-purpose search object for structured RediSearch filters without a free-text query string.
+
+== When to use it
+
+Use `FilterQuery` when the match criteria come from fielded filters:
+
+* tag equality and set membership
+* numeric ranges
+* text prefix or exact text expressions built with the filter DSL
+* geo radius predicates
+* boolean combinations through `Filter.And(...)`, `Filter.Or(...)`, and `!`
+
+If you need a user-supplied text search string, use xref:core-features/text-query.adoc[`TextQuery`] instead.
+
+== Basic shape
+
+[source,csharp]
+----
+var scienceFictionQuery = new FilterQuery(
+    Filter.And(
+        Filter.Tag("genre").Eq("science-fiction"),
+        Filter.Numeric("year").GreaterThan(1980)),
+    returnFields: ["title", "year", "genre"],
+    pagination: new QueryPagination(offset: 0, limit: 10));
+
+var results = await index.SearchAsync<Movie>(scienceFictionQuery);
+----
+
+The canonical runnable reference is `/examples/JsonStorageExample`.
+
+== Paging and projections
+
+`FilterQuery` stores paging in `QueryPagination`:
+
+* default paging is `offset: 0`, `limit: 10`
+* `offset` and `limit` cannot be negative
+* `returnFields` are normalized, so duplicate names and leading `@` markers are removed
+
+If `returnFields` is omitted, RediSearch returns the stored document payload for the matching storage type. Add projections when you want smaller responses or plan to map into a projection type.
+
+== Typed mapping and batches
+
+Every search result can stay raw or map into a .NET type:
+
+[source,csharp]
+----
+var projected = await index.SearchAsync<MovieSummary>(
+    new FilterQuery(Filter.Tag("genre").Eq("crime"), ["title", "year"]));
+----
+
+For larger result sets, iterate with `SearchBatchesAsync`:
+
+[source,csharp]
+----
+await foreach (var batch in index.SearchBatchesAsync(
+    new FilterQuery(Filter.Tag("genre").Eq("crime"), ["title"], pagination: new QueryPagination(limit: 100)),
+    batchSize: 100))
+{
+    foreach (var document in batch.Documents)
+    {
+        Console.WriteLine(document.Values["title"]);
+    }
+}
+----
+
+The batch helpers clone the original query and advance only the pagination window.
+
+== Related pages
+
+* xref:core-features/text-query.adoc[TextQuery]
+* xref:core-features/count-query.adoc[CountQuery]
+* xref:core-features/aggregation-workflows.adoc[Aggregation workflows]
+* xref:../examples/index.adoc[Examples]

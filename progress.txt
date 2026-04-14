@@ -9,6 +9,7 @@ Started: Tue Apr 14 09:38:40 EDT 2026
 - Keep connection and credential setup canonical in `docs-site/modules/ROOT/pages/getting-started/index.adoc`; examples can show story-specific overrides, but shared Redis topology and provider env var guidance should live in the getting-started page so links and onboarding stay consistent.
 - For Antora pages under nested folders, use module-relative xref targets such as `xref:core-features/search-schema.adoc[]` instead of sibling-only filenames so local docs validation resolves links consistently.
 - In Antora prose, avoid literal `{name}` placeholders unless they are real AsciiDoc attributes; use inline code like `prefix + id` or escape the braces so local docs validation does not emit missing-attribute warnings.
+- For query and aggregation docs, pair `/examples/JsonStorageExample` and `/examples/VectorSearchExample` with `tests/RedisVlDotNet.Tests/Indexes/SearchQueryCommandBuilderTests.cs`, `tests/RedisVlDotNet.Tests/Indexes/SearchIndexAsyncTests.cs`, and `tests/RedisVlDotNet.Tests/Queries/SearchResultMappingTests.cs`; the examples show canonical flows while the tests capture normalization, paging, typed mapping, and runtime-vector edge cases.
 ---
 
 ## 2026-04-14 09:42:08 EDT - US-001
@@ -86,5 +87,19 @@ Started: Tue Apr 14 09:38:40 EDT 2026
   - `UpdateJsonByIdAsync` and `UpdateHashByIdAsync` return `false` for missing documents rather than throwing, so the docs need to call that out explicitly to match the API contract.
   - Useful context
   - There are still no `AGENTS.md` files in the edited docs paths, so the reusable authoring guidance belongs in `progress.txt` instead.
+  - Manual browser verification is still required for docs UI changes because no browser-testing tool is available in this environment.
+---
+## 2026-04-14 10:03:27 EDT - US-008
+- Implemented a dedicated Antora query and aggregation doc set covering `FilterQuery`, `TextQuery`, `CountQuery`, `VectorQuery`, `VectorRangeQuery`, `HybridQuery`, `AggregateHybridQuery`, `MultiVectorQuery`, and aggregation workflows, then linked the core-features overview, nav, and examples index to the new pages and runnable examples.
+- Files changed: `docs-site/modules/ROOT/nav.adoc`, `docs-site/modules/ROOT/pages/core-features/index.adoc`, `docs-site/modules/ROOT/pages/core-features/filter-query.adoc`, `docs-site/modules/ROOT/pages/core-features/text-query.adoc`, `docs-site/modules/ROOT/pages/core-features/count-query.adoc`, `docs-site/modules/ROOT/pages/core-features/vector-query.adoc`, `docs-site/modules/ROOT/pages/core-features/vector-range-query.adoc`, `docs-site/modules/ROOT/pages/core-features/hybrid-query.adoc`, `docs-site/modules/ROOT/pages/core-features/aggregate-hybrid-query.adoc`, `docs-site/modules/ROOT/pages/core-features/multi-vector-query.adoc`, `docs-site/modules/ROOT/pages/core-features/aggregation-workflows.adoc`, `docs-site/modules/ROOT/pages/examples/index.adoc`, `prd.json`, `progress.txt`.
+- Quality checks run and result: `npm run docs:validate` passed; `npm run examples:build` passed.
+- Learnings for future iterations:
+  - Patterns discovered
+  - Query docs in this repo are strongest when they cross-link the two canonical examples with the command-builder, async-search, and result-mapping tests; examples alone miss normalization and pagination constraints.
+  - The query APIs share `QueryPagination`, but vector KNN-style queries add an extra `topK` window constraint that the docs should call out explicitly instead of treating all paging the same.
+  - Gotchas encountered
+  - `HybridQuery` and `AggregateHybridQuery` require at least one text predicate in `textFilter`; a tag-only or numeric-only filter is rejected even if the rest of the query shape is valid.
+  - Useful context
+  - There are still no `AGENTS.md` files in the edited docs paths, so reusable authoring notes belong in `progress.txt` instead.
   - Manual browser verification is still required for docs UI changes because no browser-testing tool is available in this environment.
 ---

@@ -10,7 +10,7 @@ The core package centers on these feature groups:
 * xref:core-features/field-definitions.adoc[field definitions] for text, tag, numeric, geo, and vector indexing
 * xref:core-features/index-lifecycle.adoc[`SearchIndex`] for index creation, inspection, listing, clearing, rediscovery, and dropping
 * xref:core-features/document-lifecycle.adoc[document lifecycle] and xref:core-features/partial-updates.adoc[partial updates] for JSON and HASH CRUD flows
-* structured query objects for filter, text, count, vector, hybrid, and aggregation workflows
+* structured query objects for filter, text, count, vector, hybrid, multi-vector, and aggregation workflows
 
 == Schema and index docs
 
@@ -40,6 +40,40 @@ The core package centers on these feature groups:
 | `JsonPartialUpdate` and `HashPartialUpdate`, update-by-id versus update-by-key, key resolution, and validation constraints.
 |===
 
+== Query and aggregation docs
+
+[cols="1,2"]
+|===
+| Topic | What it covers
+
+| xref:core-features/filter-query.adoc[`FilterQuery`]
+| Structured RediSearch filtering with `Filter.Tag`, `Filter.Numeric`, `Filter.Text`, `Filter.Geo`, projections, paging, and batch iteration.
+
+| xref:core-features/text-query.adoc[`TextQuery`]
+| Full-text search strings, return-field projections, typed mapping, and text-search batch helpers.
+
+| xref:core-features/count-query.adoc[`CountQuery`]
+| Count-only requests that reuse the filter DSL without fetching documents.
+
+| xref:core-features/vector-query.adoc[`VectorQuery`]
+| KNN search, `topK` windows, runtime `EF_RUNTIME` tuning, score aliases, and typed vector result mapping.
+
+| xref:core-features/vector-range-query.adoc[`VectorRangeQuery`]
+| Radius-style vector search with distance thresholds, paging, and range runtime options.
+
+| xref:core-features/hybrid-query.adoc[`HybridQuery`]
+| Combined text-plus-vector search where a text predicate narrows semantic search candidates.
+
+| xref:core-features/aggregate-hybrid-query.adoc[`AggregateHybridQuery`]
+| Vector + text filtering with aggregation pipelines, load fields, reducers, sort clauses, and runtime tuning.
+
+| xref:core-features/multi-vector-query.adoc[`MultiVectorQuery`]
+| Weighted search across multiple vector fields with deterministic score combination and shared projections.
+
+| xref:core-features/aggregation-workflows.adoc[Aggregation workflows]
+| `AggregationQuery`, `AggregationApply`, `AggregationGroupBy`, reducers, pagination, typed row mapping, and aggregate batching.
+|===
+
 == Primary example
 
 The primary runnable example for this area is `/examples/JsonStorageExample`.
@@ -51,6 +85,11 @@ It demonstrates:
 * loading, fetching, partially updating, clearing, and dropping JSON documents
 
 Pair it with `/examples/VectorSearchExample` when you need the HASH-backed view of update, fetch, and cleanup flows.
+
+The primary runnable references for query coverage are:
+
+* `/examples/JsonStorageExample` for filter, text, count, batching, and standard aggregation
+* `/examples/VectorSearchExample` for vector, hybrid aggregate, multi-vector, paging windows, and runtime vector options
 
 == Storage behavior
 
@@ -69,5 +108,8 @@ Query pagination is shared across the search APIs, and typed result mapping is d
 * xref:core-features/search-schema.adoc[SearchSchema] to start defining an index
 * xref:core-features/document-lifecycle.adoc[Document lifecycle] for load, fetch, delete, clear, and drop flows
 * xref:core-features/partial-updates.adoc[Partial updates] for JSONPath and HASH field update rules
+* xref:core-features/filter-query.adoc[FilterQuery] for structured filtering
+* xref:core-features/vector-query.adoc[VectorQuery] for vector search and runtime tuning
+* xref:core-features/aggregation-workflows.adoc[Aggregation workflows] for grouping and typed aggregate results
 * xref:../examples/index.adoc[Examples] for runnable coverage
 * xref:../cli/index.adoc[CLI] for terminal-oriented schema and index operations

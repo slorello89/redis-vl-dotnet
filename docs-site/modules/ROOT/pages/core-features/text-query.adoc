@@ -1,0 +1,61 @@
+= TextQuery
+
+`TextQuery` wraps a raw RediSearch query string and optional projections.
+
+== When to use it
+
+Use `TextQuery` when the user already has a text predicate such as:
+
+* token matches like `heat`
+* OR expressions like `Alien|Arrival`
+* RediSearch prefix or grouped expressions authored directly as a query string
+
+`TextQuery` requires a non-blank string and trims surrounding whitespace before execution.
+
+== Basic shape
+
+[source,csharp]
+----
+var projectedTextResults = await index.SearchAsync(
+    new TextQuery("Alien|Arrival", ["title", "year"], limit: 2));
+
+var typedTextResults = await index.SearchAsync<Movie>(
+    new TextQuery("Alien|Arrival", ["title", "year", "genre", "summary"], limit: 2));
+----
+
+The canonical runnable reference is `/examples/JsonStorageExample`.
+
+== Paging, projections, and mapping
+
+`TextQuery` uses the same `QueryPagination` model as `FilterQuery`:
+
+* default paging is `offset: 0`, `limit: 10`
+* `returnFields` are normalized and deduplicated
+* typed mapping works through `SearchResults.Map<TDocument>()` and `SearchAsync<TDocument>(...)`
+
+If a required projected field is missing or cannot be converted into the target .NET property type, the library throws `SearchResultMappingException`. The mapping contract is covered in `tests/RedisVlDotNet.Tests/Queries/SearchResultMappingTests.cs`.
+
+== Batch helpers
+
+Use `SearchBatchesAsync` when you want to stream pages:
+
+[source,csharp]
+----
+await foreach (var batch in index.SearchBatchesAsync(
+    new TextQuery("Alien|Arrival", ["title"], pagination: new QueryPagination(limit: 1)),
+    batchSize: 1))
+{
+    foreach (var document in batch.Documents)
+    {
+        Console.WriteLine(document.Values["title"]);
+    }
+}
+----
+
+This exact pattern is used in `/examples/JsonStorageExample`.
+
+== Related pages
+
+* xref:core-features/filter-query.adoc[FilterQuery]
+* xref:core-features/count-query.adoc[CountQuery]
+* xref:core-features/hybrid-query.adoc[HybridQuery]

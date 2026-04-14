@@ -1,0 +1,46 @@
+= HybridQuery
+
+`HybridQuery` combines a text predicate with KNN vector search.
+
+== Basic shape
+
+[source,csharp]
+----
+var hybridQuery = HybridQuery.FromFloat32(
+    Filter.Text("title").Prefix("He"),
+    "plot_embedding",
+    queryVector,
+    topK: 3,
+    filter: Filter.Tag("genre").Eq("crime"),
+    returnFields: ["title"],
+    scoreAlias: "distance",
+    runtimeOptions: new VectorKnnRuntimeOptions(efRuntime: 90));
+----
+
+The closest runnable reference is `/examples/VectorSearchExample`, which demonstrates the same text-plus-vector pattern through xref:core-features/aggregate-hybrid-query.adoc[`AggregateHybridQuery`].
+
+== Required text predicate
+
+`HybridQuery` is stricter than `FilterQuery`:
+
+* `textFilter` must contain at least one text expression
+* additional structured filters can be supplied through `filter`
+* the library combines them as `textFilter & filter`
+
+If the text side contains no text predicate, construction throws `ArgumentException`.
+
+== Paging and runtime behavior
+
+`HybridQuery` follows the same KNN rules as `VectorQuery`:
+
+* `topK` must be greater than zero
+* `offset + limit` cannot exceed `topK`
+* `VectorKnnRuntimeOptions` controls runtime `EF_RUNTIME`
+
+Return-field normalization and typed mapping behave the same way as `VectorQuery`.
+
+== Related pages
+
+* xref:core-features/text-query.adoc[TextQuery]
+* xref:core-features/vector-query.adoc[VectorQuery]
+* xref:core-features/aggregate-hybrid-query.adoc[AggregateHybridQuery]

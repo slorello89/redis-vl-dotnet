@@ -1,0 +1,30 @@
+= CountQuery
+
+`CountQuery` returns only the number of matching documents.
+
+== When to use it
+
+Use `CountQuery` when the caller needs cardinality without fetching documents:
+
+[source,csharp]
+----
+var scienceFictionCount = await index.CountAsync(
+    new CountQuery(Filter.Tag("genre").Eq("science-fiction")));
+----
+
+The canonical runnable reference is `/examples/JsonStorageExample`.
+
+== Behavior
+
+`CountQuery` accepts an optional `FilterExpression`:
+
+* `new CountQuery()` counts every indexed document
+* `new CountQuery(filter)` reuses the same filter DSL as `FilterQuery`
+* the result is a `long`
+
+Internally the library issues an `FT.SEARCH` count-only request, so use `CountQuery` instead of a search with `limit: 0` when the API contract you want is "count only".
+
+== Related pages
+
+* xref:core-features/filter-query.adoc[FilterQuery]
+* xref:core-features/document-lifecycle.adoc[Document lifecycle]
