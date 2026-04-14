@@ -1,0 +1,80 @@
+= Partial Updates
+
+`SearchIndex` supports targeted document updates for both JSON and HASH storage, but the two storage models have different constraints.
+
+== Update by id versus update by key
+
+Each storage type exposes two entry points:
+
+* `UpdateJsonByIdAsync` and `UpdateHashByIdAsync`
+* `UpdateJsonByKeyAsync` and `UpdateHashByKeyAsync`
+
+Update-by-id resolves the Redis key as `schema.Index.Prefix + id` by using `DocumentKeyResolver.ResolveKeyFromId(...)`.
+Update-by-key expects the full Redis key and trims surrounding whitespace before issuing Redis commands.
+
+If the target document does not exist, the update methods return `false` instead of throwing.
+
+== JSON partial updates
+
+JSON updates accept one or more `JsonPartialUpdate` values:
+
+[source,csharp]
+----
+var updated = await index.UpdateJsonByIdAsync(
+    "movie-2",
+    [
+        new JsonPartialUpdate("$.summary", "A linguist helps decode the intent of alien visitors."),
+        new JsonPartialUpdate("$.year", 2017)
+    ]);
+----
+
+Behavior and limitations:
+
+* each path must be an absolute JSONPath such as `$.title` or `$.metadata.rating`
+* root replacement with `$` is rejected
+* duplicate paths in one call are rejected
+* the library first checks that the document exists with `JSON.GET`
+* each update path is then written with a separate `JSON.SET`
+
+Nested JSON updates work when the path already addresses a valid RedisJSON location, as shown in the integration tests with `$.metadata.rating` and `$.metadata.director`.
+
+== HASH partial updates
+
+HASH updates accept one or more `HashPartialUpdate` values:
+
+[source,csharp]
+----
+var updated = await index.UpdateHashByIdAsync(
+    "arrival",
+    [
+        new HashPartialUpdate("summary", "A linguist decodes messages from alien visitors."),
+        new HashPartialUpdate("genre", "sci-fi")
+    ]);
+----
+
+Behavior and limitations:
+
+* field names are trimmed before execution
+* duplicate fields in one call are rejected
+* `null` values are rejected
+* updates write a single `HashSetAsync` call after the document existence check
+* HASH updates only set top-level field values; there is no nested-path syntax
+
+Complex values are serialized into a single hash field value. For example, array values are stored as JSON text in the hash entry.
+
+== Example coverage
+
+Use these runnable examples when validating the documented behavior:
+
+* `/examples/JsonStorageExample` demonstrates JSON load, fetch, update-by-id, update-by-key, clear, and drop flows
+* `/examples/VectorSearchExample` demonstrates HASH update-by-id plus final cleanup with `DropAsync(deleteDocuments: true)`
+
+The matching source-backed behavior is also covered in:
+
+* `tests/RedisVlDotNet.Tests/Indexes/SearchIndexIntegrationTests.cs`
+* `tests/RedisVlDotNet.Tests/Indexes/SearchIndexAsyncTests.cs`
+
+== Related pages
+
+* xref:core-features/document-lifecycle.adoc[Document lifecycle]
+* xref:core-features/index-lifecycle.adoc[Index lifecycle]

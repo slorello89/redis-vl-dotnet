@@ -9,7 +9,7 @@ The core package centers on these feature groups:
 * xref:core-features/search-schema.adoc[`SearchSchema`] and xref:core-features/index-definition.adoc[`IndexDefinition`] for defining index names, prefixes, storage type, and fields
 * xref:core-features/field-definitions.adoc[field definitions] for text, tag, numeric, geo, and vector indexing
 * xref:core-features/index-lifecycle.adoc[`SearchIndex`] for index creation, inspection, listing, clearing, rediscovery, and dropping
-* JSON and HASH document load, fetch, delete, and partial update flows
+* xref:core-features/document-lifecycle.adoc[document lifecycle] and xref:core-features/partial-updates.adoc[partial updates] for JSON and HASH CRUD flows
 * structured query objects for filter, text, count, vector, hybrid, and aggregation workflows
 
 == Schema and index docs
@@ -32,6 +32,12 @@ The core package centers on these feature groups:
 
 | xref:core-features/index-lifecycle.adoc[Index lifecycle]
 | `CreateAsync`, `ExistsAsync`, `InfoAsync`, `ListAsync`, `FromExistingAsync`, `ClearAsync`, and `DropAsync`.
+
+| xref:core-features/document-lifecycle.adoc[Document lifecycle]
+| `LoadJsonAsync`, `LoadHashAsync`, fetch-by-id and fetch-by-key calls, delete flows, and cleanup behavior for JSON and HASH documents.
+
+| xref:core-features/partial-updates.adoc[Partial updates]
+| `JsonPartialUpdate` and `HashPartialUpdate`, update-by-id versus update-by-key, key resolution, and validation constraints.
 |===
 
 == Primary example
@@ -42,9 +48,9 @@ It demonstrates:
 * loading a schema from YAML
 * creating a JSON-backed index with overwrite semantics
 * listing indexes and rediscovering one with `SearchIndex.FromExistingAsync`
-* loading, fetching, partially updating, clearing, and dropping documents
+* loading, fetching, partially updating, clearing, and dropping JSON documents
 
-Pair it with `/examples/VectorSearchExample` when you need the HASH-backed view of the same lifecycle and schema concepts.
+Pair it with `/examples/VectorSearchExample` when you need the HASH-backed view of update, fetch, and cleanup flows.
 
 == Storage behavior
 
@@ -61,5 +67,7 @@ Query pagination is shared across the search APIs, and typed result mapping is d
 
 * xref:../getting-started/index.adoc[Getting Started] for the first local setup flow
 * xref:core-features/search-schema.adoc[SearchSchema] to start defining an index
+* xref:core-features/document-lifecycle.adoc[Document lifecycle] for load, fetch, delete, clear, and drop flows
+* xref:core-features/partial-updates.adoc[Partial updates] for JSONPath and HASH field update rules
 * xref:../examples/index.adoc[Examples] for runnable coverage
 * xref:../cli/index.adoc[CLI] for terminal-oriented schema and index operations

@@ -1,0 +1,112 @@
+= Document Lifecycle
+
+Use the document APIs on `SearchIndex` after the index exists. The storage type in `IndexDefinition` determines whether you call the JSON or HASH variants.
+
+== End-to-end flow
+
+The common lifecycle is:
+
+. create or rediscover the index
+. load one or more documents
+. fetch documents by id or by explicit Redis key
+. delete individual documents when needed
+. clear all indexed documents or drop the index during teardown
+
+The primary runnable references are:
+
+* `/examples/JsonStorageExample` for JSON-backed create, fetch, update, clear, and drop flows
+* `/examples/VectorSearchExample` for HASH-backed update and cleanup flows
+
+== Loading documents
+
+Use JSON methods for `StorageType.Json` schemas and HASH methods for `StorageType.Hash` schemas:
+
+[source,csharp]
+----
+var jsonKey = await index.LoadJsonAsync(new Movie("movie-1", "Heat", 1995, "crime", "..."));
+var hashKey = await index.LoadHashAsync(new HashMovieDocument("movie-1", "Heat", 1995, "crime"));
+----
+
+Batch overloads return all resolved keys:
+
+[source,csharp]
+----
+var keys = await index.LoadJsonAsync(
+    movies,
+    idSelector: static movie => movie.ExternalId);
+----
+
+Key resolution follows the same rules for JSON and HASH:
+
+* if you pass `key`, the library uses that Redis key as-is after trimming whitespace
+* if you pass `id`, the library prefixes it with `schema.Index.Prefix`
+* if neither is supplied, the library looks for a readable `Id` property on the document
+* batch overloads support either `keySelector` or `idSelector`, but not both
+
+If the library cannot resolve a key, it throws an `ArgumentException`.
+
+== Fetching documents
+
+Fetch by id when you want the schema prefix applied automatically:
+
+[source,csharp]
+----
+var movie = await index.FetchJsonByIdAsync<Movie>("movie-2");
+var arrival = await index.FetchHashByIdAsync<HashMovieDocument>("arrival");
+----
+
+Fetch by key when you already have the full Redis key from a load operation or an external workflow:
+
+[source,csharp]
+----
+var envelope = await index.FetchJsonByKeyAsync<MovieEnvelope>(resolvedKey);
+----
+
+Missing documents return `null` for both storage types.
+
+== Deleting documents
+
+Delete methods remove the underlying Redis key and return `true` only when a document was actually deleted:
+
+[source,csharp]
+----
+var deletedById = await index.DeleteJsonByIdAsync("movie-1");
+var deletedByKey = await index.DeleteHashByKeyAsync("vector-example:arrival");
+----
+
+Use delete-by-id when your caller works in domain ids. Use delete-by-key when you already persisted or discovered the concrete Redis key.
+
+== Clearing and dropping
+
+`ClearAsync()` removes indexed documents by scanning each configured prefix and deleting matching keys in batches. The index definition remains available:
+
+[source,csharp]
+----
+var removed = await index.ClearAsync(batchSize: 500);
+----
+
+Use `DropAsync()` when you want to remove the index itself:
+
+* `DropAsync()` deletes only the index metadata
+* `DropAsync(deleteDocuments: true)` deletes both the index and matching documents
+
+This distinction matters in repeatable examples and tests: clear when you want to preserve the schema, drop when the whole feature fixture is done.
+
+== JSON versus HASH behavior
+
+[cols="1,2"]
+|===
+| Storage type | Lifecycle behavior
+
+| JSON
+| Stores full serialized documents with RedisJSON. Requires RedisJSON plus RediSearch. Supports fetch and partial updates through JSONPath expressions.
+
+| HASH
+| Stores flattened hash entries through `HashSetAsync`. Requires RediSearch only. Fetch maps top-level hash fields back to your target .NET type.
+|===
+
+== Related pages
+
+* xref:core-features/index-lifecycle.adoc[Index lifecycle]
+* xref:core-features/partial-updates.adoc[Partial updates]
+* xref:../examples/index.adoc[Examples]

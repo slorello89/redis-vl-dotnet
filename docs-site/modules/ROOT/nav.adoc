@@ -6,6 +6,8 @@
 ** xref:core-features/field-definitions.adoc[Field Definitions]
 ** xref:core-features/yaml-schema-loading.adoc[YAML Schema Loading]
 ** xref:core-features/index-lifecycle.adoc[Index Lifecycle]
+** xref:core-features/document-lifecycle.adoc[Document Lifecycle]
+** xref:core-features/partial-updates.adoc[Partial Updates]
 * xref:extensions/index.adoc[Extensions]
 * xref:examples/index.adoc[Examples]
 * xref:cli/index.adoc[CLI]

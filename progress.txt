@@ -8,6 +8,7 @@ Started: Tue Apr 14 09:38:40 EDT 2026
 - When Antora replaces legacy repository entry-point docs, move the substantive overview into the Antora section index pages and leave the old Markdown files as short redirect stubs so there is one canonical editing target.
 - Keep connection and credential setup canonical in `docs-site/modules/ROOT/pages/getting-started/index.adoc`; examples can show story-specific overrides, but shared Redis topology and provider env var guidance should live in the getting-started page so links and onboarding stay consistent.
 - For Antora pages under nested folders, use module-relative xref targets such as `xref:core-features/search-schema.adoc[]` instead of sibling-only filenames so local docs validation resolves links consistently.
+- In Antora prose, avoid literal `{name}` placeholders unless they are real AsciiDoc attributes; use inline code like `prefix + id` or escape the braces so local docs validation does not emit missing-attribute warnings.
 ---
 
 ## 2026-04-14 09:42:08 EDT - US-001
@@ -71,5 +72,19 @@ Started: Tue Apr 14 09:38:40 EDT 2026
   - This repo has extensive unrelated in-flight source changes, so stage only the docs-story files before committing.
   - Useful context
   - There are still no `AGENTS.md` files in the edited docs paths, so the reusable Antora navigation and xref guidance belongs in `progress.txt` instead.
+  - Manual browser verification is still required for docs UI changes because no browser-testing tool is available in this environment.
+---
+## 2026-04-14 09:59:58 EDT - US-007
+- Implemented Antora documentation for JSON and HASH document lifecycle flows plus a dedicated partial-updates page covering load, fetch, delete, clear, drop, update-by-id, update-by-key, key resolution, and storage-specific limitations.
+- Files changed: `docs-site/modules/ROOT/nav.adoc`, `docs-site/modules/ROOT/pages/core-features/index.adoc`, `docs-site/modules/ROOT/pages/core-features/document-lifecycle.adoc`, `docs-site/modules/ROOT/pages/core-features/partial-updates.adoc`, `docs-site/modules/ROOT/pages/examples/index.adoc`, `prd.json`, `progress.txt`.
+- Quality checks run and result: `npm run docs:validate` passed; `npm run examples:build` passed.
+- Learnings for future iterations:
+  - Patterns discovered
+  - For document-behavior docs in this repo, use `examples/JsonStorageExample/Program.cs`, `examples/VectorSearchExample/Program.cs`, and the `SearchIndex` integration and async tests together; the examples show canonical flows while the tests capture the edge-case contract.
+  - Antora inline prose should avoid raw `{placeholder}` text unless it is a defined AsciiDoc attribute, or the docs build will warn about missing attributes.
+  - Gotchas encountered
+  - `UpdateJsonByIdAsync` and `UpdateHashByIdAsync` return `false` for missing documents rather than throwing, so the docs need to call that out explicitly to match the API contract.
+  - Useful context
+  - There are still no `AGENTS.md` files in the edited docs paths, so the reusable authoring guidance belongs in `progress.txt` instead.
   - Manual browser verification is still required for docs UI changes because no browser-testing tool is available in this environment.
 ---

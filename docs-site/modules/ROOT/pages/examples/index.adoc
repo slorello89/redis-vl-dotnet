@@ -24,11 +24,11 @@ Examples that use JSON storage also require RedisJSON. Provider-backed examples 
 
 | Core JSON workflows
 | `/examples/JsonStorageExample`
-| Covers schema creation, document load and fetch, filter and text queries, aggregations, count, clear, and drop flows.
+| Covers schema creation, JSON document load and fetch, partial updates by id and key, filter and text queries, aggregations, count, clear, and drop flows.
 
 | Core vector workflows
 | `/examples/VectorSearchExample`
-| Covers HASH-backed vector search, runtime vector tuning, multi-vector search, and aggregate hybrid flows.
+| Covers HASH-backed vector search, hash partial updates, runtime vector tuning, multi-vector search, and aggregate hybrid flows.
 
 | Semantic message history
 | `/examples/MessageHistoryExample`
