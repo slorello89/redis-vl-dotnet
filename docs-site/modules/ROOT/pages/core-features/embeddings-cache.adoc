@@ -18,9 +18,9 @@ If you need nearest-neighbor lookup against previously stored prompts and respon
 
 * `Name`, which becomes part of the Redis key prefix
 * `KeyNamespace`, which lets multiple callers isolate entries inside one named cache
-* `TimeToLive`, which applies a Redis TTL to each stored entry
+* `TimeToLive`, which applies a default Redis TTL to each stored entry
 
-Stored values use keys shaped like `embeddings:<name>:<namespace>:<sha256(input)>`. The library hashes the original input before writing, but lookup is still an exact string match because the cache re-hashes the caller-provided input.
+Stored values use keys shaped like `embeddings:<name>:<namespace>:<sha256(input)>` for legacy input-only entries and `embeddings:<name>:<namespace>:<sha256(input + "\n" + model)>` for model-aware entries. The library hashes the original identity before writing, but lookup is still an exact string match because the cache re-hashes the caller-provided input and optional model name.
 
 == Core operations
 
@@ -28,18 +28,40 @@ Stored values use keys shaped like `embeddings:<name>:<namespace>:<sha256(input)
 |===
 | API | Behavior
 
-| `StoreAsync(input, embedding)`
-| Writes or overwrites the cached embedding for that exact input.
+| `SetAsync(input, modelName, embedding, metadata, timeToLive)`
+| Writes or overwrites the cached entry and returns an `EmbeddingsCacheEntry` that includes the Redis key, normalized identity, embedding, and serialized metadata.
 
-| `LookupAsync(input)`
-| Returns the cached `float[]` when the input matches an existing entry, otherwise `null`.
+| `GetAsync(input, modelName)`
+| Returns the cached `EmbeddingsCacheEntry` for that exact identity, otherwise `null`.
+
+| `StoreAsync(...)` / `LookupAsync(...)`
+| Legacy-compatible aliases for callers that prefer the original method names. `StoreAsync` still returns `bool`, while `LookupAsync` delegates to `GetAsync`.
 |===
 
 The cache does not expose delete or drop helpers. Use short-lived namespaces or TTLs when you want ephemeral entries.
 
 == TTL behavior
 
-When `TimeToLive` is configured, each `StoreAsync` call resets the Redis expiration for that entry. Once the key expires, `LookupAsync` returns `null`.
+When `TimeToLive` is configured, each write resets the Redis expiration for that entry. `SetAsync` and the new `StoreAsync` overloads can also accept a per-call `timeToLive`, which overrides the cache default for that write only. Once the key expires, `GetAsync` and `LookupAsync` return `null`.
+
+== Python to .NET method mapping
+
+[cols="1,1,1"]
+|===
+| Python RedisVL | .NET async | .NET sync
+
+| `set(text, model_name, embedding, metadata=None, ttl=None)`
+| `SetAsync(input, modelName, embedding, metadata, timeToLive)`
+| `Set(input, modelName, embedding, metadata, timeToLive)`
+
+| `get(text, model_name)`
+| `GetAsync(input, modelName)`
+| `Get(input, modelName)`
+
+| `set(text, embedding)` legacy input-only usage
+| `StoreAsync(input, embedding)` or `SetAsync(input, embedding)`
+| `Store(input, embedding)` or `Set(input, embedding)`
+|===
 
 == Example
 
@@ -48,8 +70,8 @@ The runnable example for this API is `/examples/EmbeddingsCacheExample`.
 It demonstrates:
 
 * creating a namespaced cache with TTL
-* storing an embedding
-* looking it up by the same input
+* storing an embedding and capturing the returned Redis key
+* looking it up by the same input and model name
 * overwriting an existing embedding entry
 
 The exact behavior is also covered in `tests/RedisVlDotNet.Tests/Caches/EmbeddingsCacheTests.cs` and `tests/RedisVlDotNet.Tests/Caches/EmbeddingsCacheIntegrationTests.cs`.

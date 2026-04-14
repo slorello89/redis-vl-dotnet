@@ -30,6 +30,39 @@ public sealed class EmbeddingsCacheTests
     }
 
     [Fact]
+    public async Task SetAsync_ReturnsStoredEntryAndRedisKey()
+    {
+        var (database, recorder) = RecordingDatabaseProxy.CreatePair();
+        var cache = new EmbeddingsCache(database, new EmbeddingsCacheOptions("unit-cache", "tests"));
+
+        var stored = await cache.SetAsync(
+            "hello world",
+            "text-embedding-3-small",
+            [1f, 2f, 3f],
+            metadata: new { source = "faq" });
+
+        Assert.Equal("hello world", stored.Input);
+        Assert.Equal("text-embedding-3-small", stored.ModelName);
+        Assert.Equal([1f, 2f, 3f], stored.Embedding);
+        Assert.Equal("{\"source\":\"faq\"}", stored.Metadata);
+        Assert.Equal(recorder.LastKey, stored.Key);
+    }
+
+    [Fact]
+    public async Task GetAsync_UsesPythonParityAlias()
+    {
+        var (database, _) = RecordingDatabaseProxy.CreatePair();
+        var cache = new EmbeddingsCache(database, new EmbeddingsCacheOptions("unit-cache", "tests"));
+
+        await cache.SetAsync("hello world", "text-embedding-3-small", [1f, 2f, 3f]);
+        var cached = await cache.GetAsync("hello world", "text-embedding-3-small");
+
+        Assert.NotNull(cached);
+        Assert.Equal("hello world", cached!.Input);
+        Assert.Equal("text-embedding-3-small", cached.ModelName);
+    }
+
+    [Fact]
     public async Task LookupAsync_WithModelName_UsesDistinctKeyForSameInput()
     {
         var (database, recorder) = RecordingDatabaseProxy.CreatePair();
@@ -78,6 +111,41 @@ public sealed class EmbeddingsCacheTests
         Assert.Equal("text-embedding-3-small", cached.ModelName);
         Assert.Equal("{\"source\":\"faq\",\"tenant\":\"team-a\"}", cached.Metadata);
         Assert.Equal([1f, 2f, 3f], cached.Embedding);
+    }
+
+    [Fact]
+    public async Task StoreAsync_UsesCacheLevelTimeToLiveByDefault()
+    {
+        var (database, recorder) = RecordingDatabaseProxy.CreatePair();
+        var cache = new EmbeddingsCache(
+            database,
+            new EmbeddingsCacheOptions("unit-cache", "tests", TimeSpan.FromMinutes(10)));
+
+        var stored = await cache.StoreAsync("hello world", [1f, 2f, 3f]);
+
+        Assert.True(stored);
+        Assert.Equal(1, recorder.KeyExpireAsyncCallCount);
+        Assert.Equal(TimeSpan.FromMinutes(10), recorder.LastExpiry);
+    }
+
+    [Fact]
+    public async Task SetAsync_PerCallTimeToLiveOverridesCacheLevelTimeToLive()
+    {
+        var (database, recorder) = RecordingDatabaseProxy.CreatePair();
+        var cache = new EmbeddingsCache(
+            database,
+            new EmbeddingsCacheOptions("unit-cache", "tests", TimeSpan.FromMinutes(10)));
+
+        var stored = await cache.SetAsync(
+            "hello world",
+            "text-embedding-3-small",
+            [1f, 2f, 3f],
+            metadata: new { source = "faq" },
+            timeToLive: TimeSpan.FromSeconds(30));
+
+        Assert.Equal("text-embedding-3-small", stored.ModelName);
+        Assert.Equal(1, recorder.KeyExpireAsyncCallCount);
+        Assert.Equal(TimeSpan.FromSeconds(30), recorder.LastExpiry);
     }
 
     [Fact]
@@ -146,9 +214,13 @@ public sealed class EmbeddingsCacheTests
 
         public int HashGetAllAsyncCallCount { get; private set; }
 
+        public int KeyExpireAsyncCallCount { get; private set; }
+
         public RedisKey? LastKey { get; private set; }
 
         public HashEntry[]? LastHashEntries { get; private set; }
+
+        public TimeSpan? LastExpiry { get; private set; }
 
         public static (IDatabase Database, RecordingDatabaseProxy Recorder) CreatePair()
         {
@@ -165,7 +237,7 @@ public sealed class EmbeddingsCacheTests
             {
                 nameof(IDatabase.HashSetAsync) => HandleHashSetAsync(args),
                 nameof(IDatabase.HashGetAllAsync) => HandleHashGetAllAsync(args),
-                nameof(IDatabase.KeyExpireAsync) => Task.FromResult(true),
+                nameof(IDatabase.KeyExpireAsync) => HandleKeyExpireAsync(args),
                 nameof(IDatabase.Multiplexer) => throw new NotSupportedException(),
                 nameof(IDatabase.Database) => 0,
                 _ => throw new NotSupportedException($"Method '{targetMethod.Name}' is not configured for this test proxy.")
@@ -192,6 +264,14 @@ public sealed class EmbeddingsCacheTests
             var key = (RedisKey)args![0]!;
             LastKey = key;
             return Task.FromResult(StoredValues.TryGetValue(key, out var value) ? value : []);
+        }
+
+        private Task<bool> HandleKeyExpireAsync(object?[]? args)
+        {
+            KeyExpireAsyncCallCount++;
+            LastKey = (RedisKey)args![0]!;
+            LastExpiry = (TimeSpan?)args[1];
+            return Task.FromResult(true);
         }
     }
 }

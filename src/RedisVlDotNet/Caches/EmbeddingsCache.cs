@@ -37,18 +37,55 @@ public sealed class EmbeddingsCache
     public bool Store(string input, float[] embedding) =>
         StoreAsync(input, embedding).GetAwaiter().GetResult();
 
+    public bool Store(string input, float[] embedding, TimeSpan? timeToLive) =>
+        StoreAsync(input, embedding, metadata: null, timeToLive).GetAwaiter().GetResult();
+
     public bool Store(string input, float[] embedding, object? metadata) =>
         StoreAsync(input, embedding, metadata).GetAwaiter().GetResult();
+
+    public bool Store(string input, float[] embedding, object? metadata, TimeSpan? timeToLive) =>
+        StoreAsync(input, embedding, metadata, timeToLive).GetAwaiter().GetResult();
 
     public bool Store(string input, string modelName, float[] embedding) =>
         StoreAsync(input, modelName, embedding).GetAwaiter().GetResult();
 
+    public bool Store(string input, string modelName, float[] embedding, TimeSpan? timeToLive) =>
+        StoreAsync(input, modelName, embedding, metadata: null, timeToLive).GetAwaiter().GetResult();
+
     public bool Store(string input, string modelName, float[] embedding, object? metadata) =>
         StoreAsync(input, modelName, embedding, metadata).GetAwaiter().GetResult();
 
+    public bool Store(string input, string modelName, float[] embedding, object? metadata, TimeSpan? timeToLive) =>
+        StoreAsync(input, modelName, embedding, metadata, timeToLive).GetAwaiter().GetResult();
+
+    public EmbeddingsCacheEntry Set(string input, float[] embedding) =>
+        SetAsync(input, embedding).GetAwaiter().GetResult();
+
+    public EmbeddingsCacheEntry Set(string input, float[] embedding, TimeSpan? timeToLive) =>
+        SetAsync(input, embedding, metadata: null, timeToLive).GetAwaiter().GetResult();
+
+    public EmbeddingsCacheEntry Set(string input, float[] embedding, object? metadata) =>
+        SetAsync(input, embedding, metadata).GetAwaiter().GetResult();
+
+    public EmbeddingsCacheEntry Set(string input, float[] embedding, object? metadata, TimeSpan? timeToLive) =>
+        SetAsync(input, embedding, metadata, timeToLive).GetAwaiter().GetResult();
+
+    public EmbeddingsCacheEntry Set(string input, string modelName, float[] embedding) =>
+        SetAsync(input, modelName, embedding).GetAwaiter().GetResult();
+
+    public EmbeddingsCacheEntry Set(string input, string modelName, float[] embedding, TimeSpan? timeToLive) =>
+        SetAsync(input, modelName, embedding, metadata: null, timeToLive).GetAwaiter().GetResult();
+
+    public EmbeddingsCacheEntry Set(string input, string modelName, float[] embedding, object? metadata) =>
+        SetAsync(input, modelName, embedding, metadata).GetAwaiter().GetResult();
+
+    public EmbeddingsCacheEntry Set(string input, string modelName, float[] embedding, object? metadata, TimeSpan? timeToLive) =>
+        SetAsync(input, modelName, embedding, metadata, timeToLive).GetAwaiter().GetResult();
+
     public async Task<bool> StoreAsync(string input, float[] embedding, CancellationToken cancellationToken = default)
     {
-        return await StoreAsyncCore(input, embedding, modelName: null, metadata: null, cancellationToken).ConfigureAwait(false);
+        await SetAsync(input, embedding, cancellationToken).ConfigureAwait(false);
+        return true;
     }
 
     public async Task<bool> StoreAsync(
@@ -57,7 +94,19 @@ public sealed class EmbeddingsCache
         object? metadata,
         CancellationToken cancellationToken = default)
     {
-        return await StoreAsyncCore(input, embedding, modelName: null, metadata, cancellationToken).ConfigureAwait(false);
+        await SetAsync(input, embedding, metadata, cancellationToken).ConfigureAwait(false);
+        return true;
+    }
+
+    public async Task<bool> StoreAsync(
+        string input,
+        float[] embedding,
+        object? metadata,
+        TimeSpan? timeToLive,
+        CancellationToken cancellationToken = default)
+    {
+        await SetAsync(input, embedding, metadata, timeToLive, cancellationToken).ConfigureAwait(false);
+        return true;
     }
 
     public async Task<bool> StoreAsync(
@@ -66,12 +115,8 @@ public sealed class EmbeddingsCache
         float[] embedding,
         CancellationToken cancellationToken = default)
     {
-        return await StoreAsyncCore(
-            input,
-            embedding,
-            NormalizeModelName(modelName),
-            metadata: null,
-            cancellationToken).ConfigureAwait(false);
+        await SetAsync(input, modelName, embedding, cancellationToken).ConfigureAwait(false);
+        return true;
     }
 
     public async Task<bool> StoreAsync(
@@ -81,19 +126,75 @@ public sealed class EmbeddingsCache
         object? metadata,
         CancellationToken cancellationToken = default)
     {
-        return await StoreAsyncCore(
-            input,
-            embedding,
-            NormalizeModelName(modelName),
-            metadata,
-            cancellationToken).ConfigureAwait(false);
+        await SetAsync(input, modelName, embedding, metadata, cancellationToken).ConfigureAwait(false);
+        return true;
     }
+
+    public async Task<bool> StoreAsync(
+        string input,
+        string modelName,
+        float[] embedding,
+        object? metadata,
+        TimeSpan? timeToLive,
+        CancellationToken cancellationToken = default)
+    {
+        await SetAsync(input, modelName, embedding, metadata, timeToLive, cancellationToken).ConfigureAwait(false);
+        return true;
+    }
+
+    public Task<EmbeddingsCacheEntry> SetAsync(string input, float[] embedding, CancellationToken cancellationToken = default) =>
+        SetAsyncCore(input, embedding, modelName: null, metadata: null, timeToLive: null, cancellationToken);
+
+    public Task<EmbeddingsCacheEntry> SetAsync(
+        string input,
+        float[] embedding,
+        object? metadata,
+        CancellationToken cancellationToken = default) =>
+        SetAsyncCore(input, embedding, modelName: null, metadata, timeToLive: null, cancellationToken);
+
+    public Task<EmbeddingsCacheEntry> SetAsync(
+        string input,
+        float[] embedding,
+        object? metadata,
+        TimeSpan? timeToLive,
+        CancellationToken cancellationToken = default) =>
+        SetAsyncCore(input, embedding, modelName: null, metadata, timeToLive, cancellationToken);
+
+    public Task<EmbeddingsCacheEntry> SetAsync(
+        string input,
+        string modelName,
+        float[] embedding,
+        CancellationToken cancellationToken = default) =>
+        SetAsyncCore(input, embedding, NormalizeModelName(modelName), metadata: null, timeToLive: null, cancellationToken);
+
+    public Task<EmbeddingsCacheEntry> SetAsync(
+        string input,
+        string modelName,
+        float[] embedding,
+        object? metadata,
+        CancellationToken cancellationToken = default) =>
+        SetAsyncCore(input, embedding, NormalizeModelName(modelName), metadata, timeToLive: null, cancellationToken);
+
+    public Task<EmbeddingsCacheEntry> SetAsync(
+        string input,
+        string modelName,
+        float[] embedding,
+        object? metadata,
+        TimeSpan? timeToLive,
+        CancellationToken cancellationToken = default) =>
+        SetAsyncCore(input, embedding, NormalizeModelName(modelName), metadata, timeToLive, cancellationToken);
+
+    public EmbeddingsCacheEntry? Get(string input) =>
+        GetAsync(input).GetAwaiter().GetResult();
+
+    public EmbeddingsCacheEntry? Get(string input, string modelName) =>
+        GetAsync(input, modelName).GetAwaiter().GetResult();
 
     public EmbeddingsCacheEntry? Lookup(string input) =>
-        LookupAsync(input).GetAwaiter().GetResult();
+        Get(input);
 
     public EmbeddingsCacheEntry? Lookup(string input, string modelName) =>
-        LookupAsync(input, modelName).GetAwaiter().GetResult();
+        Get(input, modelName);
 
     public float[]? LookupEmbedding(string input) =>
         Lookup(input)?.Embedding;
@@ -101,21 +202,23 @@ public sealed class EmbeddingsCache
     public float[]? LookupEmbedding(string input, string modelName) =>
         Lookup(input, modelName)?.Embedding;
 
-    public async Task<EmbeddingsCacheEntry?> LookupAsync(string input, CancellationToken cancellationToken = default)
-    {
-        return await LookupAsyncCore(input, modelName: null, cancellationToken).ConfigureAwait(false);
-    }
+    public Task<EmbeddingsCacheEntry?> GetAsync(string input, CancellationToken cancellationToken = default) =>
+        LookupAsyncCore(input, modelName: null, cancellationToken);
 
-    public async Task<EmbeddingsCacheEntry?> LookupAsync(
+    public Task<EmbeddingsCacheEntry?> GetAsync(
         string input,
         string modelName,
-        CancellationToken cancellationToken = default)
-    {
-        return await LookupAsyncCore(
-            input,
-            NormalizeModelName(modelName),
-            cancellationToken).ConfigureAwait(false);
-    }
+        CancellationToken cancellationToken = default) =>
+        LookupAsyncCore(input, NormalizeModelName(modelName), cancellationToken);
+
+    public Task<EmbeddingsCacheEntry?> LookupAsync(string input, CancellationToken cancellationToken = default) =>
+        GetAsync(input, cancellationToken);
+
+    public Task<EmbeddingsCacheEntry?> LookupAsync(
+        string input,
+        string modelName,
+        CancellationToken cancellationToken = default) =>
+        GetAsync(input, modelName, cancellationToken);
 
     public async Task<float[]?> LookupEmbeddingAsync(string input, CancellationToken cancellationToken = default)
     {
@@ -164,15 +267,17 @@ public sealed class EmbeddingsCache
         return values;
     }
 
-    private async Task<bool> StoreAsyncCore(
+    private async Task<EmbeddingsCacheEntry> SetAsyncCore(
         string input,
         float[] embedding,
         string? modelName,
         object? metadata,
+        TimeSpan? timeToLive,
         CancellationToken cancellationToken)
     {
         var normalizedInput = NormalizeInput(input);
         ArgumentNullException.ThrowIfNull(embedding);
+        ValidateTimeToLive(timeToLive);
 
         cancellationToken.ThrowIfCancellationRequested();
 
@@ -193,13 +298,19 @@ public sealed class EmbeddingsCache
         var key = CreateKey(normalizedInput, modelName);
         await _database.HashSetAsync(key, entries.ToArray()).WaitAsync(cancellationToken).ConfigureAwait(false);
 
-        if (TimeToLive.HasValue)
+        var effectiveTimeToLive = timeToLive ?? TimeToLive;
+        if (effectiveTimeToLive.HasValue)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            await _database.KeyExpireAsync(key, TimeToLive).WaitAsync(cancellationToken).ConfigureAwait(false);
+            await _database.KeyExpireAsync(key, effectiveTimeToLive).WaitAsync(cancellationToken).ConfigureAwait(false);
         }
 
-        return true;
+        return new EmbeddingsCacheEntry(
+            normalizedInput,
+            embedding,
+            modelName,
+            metadataPayload,
+            key);
     }
 
     private async Task<EmbeddingsCacheEntry?> LookupAsyncCore(
@@ -278,6 +389,14 @@ public sealed class EmbeddingsCache
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(modelName);
         return modelName;
+    }
+
+    private static void ValidateTimeToLive(TimeSpan? timeToLive)
+    {
+        if (timeToLive.HasValue && timeToLive.Value <= TimeSpan.Zero)
+        {
+            throw new ArgumentOutOfRangeException(nameof(timeToLive), "Cache TTL must be positive when provided.");
+        }
     }
 
     private string? SerializeMetadata(object? metadata) =>

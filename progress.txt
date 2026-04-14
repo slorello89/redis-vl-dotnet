@@ -4,6 +4,8 @@ Started: Tue Apr 14 14:01:44 EDT 2026
 ## Codebase Patterns
 - `EmbeddingsCache` compatibility depends on leaving the legacy input-only key path unchanged; add parity features through new overloads or optional identity components rather than altering `CreateKey(input)` behavior.
 - Hash-backed cache metadata in this repo is stored as a JSON string serialized with `JsonSerializerDefaults.Web`; richer read models should preserve that payload verbatim instead of trying to deserialize it eagerly.
+- For `EmbeddingsCache` parity work, keep `Store`/`Lookup` as compatibility aliases and layer newer Python-style `Set`/`Get` entry-centric APIs on top so callers can adopt richer results without breaking existing code.
+- `EmbeddingsCache` TTL precedence should be `per-call override ?? cache default`; unit tests can verify this by recording `KeyExpireAsync` arguments in the existing `DispatchProxy` database fake.
 
 ---
 
@@ -31,4 +33,17 @@ Started: Tue Apr 14 14:01:44 EDT 2026
   - Returning a richer cache entry model changes the public `Lookup*` surface, so example code and any compatibility helpers need to move in lockstep.
   - Useful context
   - Redis integration coverage for this cache area still runs under `RedisSearchIntegrationFact` even though the cache itself only uses hashes, so those tests may skip in local environments without the shared integration setup.
+---
+
+## 2026-04-14 14:10:50 EDT - US-003
+- Implemented Python-parity single-entry cache APIs by adding `Set`/`SetAsync` write methods that return `EmbeddingsCacheEntry` with the Redis key, `Get`/`GetAsync` read aliases, and per-call TTL overrides while keeping legacy `Store`/`Lookup` methods working as compatibility wrappers.
+- Files changed: `src/RedisVlDotNet/Caches/EmbeddingsCache.cs`, `tests/RedisVlDotNet.Tests/Caches/EmbeddingsCacheTests.cs`, `examples/EmbeddingsCacheExample/Program.cs`, `examples/EmbeddingsCacheExample/README.md`, `docs-site/modules/ROOT/pages/core-features/embeddings-cache.adoc`, `prd.json`, `progress.txt`
+- Quality checks run and result: `dotnet test tests/RedisVlDotNet.Tests/RedisVlDotNet.Tests.csproj --filter EmbeddingsCache --nologo` passed with 11 tests passing and 3 Redis integration tests skipped because the integration environment was unavailable; `dotnet build examples/EmbeddingsCacheExample/EmbeddingsCacheExample.csproj --nologo` passed.
+- Learnings for future iterations:
+  - Patterns discovered
+  - `EmbeddingsCache` can expose richer Python-style entry APIs non-disruptively by routing new `Set`/`Get` methods through the same hash storage path and leaving `Store`/`Lookup` as thin wrappers.
+  - Gotchas encountered
+  - TTL behavior needs explicit precedence coverage because the cache now supports both constructor-level defaults and per-call overrides on writes.
+  - Useful context
+  - There are currently no `AGENTS.md` files in this repository, so reusable implementation knowledge for Ralph iterations needs to live in `progress.txt` unless that changes later.
 ---
