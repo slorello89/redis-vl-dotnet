@@ -1,3 +1,38 @@
 = Testing
 
-This section will describe the local validation commands, CI expectations, and Redis-backed test setup.
+This section captures the current validation commands and docs publishing requirements.
+
+== Local docs validation
+
+Build the Antora site from the repository root:
+
+[source,bash]
+----
+npm install
+npm run docs:build
+----
+
+The generated static site is written to `build/site`.
+
+== GitHub Actions publishing
+
+GitHub Pages publishing is defined in `.github/workflows/docs-pages.yml`.
+The workflow:
+
+* runs on pushes to `main` and on manual dispatch
+* installs the repository Node.js dependencies with `npm ci`
+* builds the Antora site with `npm run docs:build`
+* uploads `build/site` as the Pages artifact
+* deploys only after the build job succeeds
+
+Because the deploy job depends on the build job, a failed docs build blocks publishing.
+
+== Required repository configuration
+
+Before the workflow can publish successfully, configure the repository Pages source to `GitHub Actions` in GitHub repository settings.
+
+The workflow requests the permissions required by GitHub Pages deployments:
+
+* `contents: read`
+* `pages: write`
+* `id-token: write`

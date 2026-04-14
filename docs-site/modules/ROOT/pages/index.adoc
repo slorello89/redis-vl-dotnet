@@ -3,6 +3,8 @@
 
 This site is the canonical home for redis-vl-dotnet documentation.
 
+Documentation publishing is automated through GitHub Pages. See xref:testing/index.adoc[Testing] for the repository Pages settings and workflow requirements.
+
 Use the navigation to browse the major documentation areas:
 
 * xref:getting-started/index.adoc[Getting Started]
