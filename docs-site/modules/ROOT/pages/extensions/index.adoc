@@ -24,6 +24,19 @@ The current abstractions surface includes:
 
 The legacy `RedisVl.Caches.ITextEmbeddingGenerator` interface remains as an obsolete shim over `ITextVectorizer` for incremental migration.
 
+Read the provider-neutral contract details here:
+
+* xref:extensions/vectorizer-abstractions.adoc[Vectorizer abstractions]
+* xref:extensions/reranker-abstractions.adoc[Reranker abstractions]
+
+== Provider packages
+
+Use these package pages when you need constructor, environment, and example guidance:
+
+* xref:extensions/openai-vectorizer.adoc[OpenAI vectorizer]
+* xref:extensions/huggingface-vectorizer.adoc[Hugging Face vectorizer]
+* xref:extensions/cohere-reranker.adoc[Cohere reranker]
+
 == Provider-backed examples
 
 Use these examples when you want runnable package coverage:
@@ -33,6 +46,8 @@ Use these examples when you want runnable package coverage:
 * `/examples/CohereRerankerExample` requires `COHERE_API_KEY`
 
 These examples show how the provider packages plug into higher-level workflows such as `SemanticCache`.
+
+All three examples read credentials from environment variables and fail fast with an explicit message when the required provider credential is missing.
 
 == Related sections
 

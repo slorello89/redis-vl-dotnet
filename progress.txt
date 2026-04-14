@@ -11,6 +11,7 @@ Started: Tue Apr 14 09:38:40 EDT 2026
 - In Antora prose, avoid literal `{name}` placeholders unless they are real AsciiDoc attributes; use inline code like `prefix + id` or escape the braces so local docs validation does not emit missing-attribute warnings.
 - For query and aggregation docs, pair `/examples/JsonStorageExample` and `/examples/VectorSearchExample` with `tests/RedisVlDotNet.Tests/Indexes/SearchQueryCommandBuilderTests.cs`, `tests/RedisVlDotNet.Tests/Indexes/SearchIndexAsyncTests.cs`, and `tests/RedisVlDotNet.Tests/Queries/SearchResultMappingTests.cs`; the examples show canonical flows while the tests capture normalization, paging, typed mapping, and runtime-vector edge cases.
 - For higher-level cache and workflow docs, link runnable samples where they exist and pair them with unit/integration tests for the contract details; these APIs often hide important threshold, filter, TTL, and recency behavior in tests rather than in a single broad example.
+- For provider extension docs, give each package its own Antora page under `docs-site/modules/ROOT/pages/extensions/`, document the required env var plus fail-fast missing-credential behavior, and point back to the matching smoke tests and runnable example README.
 ---
 
 ## 2026-04-14 09:42:08 EDT - US-001
@@ -116,5 +117,19 @@ Started: Tue Apr 14 09:38:40 EDT 2026
   - Literal brace syntax in AsciiDoc like `{name}` is treated as an attribute reference, so placeholder key shapes should use angle brackets or escaped braces to avoid validation warnings.
   - Useful context
   - There are still no `AGENTS.md` files in the edited docs and examples paths, so the reusable guidance for this area belongs in `progress.txt`.
+  - Manual browser verification is still required for docs UI changes because no browser-testing tool is available in this environment.
+---
+## 2026-04-14 10:10:59 EDT - US-010
+- Implemented Antora extension-package documentation for vectorizer abstractions, reranker abstractions, OpenAI vectorization, Hugging Face vectorization, and Cohere reranking; linked the new pages from the extensions overview and site navigation; and tightened provider example docs to call out environment-based configuration plus explicit missing-credential behavior.
+- Files changed: `docs-site/modules/ROOT/nav.adoc`, `docs-site/modules/ROOT/pages/extensions/index.adoc`, `docs-site/modules/ROOT/pages/extensions/vectorizer-abstractions.adoc`, `docs-site/modules/ROOT/pages/extensions/reranker-abstractions.adoc`, `docs-site/modules/ROOT/pages/extensions/openai-vectorizer.adoc`, `docs-site/modules/ROOT/pages/extensions/huggingface-vectorizer.adoc`, `docs-site/modules/ROOT/pages/extensions/cohere-reranker.adoc`, `docs-site/modules/ROOT/pages/examples/index.adoc`, `examples/OpenAiVectorizerExample/README.md`, `examples/HuggingFaceVectorizerExample/README.md`, `examples/CohereRerankerExample/README.md`, `prd.json`, `progress.txt`.
+- Quality checks run and result: `npm run docs:validate` passed; `npm run examples:build` passed; `dotnet build examples/OpenAiVectorizerExample/OpenAiVectorizerExample.csproj` passed; `dotnet build examples/HuggingFaceVectorizerExample/HuggingFaceVectorizerExample.csproj` passed; `dotnet build examples/CohereRerankerExample/CohereRerankerExample.csproj` passed. `npm run examples:build` emitted one existing `MSB3101` file-write warning while building `CohereRerankerExample`, but the build completed successfully.
+- Learnings for future iterations:
+  - Patterns discovered
+  - Provider extension docs are easier to keep consistent when each package page follows the same structure: package contents, options, required env vars, missing-credential behavior, runnable example, and smoke-test references.
+  - The provider examples already enforce environment-based secrets in `Program.cs`, so story work in this area is usually documentation alignment rather than runtime changes.
+  - Gotchas encountered
+  - The current workspace can surface transient `MSB3101` cache-write warnings during parallel or repeated builds because other in-flight work is touching the same `obj/` tree; treat that as noise only when the build still succeeds.
+  - Useful context
+  - There are still no `AGENTS.md` files in this repository, so reusable documentation patterns should keep going into `progress.txt`.
   - Manual browser verification is still required for docs UI changes because no browser-testing tool is available in this environment.
 ---

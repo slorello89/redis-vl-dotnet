@@ -1,0 +1,55 @@
+= OpenAI Vectorizer
+
+`RedisVlDotNet.Vectorizers.OpenAI` provides `OpenAiTextVectorizer`, a batch-capable `IBatchTextVectorizer` backed by the OpenAI embeddings client.
+
+== Package contents
+
+* `OpenAiTextVectorizer` for single-input and batch embedding requests
+* `OpenAiVectorizerOptions` for optional embedding dimensions and end-user identifiers
+* `OpenAiVectorizerPackage` as the package marker type
+
+== Constructor options
+
+Use one of these construction paths:
+
+* `new OpenAiTextVectorizer(string model, string apiKey, OpenAiVectorizerOptions? options = null)`
+* `new OpenAiTextVectorizer(string model, ApiKeyCredential credential, OpenAIClientOptions? clientOptions = null, OpenAiVectorizerOptions? options = null)`
+* `new OpenAiTextVectorizer(EmbeddingClient client, OpenAiVectorizerOptions? options = null)` when the application owns the client lifecycle
+
+`OpenAiVectorizerOptions` currently supports:
+
+* `Dimensions` to request a reduced embedding size when the selected model supports it
+* `EndUserId` to pass an end-user identifier through the provider client
+
+== Required environment variables
+
+The runnable sample reads:
+
+* `OPENAI_API_KEY` as the required provider credential
+* `OPENAI_EMBEDDING_MODEL` as an optional model override
+* `OPENAI_EMBEDDING_DIMENSIONS` as an optional dimension override
+* `REDIS_VL_REDIS_URL` as the Redis connection string override
+
+If `OPENAI_API_KEY` is missing, `/examples/OpenAiVectorizerExample` throws an `InvalidOperationException` before it attempts any provider or Redis request.
+
+== Example workflow
+
+`/examples/OpenAiVectorizerExample` uses OpenAI embeddings with `SemanticCache`:
+
+* create a cache whose vector field dimensions match the configured OpenAI embedding size
+* batch-generate seed embeddings for stored prompts
+* store a cache entry with the generated embedding
+* vectorize a new prompt and check for a semantic cache hit
+* drop the example index and documents during cleanup
+
+Run it from the repository root:
+
+[source,bash]
+----
+dotnet run --project examples/OpenAiVectorizerExample/OpenAiVectorizerExample.csproj
+----
+
+== Validation references
+
+* `tests/RedisVlDotNet.Tests/Vectorizers/OpenAiTextVectorizerTests.cs` covers constructor and response-shape validation
+* `tests/RedisVlDotNet.Tests/Vectorizers/OpenAiTextVectorizerSmokeTests.cs` is the live-provider smoke test gate

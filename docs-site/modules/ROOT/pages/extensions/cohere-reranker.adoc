@@ -1,0 +1,52 @@
+= Cohere Reranker
+
+`RedisVlDotNet.Rerankers.Cohere` provides `CohereTextReranker`, an `ITextReranker` implementation backed by Cohere's rerank API.
+
+== Package contents
+
+* `CohereTextReranker` for remote reranking requests
+* `CohereRerankerOptions` for request shaping and endpoint selection
+* `CohereRerankerPackage` as the package marker type
+
+== Request options
+
+`CohereRerankerOptions` currently supports:
+
+* `MaxTokensPerDocument` to cap per-document token usage
+* `Priority` to set the provider request priority
+* `ClientName` to send an `X-Client-Name` header
+* `EndpointOverride` when the application needs a non-default rerank endpoint
+
+The default provider endpoint is `https://api.cohere.com/v2/rerank`.
+
+== Required environment variables
+
+The runnable sample reads:
+
+* `COHERE_API_KEY` as the required provider credential
+* `COHERE_RERANK_MODEL` as an optional model override
+* `REDIS_VL_REDIS_URL` as the Redis connection string override
+
+If `COHERE_API_KEY` is missing, `/examples/CohereRerankerExample` throws an `InvalidOperationException` before it attempts the provider request.
+
+== Example workflow
+
+`/examples/CohereRerankerExample` shows the expected integration pattern:
+
+* load a Redis index with candidate documents
+* collect an initial candidate set through `TextQuery`
+* build `RerankDocument` values from those Redis hits
+* rerank the candidates with `CohereTextReranker`
+* print both the Redis order and the reranked provider order
+
+Run it from the repository root:
+
+[source,bash]
+----
+dotnet run --project examples/CohereRerankerExample/CohereRerankerExample.csproj
+----
+
+== Validation references
+
+* `tests/RedisVlDotNet.Tests/Rerankers/CohereTextRerankerTests.cs` covers request construction and response validation
+* `tests/RedisVlDotNet.Tests/Rerankers/CohereTextRerankerSmokeTests.cs` is the live-provider smoke test gate

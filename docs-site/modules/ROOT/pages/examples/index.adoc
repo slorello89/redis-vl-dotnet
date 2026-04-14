@@ -48,15 +48,15 @@ Examples that use JSON storage also require RedisJSON. Provider-backed examples 
 
 | OpenAI vectorization
 | `/examples/OpenAiVectorizerExample`
-| Uses the OpenAI extension package and requires `OPENAI_API_KEY`.
+| Uses the OpenAI extension package, reads credentials from `OPENAI_API_KEY`, and fails fast when the variable is missing.
 
 | Hugging Face vectorization
 | `/examples/HuggingFaceVectorizerExample`
-| Uses the Hugging Face extension package and requires `HF_TOKEN`.
+| Uses the Hugging Face extension package, reads credentials from `HF_TOKEN`, and fails fast when the variable is missing.
 
 | Cohere reranking
 | `/examples/CohereRerankerExample`
-| Uses the Cohere extension package and requires `COHERE_API_KEY`.
+| Uses the Cohere extension package, reads credentials from `COHERE_API_KEY`, and fails fast when the variable is missing.
 |===
 
 == Build validation
@@ -73,5 +73,5 @@ This sweep is also used by CI so documented samples fail fast when they drift fr
 == Related sections
 
 * xref:../getting-started/index.adoc[Getting Started] for local Redis setup
-* xref:../extensions/index.adoc[Extensions] for provider package context
+* xref:../extensions/index.adoc[Extensions] for provider package context and per-package setup details
 * xref:../testing/index.adoc[Testing] for the example validation gate

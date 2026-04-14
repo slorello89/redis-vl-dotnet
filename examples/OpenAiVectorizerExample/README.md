@@ -1,6 +1,6 @@
 # OpenAiVectorizerExample
 
-This example demonstrates using `RedisVlDotNet.Vectorizers.OpenAI` with `SemanticCache`.
+This example demonstrates using `RedisVl.Vectorizers.OpenAI` with `SemanticCache`.
 
 It:
 
@@ -21,6 +21,8 @@ Optional environment variables:
 - `REDIS_VL_REDIS_URL` to override the default Redis connection string of `localhost:6379`
 - `OPENAI_EMBEDDING_MODEL` to override the default model of `text-embedding-3-small`
 - `OPENAI_EMBEDDING_DIMENSIONS` to override the default embedding size of `256`
+
+If `OPENAI_API_KEY` is not set, the example exits immediately with an explicit environment-variable error instead of attempting a partially configured OpenAI request.
 
 Run it from the repository root:
 

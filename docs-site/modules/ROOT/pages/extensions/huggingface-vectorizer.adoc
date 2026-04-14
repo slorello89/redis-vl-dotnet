@@ -1,0 +1,53 @@
+= Hugging Face Vectorizer
+
+`RedisVlDotNet.Vectorizers.HuggingFace` provides `HuggingFaceTextVectorizer`, a batch-capable `IBatchTextVectorizer` backed by the Hugging Face `hf-inference` feature-extraction API.
+
+== Package contents
+
+* `HuggingFaceTextVectorizer` for single-input and batch embedding requests
+* `HuggingFaceVectorizerOptions` for request shaping
+* `HuggingFaceTruncationDirection` for truncation-direction selection
+* `HuggingFaceVectorizerPackage` as the package marker type
+
+== Request options
+
+`HuggingFaceVectorizerOptions` currently supports:
+
+* `Normalize` to request normalized embeddings from the provider
+* `PromptName` to select a named prompt when the model supports it
+* `Truncate` and `TruncationDirection` to control overflow handling
+* `EndpointOverride` when the application needs a non-default inference endpoint
+
+The default provider endpoint is `https://router.huggingface.co/hf-inference/models/<model>`.
+
+== Required environment variables
+
+The runnable sample reads:
+
+* `HF_TOKEN` as the required provider credential
+* `HF_EMBEDDING_MODEL` as an optional model override
+* `REDIS_VL_REDIS_URL` as the Redis connection string override
+
+If `HF_TOKEN` is missing, `/examples/HuggingFaceVectorizerExample` throws an `InvalidOperationException` before it calls the Hugging Face API.
+
+== Example workflow
+
+`/examples/HuggingFaceVectorizerExample` uses Hugging Face embeddings with `SemanticCache`:
+
+* create the vectorizer with environment-based credentials
+* probe one embedding first so the cache schema can use the live provider dimension
+* batch-generate seed embeddings for stored prompts
+* vectorize a new prompt and check for a semantic cache hit
+* drop the example index and documents during cleanup
+
+Run it from the repository root:
+
+[source,bash]
+----
+dotnet run --project examples/HuggingFaceVectorizerExample/HuggingFaceVectorizerExample.csproj
+----
+
+== Validation references
+
+* `tests/RedisVlDotNet.Tests/Vectorizers/HuggingFaceTextVectorizerTests.cs` covers request construction and response parsing
+* `tests/RedisVlDotNet.Tests/Vectorizers/HuggingFaceTextVectorizerSmokeTests.cs` is the live-provider smoke test gate

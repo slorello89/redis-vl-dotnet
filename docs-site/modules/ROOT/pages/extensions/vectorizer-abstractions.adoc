@@ -1,0 +1,32 @@
+= Vectorizer Abstractions
+
+`RedisVlDotNet.Vectorizers.Abstractions` defines the provider-neutral contracts used by caches and workflow APIs.
+
+== Core interfaces
+
+* `ITextVectorizer` exposes `VectorizeAsync(string input, CancellationToken cancellationToken = default)` for single-input embedding generation.
+* `IBatchTextVectorizer` extends `ITextVectorizer` with `VectorizeAsync(IReadOnlyList<string> inputs, CancellationToken cancellationToken = default)` for providers that can embed a batch in one request.
+* `TextVectorizerExtensions.VectorizeManyAsync(...)` is the compatibility helper for callers that only know about `ITextVectorizer`. It uses native batch support when available and otherwise falls back to sequential single-input calls.
+
+== Input and batching behavior
+
+These contracts are intentionally minimal:
+
+* Callers own model selection, provider credentials, and HTTP client lifetime.
+* Providers are expected to reject null or empty inputs before making a remote request.
+* Empty batch requests should return an empty collection without calling the provider.
+
+Use `TextVectorizerExtensions.VectorizeManyAsync(...)` when higher-level code should accept either a batch-capable provider or a single-input provider without branching.
+
+== Relationship to older APIs
+
+`RedisVl.Caches.ITextEmbeddingGenerator` remains in the core package as an obsolete migration shim over `ITextVectorizer`.
+
+Prefer new code to depend on `ITextVectorizer` directly so vectorizer packages can plug into `SemanticCache`, `SemanticRouter`, and `SemanticMessageHistory` without adapter code.
+
+== Examples and tests
+
+* xref:extensions/openai-vectorizer.adoc[OpenAI vectorizer] is the batch-capable reference implementation under `src/RedisVlDotNet.Vectorizers.OpenAI`.
+* xref:extensions/huggingface-vectorizer.adoc[Hugging Face vectorizer] is the HTTP-based reference implementation under `src/RedisVlDotNet.Vectorizers.HuggingFace`.
+* `/examples/OpenAiVectorizerExample` and `/examples/HuggingFaceVectorizerExample` show environment-based provider setup.
+* `tests/RedisVlDotNet.Tests/Vectorizers/TextVectorizerExtensionsTests.cs` captures the batch fallback contract.

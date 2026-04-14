@@ -1,0 +1,30 @@
+= Reranker Abstractions
+
+`RedisVlDotNet.Rerankers.Abstractions` defines the provider-neutral reranking surface for search result post-processing.
+
+== Core interfaces and records
+
+* `ITextReranker` exposes `RerankAsync(RerankRequest request, CancellationToken cancellationToken = default)`.
+* `RerankRequest` carries the user query, the ordered candidate list, and an optional `topN` cap.
+* `RerankDocument` carries the text sent to the provider plus optional `id` and `metadata` that come back with each result.
+* `RerankResult` returns the provider score, the original candidate index, and the matched `RerankDocument`.
+
+== Contract details
+
+The abstraction keeps Redis-specific search logic separate from provider ranking logic:
+
+* Use Redis search APIs to collect an initial candidate window.
+* Convert those candidates into `RerankDocument` instances.
+* Submit the `RerankRequest` to the provider-backed implementation.
+* Use the returned `Index` field to map back to the original candidate ordering when needed.
+
+`RerankRequest` rejects an empty query and rejects `topN <= 0`. Provider implementations are expected to return an empty collection when the request contains no documents.
+
+== Current provider package
+
+* xref:extensions/cohere-reranker.adoc[Cohere reranker] is the current provider-backed implementation.
+
+== Examples and tests
+
+* `/examples/CohereRerankerExample` shows the canonical pattern of Redis search first, provider reranking second.
+* `tests/RedisVlDotNet.Tests/Rerankers/TextRerankerExtensionsTests.cs` and `tests/RedisVlDotNet.Tests/Rerankers/CohereTextRerankerTests.cs` capture the shape and validation expectations for the current abstraction.
