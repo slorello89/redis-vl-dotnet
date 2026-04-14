@@ -1,0 +1,8 @@
+* xref:index.adoc[Overview]
+* xref:getting-started/index.adoc[Getting Started]
+* xref:core-features/index.adoc[Core Features]
+* xref:extensions/index.adoc[Extensions]
+* xref:examples/index.adoc[Examples]
+* xref:cli/index.adoc[CLI]
+* xref:testing/index.adoc[Testing]
+* xref:reference/index.adoc[Reference]

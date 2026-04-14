@@ -1,0 +1,3 @@
+= Testing
+
+This section will describe the local validation commands, CI expectations, and Redis-backed test setup.

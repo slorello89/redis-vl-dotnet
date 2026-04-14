@@ -1,0 +1,3 @@
+= Extensions
+
+This section will document optional vectorizer and reranker packages plus provider-specific setup.

@@ -1,0 +1,3 @@
+= Reference
+
+This section will hold API-oriented and behavior-oriented reference material for redis-vl-dotnet.

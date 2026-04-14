@@ -1,0 +1,3 @@
+= CLI
+
+This section will document the redis-vl-dotnet command-line workflows for schema and index operations.

@@ -4,6 +4,8 @@
 
 The active implementation roadmap is defined in [docs/parity-roadmap.md](/Users/steve.lorello/projects/redis/redis-vl-dotnet/docs/parity-roadmap.md). That document is the current contract for cross-language parity scope, intentional .NET-native differences, and feature priority across future Ralph iterations.
 
+The Antora docs scaffold lives under `docs-site/`. Build it locally with `npm install` followed by `npm run docs:build`.
+
 Start with [docs/getting-started.md](/Users/steve.lorello/projects/redis/redis-vl-dotnet/docs/getting-started.md) for the core install, connection, schema, index, document, and query flow.
 Browse [examples/README.md](/Users/steve.lorello/projects/redis/redis-vl-dotnet/examples/README.md) for the runnable sample index, Redis prerequisites, and links to each example's local run instructions.
 Read [docs/extensions.md](/Users/steve.lorello/projects/redis/redis-vl-dotnet/docs/extensions.md) for the vectorizer and reranker abstractions package split plus the provider-extension layout.

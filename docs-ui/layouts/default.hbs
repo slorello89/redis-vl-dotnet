@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{site.title}}</title>
+    <link rel="stylesheet" href="{{{uiRootPath}}}/css/site.css">
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="site-shell">
+        <a class="site-title" href="{{{siteRootPath}}}">{{site.title}}</a>
+        <p class="site-tagline">Antora scaffold for redis-vl-dotnet documentation.</p>
+      </div>
+    </header>
+    <main class="site-shell">
+      <article class="doc-content">
+        {{{page.contents}}}
+      </article>
+    </main>
+  </body>
+</html>

@@ -1,0 +1,3 @@
+= Getting Started
+
+This section will cover installation, local Redis setup, and first-run workflows for redis-vl-dotnet.

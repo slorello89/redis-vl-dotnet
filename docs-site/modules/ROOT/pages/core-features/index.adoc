@@ -1,0 +1,3 @@
+= Core Features
+
+This section will document schemas, indexes, documents, search queries, and aggregation workflows.

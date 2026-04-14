@@ -1,0 +1,16 @@
+site:
+  title: redis-vl-dotnet Documentation
+  start_page: redis-vl-dotnet::index.adoc
+
+content:
+  sources:
+    - url: .
+      branches: HEAD
+      start_path: docs-site
+
+ui:
+  bundle:
+    url: ./docs-ui
+
+output:
+  dir: build/site

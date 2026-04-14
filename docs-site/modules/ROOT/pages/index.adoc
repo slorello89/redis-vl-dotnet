@@ -1,0 +1,14 @@
+= redis-vl-dotnet Documentation
+:page-description: Antora landing page for redis-vl-dotnet documentation.
+
+This site is the canonical home for redis-vl-dotnet documentation.
+
+Use the navigation to browse the major documentation areas:
+
+* xref:getting-started/index.adoc[Getting Started]
+* xref:core-features/index.adoc[Core Features]
+* xref:extensions/index.adoc[Extensions]
+* xref:examples/index.adoc[Examples]
+* xref:cli/index.adoc[CLI]
+* xref:testing/index.adoc[Testing]
+* xref:reference/index.adoc[Reference]

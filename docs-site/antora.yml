@@ -1,0 +1,5 @@
+name: redis-vl-dotnet
+title: redis-vl-dotnet
+version: ~
+nav:
+  - modules/ROOT/nav.adoc
