@@ -13,6 +13,7 @@ Started: Tue Apr 14 09:38:40 EDT 2026
 - For higher-level cache and workflow docs, link runnable samples where they exist and pair them with unit/integration tests for the contract details; these APIs often hide important threshold, filter, TTL, and recency behavior in tests rather than in a single broad example.
 - For provider extension docs, give each package its own Antora page under `docs-site/modules/ROOT/pages/extensions/`, document the required env var plus fail-fast missing-credential behavior, and point back to the matching smoke tests and runnable example README.
 - For CLI docs, mirror the built-in help text and parser behavior in `src/RedisVlDotNet.Cli/RedisVlCliApplication.cs`; document `--redis` plus `REDIS_VL_REDIS_URL`, and keep the canonical CLI entry point in Antora rather than old repository Markdown stubs.
+- Keep example discovery canonical in two places only: `docs-site/modules/ROOT/pages/examples/index.adoc` for Antora navigation and `examples/README.md` for repository browsing; both should point to the same Antora pages and list per-example Redis/module/env-var requirements.
 ---
 
 ## 2026-04-14 09:42:08 EDT - US-001
@@ -146,5 +147,19 @@ Started: Tue Apr 14 09:38:40 EDT 2026
   - Running multiple `dotnet` builds or tests in parallel in this workspace can cause transient `obj/` file-lock failures, so story validation should keep .NET checks sequential.
   - Useful context
   - There are still no `AGENTS.md` files in this repository, so reusable CLI authoring and validation notes belong in `progress.txt`.
+  - Manual browser verification is still required for docs UI changes because no browser-testing tool is available in this environment.
+---
+## 2026-04-14 10:17:17 EDT - US-012
+- Implemented a docs-alignment pass for the examples surface by expanding the Antora examples coverage map to include the canonical entry point and runtime requirements for each major feature area, adding explicit CLI coverage there, and updating repository example READMEs to point back to the canonical Antora pages instead of legacy Markdown stubs.
+- Files changed: `docs-site/modules/ROOT/pages/examples/index.adoc`, `examples/README.md`, `examples/EmbeddingsCacheExample/README.md`, `examples/JsonStorageExample/README.md`, `examples/MessageHistoryExample/README.md`, `examples/OpenAiVectorizerExample/README.md`, `examples/SemanticCacheExample/README.md`, `examples/SemanticRouterExample/README.md`, `examples/VectorSearchExample/README.md`, `examples/CohereRerankerExample/README.md`, `examples/HuggingFaceVectorizerExample/README.md`, `prd.json`, `progress.txt`.
+- Quality checks run and result: `npm run docs:validate` passed; `npm run examples:build` passed.
+- Learnings for future iterations:
+  - Patterns discovered
+  - Keep the Antora examples page and `examples/README.md` structurally aligned so feature-area discovery does not drift between the docs site and repository browsing.
+  - Example READMEs should link to the canonical Antora source pages under `docs-site/modules/ROOT/pages/` rather than legacy `docs/*.md` stubs.
+  - Gotchas encountered
+  - This story only needed documentation edits even though the workspace contains many unrelated code changes, so staging by explicit path is mandatory before committing.
+  - Useful context
+  - There are still no `AGENTS.md` files anywhere in this repository, so reusable docs-authoring knowledge for this repo should continue to live in `progress.txt`.
   - Manual browser verification is still required for docs UI changes because no browser-testing tool is available in this environment.
 ---

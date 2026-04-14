@@ -1,6 +1,6 @@
 = Examples
 
-This section maps the main feature areas to runnable sample projects.
+This section maps the main feature areas to runnable sample projects and the canonical Antora pages that explain each workflow.
 
 == Prerequisites
 
@@ -18,45 +18,59 @@ Examples that use JSON storage also require RedisJSON. Provider-backed examples 
 
 == Coverage map
 
-[cols="1,1,2"]
+[cols="1,1,1,2"]
 |===
-| Feature area | Example | Notes
+| Feature area | Antora entry point | Example | Runtime requirements
 
 | Core JSON workflows
+| xref:../core-features/index.adoc[Core Features]
 | `/examples/JsonStorageExample`
-| Covers schema creation, JSON document load and fetch, partial updates by id and key, filter and text queries, aggregations, count, clear, and drop flows.
+| RediSearch + RedisJSON. Supports `REDIS_VL_REDIS_URL`, `REDIS_VL_REDIS_CLUSTER_NODES`, or `REDIS_VL_REDIS_SENTINEL_NODES` plus `REDIS_VL_REDIS_SENTINEL_SERVICE_NAME`.
 
 | Core vector workflows
+| xref:../core-features/index.adoc[Core Features]
 | `/examples/VectorSearchExample`
-| Covers HASH-backed vector search, vector paging windows, hash partial updates, runtime vector tuning, multi-vector search, and aggregate hybrid flows.
-
-| Semantic message history
-| `/examples/MessageHistoryExample`
-| Covers recency and semantic retrieval without requiring provider credentials.
+| RediSearch with vector similarity support. Supports `REDIS_VL_REDIS_URL`.
 
 | Embeddings cache
+| xref:../core-features/embeddings-cache.adoc[EmbeddingsCache]
 | `/examples/EmbeddingsCacheExample`
-| Covers exact-input embedding reuse and TTL-backed expiration without requiring RediSearch.
+| Basic Redis only. Supports `REDIS_VL_REDIS_URL`. Does not require RediSearch or provider credentials.
+
+| Message history and semantic retrieval
+| xref:../core-features/semantic-message-history.adoc[SemanticMessageHistory]
+| `/examples/MessageHistoryExample`
+| RediSearch with vector similarity support. Supports `REDIS_VL_REDIS_URL`. Uses an in-process vectorizer, so no provider credentials are required.
 
 | Semantic cache
+| xref:../core-features/semantic-cache.adoc[SemanticCache]
 | `/examples/SemanticCacheExample`
-| Covers filterable semantic cache entries and metadata payloads.
+| RediSearch with vector similarity support. Supports `REDIS_VL_REDIS_URL`. No provider credentials required for the local sample flow.
 
 | Semantic router
+| xref:../core-features/semantic-router.adoc[SemanticRouter]
 | `/examples/SemanticRouterExample`
-| Covers route registration and nearest-route matching without requiring provider credentials.
+| RediSearch with vector similarity support. Supports `REDIS_VL_REDIS_URL`. Uses an in-process vectorizer, so no provider credentials are required.
 
 | OpenAI vectorization
+| xref:../extensions/openai-vectorizer.adoc[OpenAI Vectorizer]
 | `/examples/OpenAiVectorizerExample`
-| Uses the OpenAI extension package, reads credentials from `OPENAI_API_KEY`, and fails fast when the variable is missing.
+| RediSearch with vector similarity support. Requires `OPENAI_API_KEY`. Optional `OPENAI_EMBEDDING_MODEL`, `OPENAI_EMBEDDING_DIMENSIONS`, and `REDIS_VL_REDIS_URL`.
 
 | Hugging Face vectorization
+| xref:../extensions/huggingface-vectorizer.adoc[Hugging Face Vectorizer]
 | `/examples/HuggingFaceVectorizerExample`
-| Uses the Hugging Face extension package, reads credentials from `HF_TOKEN`, and fails fast when the variable is missing.
+| RediSearch with vector similarity support. Requires `HF_TOKEN`. Optional `HF_EMBEDDING_MODEL` and `REDIS_VL_REDIS_URL`.
 
 | Cohere reranking
+| xref:../extensions/cohere-reranker.adoc[Cohere Reranker]
 | `/examples/CohereRerankerExample`
-| Uses the Cohere extension package, reads credentials from `COHERE_API_KEY`, and fails fast when the variable is missing.
+| RediSearch + RedisJSON. Requires `COHERE_API_KEY`. Optional `COHERE_RERANK_MODEL` and `REDIS_VL_REDIS_URL`.
+
+| CLI workflows
+| xref:../cli/index.adoc[CLI]
+| `dotnet run --project src/RedisVlDotNet.Cli -- ...`
+| Index commands require RediSearch plus `--redis` or `REDIS_VL_REDIS_URL`. JSON-backed index creation also requires RedisJSON. Schema commands run locally without Redis.
 |===
 
 == Build validation

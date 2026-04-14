@@ -29,3 +29,9 @@ Run it from the repository root:
 ```bash
 dotnet run --project examples/OpenAiVectorizerExample/OpenAiVectorizerExample.csproj
 ```
+
+## Related Docs
+
+- [OpenAI Vectorizer](/Users/steve.lorello/projects/redis/redis-vl-dotnet/docs-site/modules/ROOT/pages/extensions/openai-vectorizer.adoc)
+- [SemanticCache](/Users/steve.lorello/projects/redis/redis-vl-dotnet/docs-site/modules/ROOT/pages/core-features/semantic-cache.adoc)
+- [Examples index](/Users/steve.lorello/projects/redis/redis-vl-dotnet/examples/README.md)

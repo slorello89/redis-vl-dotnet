@@ -26,18 +26,18 @@ export REDIS_VL_REDIS_URL=localhost:6379
 
 Use this map when you want the fastest path to a parity feature area:
 
-| Feature area | Example or doc entry point | Notes |
-| --- | --- | --- |
-| Advanced schema options, YAML loading, from-existing index, index listing, JSON partial updates, `TextQuery`, aggregation, clear helper | [JsonStorageExample](/Users/steve.lorello/projects/redis/redis-vl-dotnet/examples/JsonStorageExample/README.md) | Also covers cluster and Sentinel connection environment variables |
-| Vector query basics, runtime vector search tuning, `MultiVectorQuery`, aggregate hybrid search, HASH partial updates | [VectorSearchExample](/Users/steve.lorello/projects/redis/redis-vl-dotnet/examples/VectorSearchExample/README.md) | HASH-backed workflow with deterministic vector seed data |
-| Exact-input embedding reuse with TTL | [EmbeddingsCacheExample](/Users/steve.lorello/projects/redis/redis-vl-dotnet/examples/EmbeddingsCacheExample/README.md) | Uses Redis string storage and does not require RediSearch |
-| Semantic message history with recency and semantic retrieval | [MessageHistoryExample](/Users/steve.lorello/projects/redis/redis-vl-dotnet/examples/MessageHistoryExample/README.md) | Uses an in-process sample vectorizer so no provider credentials are required |
-| Semantic cache filter fields and metadata payloads | [SemanticCacheExample](/Users/steve.lorello/projects/redis/redis-vl-dotnet/examples/SemanticCacheExample/README.md) | Shows tenant/model filter composition |
-| Semantic route registration and nearest-route matching | [SemanticRouterExample](/Users/steve.lorello/projects/redis/redis-vl-dotnet/examples/SemanticRouterExample/README.md) | Uses an in-process sample vectorizer so no provider credentials are required |
-| OpenAI vectorizer package | [OpenAiVectorizerExample](/Users/steve.lorello/projects/redis/redis-vl-dotnet/examples/OpenAiVectorizerExample/README.md) | Requires `OPENAI_API_KEY` |
-| Hugging Face vectorizer package | [HuggingFaceVectorizerExample](/Users/steve.lorello/projects/redis/redis-vl-dotnet/examples/HuggingFaceVectorizerExample/README.md) | Requires `HF_TOKEN` |
-| Cohere reranker package | [CohereRerankerExample](/Users/steve.lorello/projects/redis/redis-vl-dotnet/examples/CohereRerankerExample/README.md) | Requires `COHERE_API_KEY` |
-| CLI index and schema commands | [CLI docs](/Users/steve.lorello/projects/redis/redis-vl-dotnet/docs-site/modules/ROOT/pages/cli/index.adoc) | Covers build/install, command discovery, `index create/list/info/clear/delete`, and `schema validate/show` |
+| Feature area | Antora entry point | Example or command | Runtime requirements |
+| --- | --- | --- | --- |
+| Advanced schema options, YAML loading, from-existing index, index listing, JSON partial updates, `TextQuery`, aggregation, clear helper | [Core Features](/Users/steve.lorello/projects/redis/redis-vl-dotnet/docs-site/modules/ROOT/pages/core-features/index.adoc) | [JsonStorageExample](/Users/steve.lorello/projects/redis/redis-vl-dotnet/examples/JsonStorageExample/README.md) | RediSearch + RedisJSON. Supports `REDIS_VL_REDIS_URL`, `REDIS_VL_REDIS_CLUSTER_NODES`, or `REDIS_VL_REDIS_SENTINEL_NODES` plus `REDIS_VL_REDIS_SENTINEL_SERVICE_NAME` |
+| Vector query basics, runtime vector search tuning, `MultiVectorQuery`, aggregate hybrid search, HASH partial updates | [Core Features](/Users/steve.lorello/projects/redis/redis-vl-dotnet/docs-site/modules/ROOT/pages/core-features/index.adoc) | [VectorSearchExample](/Users/steve.lorello/projects/redis/redis-vl-dotnet/examples/VectorSearchExample/README.md) | RediSearch with vector similarity support and optional `REDIS_VL_REDIS_URL` |
+| Exact-input embedding reuse with TTL | [EmbeddingsCache](/Users/steve.lorello/projects/redis/redis-vl-dotnet/docs-site/modules/ROOT/pages/core-features/embeddings-cache.adoc) | [EmbeddingsCacheExample](/Users/steve.lorello/projects/redis/redis-vl-dotnet/examples/EmbeddingsCacheExample/README.md) | Basic Redis only with optional `REDIS_VL_REDIS_URL` |
+| Semantic message history with recency and semantic retrieval | [SemanticMessageHistory](/Users/steve.lorello/projects/redis/redis-vl-dotnet/docs-site/modules/ROOT/pages/core-features/semantic-message-history.adoc) | [MessageHistoryExample](/Users/steve.lorello/projects/redis/redis-vl-dotnet/examples/MessageHistoryExample/README.md) | RediSearch with vector similarity support and optional `REDIS_VL_REDIS_URL`; no provider credentials required |
+| Semantic cache filter fields and metadata payloads | [SemanticCache](/Users/steve.lorello/projects/redis/redis-vl-dotnet/docs-site/modules/ROOT/pages/core-features/semantic-cache.adoc) | [SemanticCacheExample](/Users/steve.lorello/projects/redis/redis-vl-dotnet/examples/SemanticCacheExample/README.md) | RediSearch with vector similarity support and optional `REDIS_VL_REDIS_URL` |
+| Semantic route registration and nearest-route matching | [SemanticRouter](/Users/steve.lorello/projects/redis/redis-vl-dotnet/docs-site/modules/ROOT/pages/core-features/semantic-router.adoc) | [SemanticRouterExample](/Users/steve.lorello/projects/redis/redis-vl-dotnet/examples/SemanticRouterExample/README.md) | RediSearch with vector similarity support and optional `REDIS_VL_REDIS_URL`; no provider credentials required |
+| OpenAI vectorizer package | [OpenAI Vectorizer](/Users/steve.lorello/projects/redis/redis-vl-dotnet/docs-site/modules/ROOT/pages/extensions/openai-vectorizer.adoc) | [OpenAiVectorizerExample](/Users/steve.lorello/projects/redis/redis-vl-dotnet/examples/OpenAiVectorizerExample/README.md) | RediSearch with vector similarity support, `OPENAI_API_KEY`, and optional `OPENAI_EMBEDDING_MODEL`, `OPENAI_EMBEDDING_DIMENSIONS`, `REDIS_VL_REDIS_URL` |
+| Hugging Face vectorizer package | [Hugging Face Vectorizer](/Users/steve.lorello/projects/redis/redis-vl-dotnet/docs-site/modules/ROOT/pages/extensions/huggingface-vectorizer.adoc) | [HuggingFaceVectorizerExample](/Users/steve.lorello/projects/redis/redis-vl-dotnet/examples/HuggingFaceVectorizerExample/README.md) | RediSearch with vector similarity support, `HF_TOKEN`, and optional `HF_EMBEDDING_MODEL`, `REDIS_VL_REDIS_URL` |
+| Cohere reranker package | [Cohere Reranker](/Users/steve.lorello/projects/redis/redis-vl-dotnet/docs-site/modules/ROOT/pages/extensions/cohere-reranker.adoc) | [CohereRerankerExample](/Users/steve.lorello/projects/redis/redis-vl-dotnet/examples/CohereRerankerExample/README.md) | RediSearch + RedisJSON, `COHERE_API_KEY`, and optional `COHERE_RERANK_MODEL`, `REDIS_VL_REDIS_URL` |
+| CLI index and schema commands | [CLI](/Users/steve.lorello/projects/redis/redis-vl-dotnet/docs-site/modules/ROOT/pages/cli/index.adoc) | `dotnet run --project src/RedisVlDotNet.Cli -- ...` | Index commands require RediSearch plus `--redis` or `REDIS_VL_REDIS_URL`; JSON-backed index creation also requires RedisJSON |
 
 ### [JsonStorageExample](/Users/steve.lorello/projects/redis/redis-vl-dotnet/examples/JsonStorageExample/README.md)
 
@@ -232,6 +232,7 @@ dotnet run --project examples/CohereRerankerExample/CohereRerankerExample.csproj
 
 ## Related Docs
 
-- [Getting started guide](/Users/steve.lorello/projects/redis/redis-vl-dotnet/docs/getting-started.md)
-- [Testing and local Redis setup](/Users/steve.lorello/projects/redis/redis-vl-dotnet/docs/testing.md)
-- [Current parity roadmap and matrix](/Users/steve.lorello/projects/redis/redis-vl-dotnet/docs/parity-roadmap.md)
+- [Getting Started](/Users/steve.lorello/projects/redis/redis-vl-dotnet/docs-site/modules/ROOT/pages/getting-started/index.adoc)
+- [Examples](/Users/steve.lorello/projects/redis/redis-vl-dotnet/docs-site/modules/ROOT/pages/examples/index.adoc)
+- [Testing](/Users/steve.lorello/projects/redis/redis-vl-dotnet/docs-site/modules/ROOT/pages/testing/index.adoc)
+- [CLI](/Users/steve.lorello/projects/redis/redis-vl-dotnet/docs-site/modules/ROOT/pages/cli/index.adoc)

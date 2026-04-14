@@ -15,3 +15,9 @@ If `HF_TOKEN` is not set, the example exits immediately with an explicit environ
 ```bash
 dotnet run --project examples/HuggingFaceVectorizerExample/HuggingFaceVectorizerExample.csproj
 ```
+
+## Related Docs
+
+- [Hugging Face Vectorizer](/Users/steve.lorello/projects/redis/redis-vl-dotnet/docs-site/modules/ROOT/pages/extensions/huggingface-vectorizer.adoc)
+- [SemanticCache](/Users/steve.lorello/projects/redis/redis-vl-dotnet/docs-site/modules/ROOT/pages/core-features/semantic-cache.adoc)
+- [Examples index](/Users/steve.lorello/projects/redis/redis-vl-dotnet/examples/README.md)

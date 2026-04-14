@@ -15,3 +15,9 @@ If `COHERE_API_KEY` is not set, the example exits immediately with an explicit e
 ```bash
 dotnet run --project examples/CohereRerankerExample/CohereRerankerExample.csproj
 ```
+
+## Related Docs
+
+- [Cohere Reranker](/Users/steve.lorello/projects/redis/redis-vl-dotnet/docs-site/modules/ROOT/pages/extensions/cohere-reranker.adoc)
+- [TextQuery](/Users/steve.lorello/projects/redis/redis-vl-dotnet/docs-site/modules/ROOT/pages/core-features/text-query.adoc)
+- [Examples index](/Users/steve.lorello/projects/redis/redis-vl-dotnet/examples/README.md)
