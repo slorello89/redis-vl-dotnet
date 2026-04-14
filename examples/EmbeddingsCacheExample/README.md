@@ -5,6 +5,7 @@ Demonstrates exact-input embedding reuse:
 - create an `EmbeddingsCache` with a per-run namespace and TTL
 - store an embedding with Python-style `SetAsync(...)`
 - look up the cached entry with `GetAsync(...)`
+- understand that `GetManyAsync(...)` preserves request order and leaves `null` placeholders for misses
 - inspect the Redis key returned from the write call
 - overwrite the cached embedding and confirm the new value is returned
 

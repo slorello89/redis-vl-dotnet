@@ -142,4 +142,56 @@ public sealed class EmbeddingsCacheIntegrationTests
         Assert.False(await cache.ExistsByKeyAsync(semanticEntry.Key!));
         Assert.False(await cache.ExistsByKeyAsync(directEntry.Key!));
     }
+
+    [RedisSearchIntegrationFact]
+    public async Task SupportsBatchOperationsWithMixedHitsAndMisses()
+    {
+        await using var connection = await ConnectionMultiplexer.ConnectAsync(RedisSearchTestEnvironment.ConnectionString!);
+        var database = connection.GetDatabase();
+
+        var token = Guid.NewGuid().ToString("N");
+        var cache = new EmbeddingsCache(
+            database,
+            new EmbeddingsCacheOptions("integration-cache", token, TimeSpan.FromMinutes(5)));
+
+        var stored = await cache.SetManyAsync(
+        [
+            new EmbeddingsCacheWriteRequest("alpha", [1f, 2f], "model-a"),
+            new EmbeddingsCacheWriteRequest("beta", [3f, 4f], "model-b", metadata: new { source = "faq" })
+        ]);
+
+        var semanticHits = await cache.GetManyAsync(
+        [
+            new EmbeddingsCacheLookup("beta", "model-b"),
+            new EmbeddingsCacheLookup("missing", "model-x"),
+            new EmbeddingsCacheLookup("alpha", "model-a")
+        ]);
+        var directHits = await cache.GetManyByKeyAsync([stored[1].Key!, $"{stored[1].Key}:missing", stored[0].Key!]);
+        var semanticExists = await cache.ExistsManyAsync(
+        [
+            new EmbeddingsCacheLookup("alpha", "model-a"),
+            new EmbeddingsCacheLookup("alpha", "model-x")
+        ]);
+        var directExists = await cache.ExistsManyByKeyAsync([stored[0].Key!, $"{stored[0].Key}:missing"]);
+        var semanticDeleted = await cache.DeleteManyAsync(
+        [
+            new EmbeddingsCacheLookup("alpha", "model-a"),
+            new EmbeddingsCacheLookup("missing", "model-x")
+        ]);
+        var directDeleted = await cache.DeleteManyByKeyAsync([stored[1].Key!, $"{stored[1].Key}:missing"]);
+
+        Assert.Equal(2, stored.Count);
+        Assert.Equal("beta", semanticHits[0]!.Input);
+        Assert.Null(semanticHits[1]);
+        Assert.Equal("alpha", semanticHits[2]!.Input);
+        Assert.Equal("beta", directHits[0]!.Input);
+        Assert.Null(directHits[1]);
+        Assert.Equal("alpha", directHits[2]!.Input);
+        Assert.Equal([true, false], semanticExists);
+        Assert.Equal([true, false], directExists);
+        Assert.Equal(1, semanticDeleted);
+        Assert.Equal(1, directDeleted);
+        Assert.Null(await cache.GetAsync("alpha", "model-a"));
+        Assert.Null(await cache.GetByKeyAsync(stored[1].Key!));
+    }
 }

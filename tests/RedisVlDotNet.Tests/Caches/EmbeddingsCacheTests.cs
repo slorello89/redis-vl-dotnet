@@ -49,6 +49,34 @@ public sealed class EmbeddingsCacheTests
     }
 
     [Fact]
+    public async Task SetManyAsync_ReturnsEntriesInInputOrder()
+    {
+        var (database, recorder) = RecordingDatabaseProxy.CreatePair();
+        var cache = new EmbeddingsCache(
+            database,
+            new EmbeddingsCacheOptions("unit-cache", "tests", TimeSpan.FromMinutes(10)));
+
+        var stored = await cache.SetManyAsync(
+        [
+            new EmbeddingsCacheWriteRequest("alpha", [1f, 2f], "model-a"),
+            new EmbeddingsCacheWriteRequest("beta", [3f, 4f], "model-b", metadata: new { source = "faq" }, timeToLive: TimeSpan.FromSeconds(30))
+        ]);
+
+        Assert.Equal(2, stored.Count);
+        Assert.Equal("alpha", stored[0].Input);
+        Assert.Equal("model-a", stored[0].ModelName);
+        Assert.Equal([1f, 2f], stored[0].Embedding);
+        Assert.Null(stored[0].Metadata);
+        Assert.Equal("beta", stored[1].Input);
+        Assert.Equal("model-b", stored[1].ModelName);
+        Assert.Equal([3f, 4f], stored[1].Embedding);
+        Assert.Equal("{\"source\":\"faq\"}", stored[1].Metadata);
+        Assert.Equal(2, recorder.HashSetAsyncCallCount);
+        Assert.Equal(2, recorder.KeyExpireAsyncCallCount);
+        Assert.Equal(TimeSpan.FromSeconds(30), recorder.LastExpiry);
+    }
+
+    [Fact]
     public async Task GetAsync_UsesPythonParityAlias()
     {
         var (database, _) = RecordingDatabaseProxy.CreatePair();
@@ -88,6 +116,45 @@ public sealed class EmbeddingsCacheTests
         var cached = await cache.GetByKeyAsync("embeddings:unit-cache:tests:missing");
 
         Assert.Null(cached);
+    }
+
+    [Fact]
+    public async Task GetManyAsync_ReturnsHitsAndMissesInLookupOrder()
+    {
+        var (database, recorder) = RecordingDatabaseProxy.CreatePair();
+        var cache = new EmbeddingsCache(database, new EmbeddingsCacheOptions("unit-cache", "tests"));
+
+        await cache.SetAsync("alpha", "model-a", [1f, 2f]);
+        await cache.SetAsync("beta", "model-b", [3f, 4f]);
+
+        var cached = await cache.GetManyAsync(
+        [
+            new EmbeddingsCacheLookup("beta", "model-b"),
+            new EmbeddingsCacheLookup("missing", "model-x"),
+            new EmbeddingsCacheLookup("alpha", "model-a")
+        ]);
+
+        Assert.Equal(3, cached.Count);
+        Assert.Equal("beta", cached[0]!.Input);
+        Assert.Null(cached[1]);
+        Assert.Equal("alpha", cached[2]!.Input);
+        Assert.Equal(3, recorder.HashGetAllAsyncCallCount);
+    }
+
+    [Fact]
+    public async Task GetManyByKeyAsync_ReturnsHitsAndMissesInKeyOrder()
+    {
+        var (database, _) = RecordingDatabaseProxy.CreatePair();
+        var cache = new EmbeddingsCache(database, new EmbeddingsCacheOptions("unit-cache", "tests"));
+        var alpha = await cache.SetAsync("alpha", "model-a", [1f, 2f]);
+        var beta = await cache.SetAsync("beta", "model-b", [3f, 4f]);
+
+        var cached = await cache.GetManyByKeyAsync([beta.Key!, "embeddings:unit-cache:tests:missing", alpha.Key!]);
+
+        Assert.Equal(3, cached.Count);
+        Assert.Equal("beta", cached[0]!.Input);
+        Assert.Null(cached[1]);
+        Assert.Equal("alpha", cached[2]!.Input);
     }
 
     [Fact]
@@ -229,6 +296,38 @@ public sealed class EmbeddingsCacheTests
     }
 
     [Fact]
+    public async Task ExistsManyAsync_ReturnsBooleansInLookupOrder()
+    {
+        var (database, recorder) = RecordingDatabaseProxy.CreatePair();
+        var cache = new EmbeddingsCache(database, new EmbeddingsCacheOptions("unit-cache", "tests"));
+
+        await cache.SetAsync("alpha", "model-a", [1f, 2f]);
+
+        var exists = await cache.ExistsManyAsync(
+        [
+            new EmbeddingsCacheLookup("alpha", "model-a"),
+            new EmbeddingsCacheLookup("alpha", "model-b"),
+            new EmbeddingsCacheLookup("missing")
+        ]);
+
+        Assert.Equal([true, false, false], exists);
+        Assert.Equal(3, recorder.KeyExistsAsyncCallCount);
+    }
+
+    [Fact]
+    public async Task ExistsManyByKeyAsync_ReturnsBooleansInKeyOrder()
+    {
+        var (database, recorder) = RecordingDatabaseProxy.CreatePair();
+        var cache = new EmbeddingsCache(database, new EmbeddingsCacheOptions("unit-cache", "tests"));
+        var stored = await cache.SetAsync("alpha", "model-a", [1f, 2f]);
+
+        var exists = await cache.ExistsManyByKeyAsync([stored.Key!, "embeddings:unit-cache:tests:missing"]);
+
+        Assert.Equal([true, false], exists);
+        Assert.Equal(2, recorder.KeyExistsAsyncCallCount);
+    }
+
+    [Fact]
     public async Task DeleteAsync_ReturnsTrueForStoredSemanticKey()
     {
         var (database, recorder) = RecordingDatabaseProxy.CreatePair();
@@ -272,6 +371,44 @@ public sealed class EmbeddingsCacheTests
         Assert.False(secondDelete);
         Assert.Equal(2, recorder.KeyDeleteAsyncCallCount);
         Assert.Equal(stored.Key, recorder.LastKey);
+    }
+
+    [Fact]
+    public async Task DeleteManyAsync_ReturnsDeletedCountForMixedHitsAndMisses()
+    {
+        var (database, recorder) = RecordingDatabaseProxy.CreatePair();
+        var cache = new EmbeddingsCache(database, new EmbeddingsCacheOptions("unit-cache", "tests"));
+
+        await cache.SetAsync("alpha", "model-a", [1f, 2f]);
+        await cache.SetAsync("beta", "model-b", [3f, 4f]);
+
+        var deleted = await cache.DeleteManyAsync(
+        [
+            new EmbeddingsCacheLookup("alpha", "model-a"),
+            new EmbeddingsCacheLookup("missing", "model-x"),
+            new EmbeddingsCacheLookup("beta", "model-b")
+        ]);
+
+        Assert.Equal(2, deleted);
+        Assert.Equal(3, recorder.KeyDeleteAsyncCallCount);
+        Assert.False(await cache.ExistsAsync("alpha", "model-a"));
+        Assert.False(await cache.ExistsAsync("beta", "model-b"));
+    }
+
+    [Fact]
+    public async Task DeleteManyByKeyAsync_ReturnsDeletedCountForMixedHitsAndMisses()
+    {
+        var (database, recorder) = RecordingDatabaseProxy.CreatePair();
+        var cache = new EmbeddingsCache(database, new EmbeddingsCacheOptions("unit-cache", "tests"));
+        var alpha = await cache.SetAsync("alpha", "model-a", [1f, 2f]);
+        var beta = await cache.SetAsync("beta", "model-b", [3f, 4f]);
+
+        var deleted = await cache.DeleteManyByKeyAsync([alpha.Key!, "embeddings:unit-cache:tests:missing", beta.Key!]);
+
+        Assert.Equal(2, deleted);
+        Assert.Equal(3, recorder.KeyDeleteAsyncCallCount);
+        Assert.False(await cache.ExistsByKeyAsync(alpha.Key!));
+        Assert.False(await cache.ExistsByKeyAsync(beta.Key!));
     }
 
     [Fact]

@@ -34,11 +34,17 @@ Stored values use keys shaped like `embeddings:<name>:<namespace>:<sha256(input)
 | `GetAsync(input, modelName)`
 | Returns the cached `EmbeddingsCacheEntry` for that exact identity, otherwise `null`.
 
+| `SetManyAsync(entries)` / `GetManyAsync(lookups)` / `GetManyByKeyAsync(keys)`
+| Batch operations preserve the caller's input order. Read batches return one result per requested lookup or key, using `null` in-place for misses instead of dropping them.
+
+| `ExistsManyAsync(lookups)` / `ExistsManyByKeyAsync(keys)` / `DeleteManyAsync(lookups)` / `DeleteManyByKeyAsync(keys)`
+| Batch existence checks return aligned `bool` results, while batch deletes return the number of deleted entries so mixed hit/miss batches can be handled without re-querying Redis.
+
 | `StoreAsync(...)` / `LookupAsync(...)`
 | Legacy-compatible aliases for callers that prefer the original method names. `StoreAsync` still returns `bool`, while `LookupAsync` delegates to `GetAsync`.
 |===
 
-The cache does not expose delete or drop helpers. Use short-lived namespaces or TTLs when you want ephemeral entries.
+Single-entry and batch delete helpers are available for semantic lookups and direct Redis keys. Use short-lived namespaces or TTLs when you want automatic expiration instead of explicit cleanup.
 
 == TTL behavior
 
@@ -58,6 +64,14 @@ When `TimeToLive` is configured, each write resets the Redis expiration for that
 | `GetAsync(input, modelName)`
 | `Get(input, modelName)`
 
+| `mset([{ text, model_name, embedding, metadata, ttl }])`
+| `SetManyAsync(entries)`
+| `SetMany(entries)`
+
+| `mget([{ text, model_name }])`
+| `GetManyAsync(lookups)`
+| `GetMany(lookups)`
+
 | `set(text, embedding)` legacy input-only usage
 | `StoreAsync(input, embedding)` or `SetAsync(input, embedding)`
 | `Store(input, embedding)` or `Set(input, embedding)`
@@ -72,6 +86,7 @@ It demonstrates:
 * creating a namespaced cache with TTL
 * storing an embedding and capturing the returned Redis key
 * looking it up by the same input and model name
+* reading mixed-hit batches while preserving request order
 * overwriting an existing embedding entry
 
 The exact behavior is also covered in `tests/RedisVlDotNet.Tests/Caches/EmbeddingsCacheTests.cs` and `tests/RedisVlDotNet.Tests/Caches/EmbeddingsCacheIntegrationTests.cs`.

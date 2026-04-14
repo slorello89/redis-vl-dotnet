@@ -8,6 +8,7 @@ Started: Tue Apr 14 14:01:44 EDT 2026
 - `EmbeddingsCache` TTL precedence should be `per-call override ?? cache default`; unit tests can verify this by recording `KeyExpireAsync` arguments in the existing `DispatchProxy` database fake.
 - When adding more `EmbeddingsCache` read variants, route them through a shared hash-to-entry parser so semantic lookups can keep validating input/model identity while direct-key APIs reuse the same decode path.
 - Single-entry `EmbeddingsCache` lifecycle methods should keep returning `bool` hit/miss semantics from Redis single-key commands (`KeyExistsAsync`, `KeyDeleteAsync`) so future batch APIs can reserve count-based returns for multi-key operations.
+- Batch `EmbeddingsCache` APIs should preserve caller order and represent misses in-place (`null` for reads, `false` for existence) so mixed hit/miss workflows do not need an additional join step.
 
 ---
 
@@ -74,4 +75,17 @@ Started: Tue Apr 14 14:01:44 EDT 2026
   - The `DispatchProxy`-based `IDatabase` test fake needs explicit `KeyDeleteAsync` handling for single-key deletes; otherwise new lifecycle tests fail with `NotSupportedException`.
   - Useful context
   - Repeated deletes should be covered explicitly because Redis returns `false` on the second single-key delete even when the first delete succeeded.
+---
+
+## 2026-04-14 14:18:52 EDT - US-006
+- Implemented batch `EmbeddingsCache` write, read, existence, and delete APIs for semantic lookups and direct Redis keys, including dedicated batch request models and Python-style `LookupMany` compatibility aliases.
+- Files changed: `src/RedisVlDotNet/Caches/EmbeddingsCache.cs`, `src/RedisVlDotNet/Caches/EmbeddingsCacheLookup.cs`, `src/RedisVlDotNet/Caches/EmbeddingsCacheWriteRequest.cs`, `tests/RedisVlDotNet.Tests/Caches/EmbeddingsCacheTests.cs`, `tests/RedisVlDotNet.Tests/Caches/EmbeddingsCacheIntegrationTests.cs`, `docs-site/modules/ROOT/pages/core-features/embeddings-cache.adoc`, `examples/EmbeddingsCacheExample/README.md`, `prd.json`, `progress.txt`
+- Quality checks run and result: `dotnet test tests/RedisVlDotNet.Tests/RedisVlDotNet.Tests.csproj --filter EmbeddingsCache --nologo` passed with 27 tests passing and 6 Redis integration tests skipped because the integration environment was unavailable; `dotnet build examples/EmbeddingsCacheExample/EmbeddingsCacheExample.csproj --nologo` passed.
+- Learnings for future iterations:
+  - Patterns discovered
+  - Batch cache methods in this repo should keep one output slot per requested lookup or key so callers can safely correlate results by index even when some entries miss.
+  - Gotchas encountered
+  - This repository currently has no `AGENTS.md` files in the edited cache/docs/example paths, so reusable notes for this area still need to be captured in `progress.txt`.
+  - Useful context
+  - `EmbeddingsCacheWriteRequest` is a cleaner place for per-entry TTL overrides than trying to bolt batch TTL state onto `EmbeddingsCacheEntry`, which represents persisted results instead of write intent.
 ---

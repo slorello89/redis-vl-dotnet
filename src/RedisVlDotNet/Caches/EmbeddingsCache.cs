@@ -82,6 +82,12 @@ public sealed class EmbeddingsCache
     public EmbeddingsCacheEntry Set(string input, string modelName, float[] embedding, object? metadata, TimeSpan? timeToLive) =>
         SetAsync(input, modelName, embedding, metadata, timeToLive).GetAwaiter().GetResult();
 
+    public bool StoreMany(IReadOnlyList<EmbeddingsCacheWriteRequest> entries) =>
+        StoreManyAsync(entries).GetAwaiter().GetResult();
+
+    public IReadOnlyList<EmbeddingsCacheEntry> SetMany(IReadOnlyList<EmbeddingsCacheWriteRequest> entries) =>
+        SetManyAsync(entries).GetAwaiter().GetResult();
+
     public async Task<bool> StoreAsync(string input, float[] embedding, CancellationToken cancellationToken = default)
     {
         await SetAsync(input, embedding, cancellationToken).ConfigureAwait(false);
@@ -184,20 +190,65 @@ public sealed class EmbeddingsCache
         CancellationToken cancellationToken = default) =>
         SetAsyncCore(input, embedding, NormalizeModelName(modelName), metadata, timeToLive, cancellationToken);
 
+    public async Task<bool> StoreManyAsync(
+        IReadOnlyList<EmbeddingsCacheWriteRequest> entries,
+        CancellationToken cancellationToken = default)
+    {
+        await SetManyAsync(entries, cancellationToken).ConfigureAwait(false);
+        return true;
+    }
+
+    public async Task<IReadOnlyList<EmbeddingsCacheEntry>> SetManyAsync(
+        IReadOnlyList<EmbeddingsCacheWriteRequest> entries,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(entries);
+
+        if (entries.Count == 0)
+        {
+            return [];
+        }
+
+        var results = new EmbeddingsCacheEntry[entries.Count];
+        for (var index = 0; index < entries.Count; index++)
+        {
+            var entry = entries[index];
+            var normalizedModelName = entry.ModelName is null ? null : NormalizeModelName(entry.ModelName);
+            results[index] = await SetAsyncCore(
+                entry.Input,
+                entry.Embedding,
+                normalizedModelName,
+                entry.Metadata,
+                entry.TimeToLive,
+                cancellationToken).ConfigureAwait(false);
+        }
+
+        return results;
+    }
+
     public EmbeddingsCacheEntry? Get(string input) =>
         GetAsync(input).GetAwaiter().GetResult();
 
     public EmbeddingsCacheEntry? Get(string input, string modelName) =>
         GetAsync(input, modelName).GetAwaiter().GetResult();
 
+    public IReadOnlyList<EmbeddingsCacheEntry?> GetMany(IReadOnlyList<EmbeddingsCacheLookup> lookups) =>
+        GetManyAsync(lookups).GetAwaiter().GetResult();
+
     public EmbeddingsCacheEntry? GetByKey(string key) =>
         GetByKeyAsync(key).GetAwaiter().GetResult();
+
+    public IReadOnlyList<EmbeddingsCacheEntry?> GetManyByKey(IReadOnlyList<string> keys) =>
+        GetManyByKeyAsync(keys).GetAwaiter().GetResult();
 
     public EmbeddingsCacheEntry? Lookup(string input) =>
         Get(input);
 
     public EmbeddingsCacheEntry? Lookup(string input, string modelName) =>
         Get(input, modelName);
+
+    public IReadOnlyList<EmbeddingsCacheEntry?> LookupMany(IReadOnlyList<EmbeddingsCacheLookup> lookups) =>
+        GetMany(lookups);
 
     public float[]? LookupEmbedding(string input) =>
         Lookup(input)?.Embedding;
@@ -211,8 +262,14 @@ public sealed class EmbeddingsCache
     public bool Exists(string input, string modelName) =>
         ExistsAsync(input, modelName).GetAwaiter().GetResult();
 
+    public IReadOnlyList<bool> ExistsMany(IReadOnlyList<EmbeddingsCacheLookup> lookups) =>
+        ExistsManyAsync(lookups).GetAwaiter().GetResult();
+
     public bool ExistsByKey(string key) =>
         ExistsByKeyAsync(key).GetAwaiter().GetResult();
+
+    public IReadOnlyList<bool> ExistsManyByKey(IReadOnlyList<string> keys) =>
+        ExistsManyByKeyAsync(keys).GetAwaiter().GetResult();
 
     public bool Delete(string input) =>
         DeleteAsync(input).GetAwaiter().GetResult();
@@ -220,8 +277,14 @@ public sealed class EmbeddingsCache
     public bool Delete(string input, string modelName) =>
         DeleteAsync(input, modelName).GetAwaiter().GetResult();
 
+    public long DeleteMany(IReadOnlyList<EmbeddingsCacheLookup> lookups) =>
+        DeleteManyAsync(lookups).GetAwaiter().GetResult();
+
     public bool DeleteByKey(string key) =>
         DeleteByKeyAsync(key).GetAwaiter().GetResult();
+
+    public long DeleteManyByKey(IReadOnlyList<string> keys) =>
+        DeleteManyByKeyAsync(keys).GetAwaiter().GetResult();
 
     public Task<EmbeddingsCacheEntry?> GetAsync(string input, CancellationToken cancellationToken = default) =>
         LookupAsyncCore(input, modelName: null, cancellationToken);
@@ -232,8 +295,51 @@ public sealed class EmbeddingsCache
         CancellationToken cancellationToken = default) =>
         LookupAsyncCore(input, NormalizeModelName(modelName), cancellationToken);
 
+    public async Task<IReadOnlyList<EmbeddingsCacheEntry?>> GetManyAsync(
+        IReadOnlyList<EmbeddingsCacheLookup> lookups,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(lookups);
+
+        if (lookups.Count == 0)
+        {
+            return [];
+        }
+
+        var results = new EmbeddingsCacheEntry?[lookups.Count];
+        for (var index = 0; index < lookups.Count; index++)
+        {
+            var lookup = lookups[index];
+            results[index] = lookup.ModelName is null
+                ? await GetAsync(lookup.Input, cancellationToken).ConfigureAwait(false)
+                : await GetAsync(lookup.Input, lookup.ModelName, cancellationToken).ConfigureAwait(false);
+        }
+
+        return results;
+    }
+
     public Task<EmbeddingsCacheEntry?> GetByKeyAsync(string key, CancellationToken cancellationToken = default) =>
         GetByKeyAsyncCore(NormalizeKey(key), cancellationToken);
+
+    public async Task<IReadOnlyList<EmbeddingsCacheEntry?>> GetManyByKeyAsync(
+        IReadOnlyList<string> keys,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(keys);
+
+        if (keys.Count == 0)
+        {
+            return [];
+        }
+
+        var results = new EmbeddingsCacheEntry?[keys.Count];
+        for (var index = 0; index < keys.Count; index++)
+        {
+            results[index] = await GetByKeyAsync(keys[index], cancellationToken).ConfigureAwait(false);
+        }
+
+        return results;
+    }
 
     public Task<EmbeddingsCacheEntry?> LookupAsync(string input, CancellationToken cancellationToken = default) =>
         GetAsync(input, cancellationToken);
@@ -243,6 +349,11 @@ public sealed class EmbeddingsCache
         string modelName,
         CancellationToken cancellationToken = default) =>
         GetAsync(input, modelName, cancellationToken);
+
+    public Task<IReadOnlyList<EmbeddingsCacheEntry?>> LookupManyAsync(
+        IReadOnlyList<EmbeddingsCacheLookup> lookups,
+        CancellationToken cancellationToken = default) =>
+        GetManyAsync(lookups, cancellationToken);
 
     public async Task<float[]?> LookupEmbeddingAsync(string input, CancellationToken cancellationToken = default)
     {
@@ -266,8 +377,51 @@ public sealed class EmbeddingsCache
         CancellationToken cancellationToken = default) =>
         ExistsAsyncCore(CreateKey(NormalizeInput(input), NormalizeModelName(modelName)), cancellationToken);
 
+    public async Task<IReadOnlyList<bool>> ExistsManyAsync(
+        IReadOnlyList<EmbeddingsCacheLookup> lookups,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(lookups);
+
+        if (lookups.Count == 0)
+        {
+            return [];
+        }
+
+        var results = new bool[lookups.Count];
+        for (var index = 0; index < lookups.Count; index++)
+        {
+            var lookup = lookups[index];
+            results[index] = lookup.ModelName is null
+                ? await ExistsAsync(lookup.Input, cancellationToken).ConfigureAwait(false)
+                : await ExistsAsync(lookup.Input, lookup.ModelName, cancellationToken).ConfigureAwait(false);
+        }
+
+        return results;
+    }
+
     public Task<bool> ExistsByKeyAsync(string key, CancellationToken cancellationToken = default) =>
         ExistsAsyncCore(NormalizeKey(key), cancellationToken);
+
+    public async Task<IReadOnlyList<bool>> ExistsManyByKeyAsync(
+        IReadOnlyList<string> keys,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(keys);
+
+        if (keys.Count == 0)
+        {
+            return [];
+        }
+
+        var results = new bool[keys.Count];
+        for (var index = 0; index < keys.Count; index++)
+        {
+            results[index] = await ExistsByKeyAsync(keys[index], cancellationToken).ConfigureAwait(false);
+        }
+
+        return results;
+    }
 
     public Task<bool> DeleteAsync(string input, CancellationToken cancellationToken = default) =>
         DeleteAsyncCore(CreateKey(NormalizeInput(input)), cancellationToken);
@@ -278,8 +432,58 @@ public sealed class EmbeddingsCache
         CancellationToken cancellationToken = default) =>
         DeleteAsyncCore(CreateKey(NormalizeInput(input), NormalizeModelName(modelName)), cancellationToken);
 
+    public async Task<long> DeleteManyAsync(
+        IReadOnlyList<EmbeddingsCacheLookup> lookups,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(lookups);
+
+        if (lookups.Count == 0)
+        {
+            return 0;
+        }
+
+        var deletedCount = 0L;
+        for (var index = 0; index < lookups.Count; index++)
+        {
+            var lookup = lookups[index];
+            var deleted = lookup.ModelName is null
+                ? await DeleteAsync(lookup.Input, cancellationToken).ConfigureAwait(false)
+                : await DeleteAsync(lookup.Input, lookup.ModelName, cancellationToken).ConfigureAwait(false);
+            if (deleted)
+            {
+                deletedCount++;
+            }
+        }
+
+        return deletedCount;
+    }
+
     public Task<bool> DeleteByKeyAsync(string key, CancellationToken cancellationToken = default) =>
         DeleteAsyncCore(NormalizeKey(key), cancellationToken);
+
+    public async Task<long> DeleteManyByKeyAsync(
+        IReadOnlyList<string> keys,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(keys);
+
+        if (keys.Count == 0)
+        {
+            return 0;
+        }
+
+        var deletedCount = 0L;
+        for (var index = 0; index < keys.Count; index++)
+        {
+            if (await DeleteByKeyAsync(keys[index], cancellationToken).ConfigureAwait(false))
+            {
+                deletedCount++;
+            }
+        }
+
+        return deletedCount;
+    }
 
     internal RedisKey CreateKey(string input) => CreateKey(input, modelName: null);
 
