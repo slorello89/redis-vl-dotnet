@@ -87,4 +87,32 @@ public sealed class EmbeddingsCacheIntegrationTests
         Assert.Equal("{\"source\":\"faq\",\"tenant\":\"team-a\"}", hit!.Metadata);
         Assert.Equal([1f, 2f, 3f], hit.Embedding);
     }
+
+    [RedisSearchIntegrationFact]
+    public async Task ReadsAndChecksExistenceByKeyAndSemanticLookup()
+    {
+        await using var connection = await ConnectionMultiplexer.ConnectAsync(RedisSearchTestEnvironment.ConnectionString!);
+        var database = connection.GetDatabase();
+
+        var token = Guid.NewGuid().ToString("N");
+        var cache = new EmbeddingsCache(database, new EmbeddingsCacheOptions("integration-cache", token));
+
+        var stored = await cache.SetAsync("prompt", "text-embedding-3-small", [1f, 2f, 3f]);
+        var directHit = await cache.GetByKeyAsync(stored.Key!);
+        var directMiss = await cache.GetByKeyAsync($"{stored.Key}:missing");
+        var semanticHit = await cache.ExistsAsync("prompt", "text-embedding-3-small");
+        var semanticMiss = await cache.ExistsAsync("prompt", "text-embedding-3-large");
+        var directExists = await cache.ExistsByKeyAsync(stored.Key!);
+        var directMissing = await cache.ExistsByKeyAsync($"{stored.Key}:missing");
+
+        Assert.NotNull(directHit);
+        Assert.Equal(stored.Key, directHit!.Key);
+        Assert.Equal("prompt", directHit.Input);
+        Assert.Equal("text-embedding-3-small", directHit.ModelName);
+        Assert.Null(directMiss);
+        Assert.True(semanticHit);
+        Assert.False(semanticMiss);
+        Assert.True(directExists);
+        Assert.False(directMissing);
+    }
 }

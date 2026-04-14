@@ -63,6 +63,34 @@ public sealed class EmbeddingsCacheTests
     }
 
     [Fact]
+    public async Task GetByKeyAsync_ReturnsStoredEntryForDirectKeyHit()
+    {
+        var (database, recorder) = RecordingDatabaseProxy.CreatePair();
+        var cache = new EmbeddingsCache(database, new EmbeddingsCacheOptions("unit-cache", "tests"));
+
+        var stored = await cache.SetAsync("hello world", "text-embedding-3-small", [1f, 2f, 3f]);
+        var cached = await cache.GetByKeyAsync(stored.Key!);
+
+        Assert.NotNull(cached);
+        Assert.Equal(stored.Key, cached!.Key);
+        Assert.Equal("hello world", cached.Input);
+        Assert.Equal("text-embedding-3-small", cached.ModelName);
+        Assert.Equal([1f, 2f, 3f], cached.Embedding);
+        Assert.Equal(stored.Key, recorder.LastKey);
+    }
+
+    [Fact]
+    public async Task GetByKeyAsync_ReturnsMissForUnknownKey()
+    {
+        var (database, _) = RecordingDatabaseProxy.CreatePair();
+        var cache = new EmbeddingsCache(database, new EmbeddingsCacheOptions("unit-cache", "tests"));
+
+        var cached = await cache.GetByKeyAsync("embeddings:unit-cache:tests:missing");
+
+        Assert.Null(cached);
+    }
+
+    [Fact]
     public async Task LookupAsync_WithModelName_UsesDistinctKeyForSameInput()
     {
         var (database, recorder) = RecordingDatabaseProxy.CreatePair();
@@ -149,6 +177,58 @@ public sealed class EmbeddingsCacheTests
     }
 
     [Fact]
+    public async Task ExistsAsync_ReturnsTrueForStoredSemanticKey()
+    {
+        var (database, recorder) = RecordingDatabaseProxy.CreatePair();
+        var cache = new EmbeddingsCache(database, new EmbeddingsCacheOptions("unit-cache", "tests"));
+
+        await cache.SetAsync("hello world", "text-embedding-3-small", [1f, 2f, 3f]);
+
+        var exists = await cache.ExistsAsync("hello world", "text-embedding-3-small");
+
+        Assert.True(exists);
+        Assert.Equal(1, recorder.KeyExistsAsyncCallCount);
+        Assert.Equal(cache.CreateKey("hello world", "text-embedding-3-small"), recorder.LastKey);
+    }
+
+    [Fact]
+    public async Task ExistsAsync_ReturnsFalseForSemanticMiss()
+    {
+        var (database, recorder) = RecordingDatabaseProxy.CreatePair();
+        var cache = new EmbeddingsCache(database, new EmbeddingsCacheOptions("unit-cache", "tests"));
+
+        await cache.SetAsync("hello world", "text-embedding-3-small", [1f, 2f, 3f]);
+
+        var exists = await cache.ExistsAsync("hello world", "text-embedding-3-large");
+
+        Assert.False(exists);
+        Assert.Equal(1, recorder.KeyExistsAsyncCallCount);
+    }
+
+    [Fact]
+    public async Task ExistsByKeyAsync_ReturnsTrueForStoredDirectKey()
+    {
+        var (database, _) = RecordingDatabaseProxy.CreatePair();
+        var cache = new EmbeddingsCache(database, new EmbeddingsCacheOptions("unit-cache", "tests"));
+        var stored = await cache.SetAsync("hello world", [1f, 2f, 3f]);
+
+        var exists = await cache.ExistsByKeyAsync(stored.Key!);
+
+        Assert.True(exists);
+    }
+
+    [Fact]
+    public async Task ExistsByKeyAsync_ReturnsFalseForUnknownDirectKey()
+    {
+        var (database, _) = RecordingDatabaseProxy.CreatePair();
+        var cache = new EmbeddingsCache(database, new EmbeddingsCacheOptions("unit-cache", "tests"));
+
+        var exists = await cache.ExistsByKeyAsync("embeddings:unit-cache:tests:missing");
+
+        Assert.False(exists);
+    }
+
+    [Fact]
     public async Task LookupAsync_ReturnsMissWhenStoredPayloadInputDoesNotMatch()
     {
         var (database, recorder) = RecordingDatabaseProxy.CreatePair();
@@ -216,6 +296,8 @@ public sealed class EmbeddingsCacheTests
 
         public int KeyExpireAsyncCallCount { get; private set; }
 
+        public int KeyExistsAsyncCallCount { get; private set; }
+
         public RedisKey? LastKey { get; private set; }
 
         public HashEntry[]? LastHashEntries { get; private set; }
@@ -238,6 +320,7 @@ public sealed class EmbeddingsCacheTests
                 nameof(IDatabase.HashSetAsync) => HandleHashSetAsync(args),
                 nameof(IDatabase.HashGetAllAsync) => HandleHashGetAllAsync(args),
                 nameof(IDatabase.KeyExpireAsync) => HandleKeyExpireAsync(args),
+                nameof(IDatabase.KeyExistsAsync) => HandleKeyExistsAsync(args),
                 nameof(IDatabase.Multiplexer) => throw new NotSupportedException(),
                 nameof(IDatabase.Database) => 0,
                 _ => throw new NotSupportedException($"Method '{targetMethod.Name}' is not configured for this test proxy.")
@@ -272,6 +355,14 @@ public sealed class EmbeddingsCacheTests
             LastKey = (RedisKey)args![0]!;
             LastExpiry = (TimeSpan?)args[1];
             return Task.FromResult(true);
+        }
+
+        private Task<bool> HandleKeyExistsAsync(object?[]? args)
+        {
+            KeyExistsAsyncCallCount++;
+            var key = (RedisKey)args![0]!;
+            LastKey = key;
+            return Task.FromResult(StoredValues.ContainsKey(key));
         }
     }
 }

@@ -190,6 +190,9 @@ public sealed class EmbeddingsCache
     public EmbeddingsCacheEntry? Get(string input, string modelName) =>
         GetAsync(input, modelName).GetAwaiter().GetResult();
 
+    public EmbeddingsCacheEntry? GetByKey(string key) =>
+        GetByKeyAsync(key).GetAwaiter().GetResult();
+
     public EmbeddingsCacheEntry? Lookup(string input) =>
         Get(input);
 
@@ -202,6 +205,15 @@ public sealed class EmbeddingsCache
     public float[]? LookupEmbedding(string input, string modelName) =>
         Lookup(input, modelName)?.Embedding;
 
+    public bool Exists(string input) =>
+        ExistsAsync(input).GetAwaiter().GetResult();
+
+    public bool Exists(string input, string modelName) =>
+        ExistsAsync(input, modelName).GetAwaiter().GetResult();
+
+    public bool ExistsByKey(string key) =>
+        ExistsByKeyAsync(key).GetAwaiter().GetResult();
+
     public Task<EmbeddingsCacheEntry?> GetAsync(string input, CancellationToken cancellationToken = default) =>
         LookupAsyncCore(input, modelName: null, cancellationToken);
 
@@ -210,6 +222,9 @@ public sealed class EmbeddingsCache
         string modelName,
         CancellationToken cancellationToken = default) =>
         LookupAsyncCore(input, NormalizeModelName(modelName), cancellationToken);
+
+    public Task<EmbeddingsCacheEntry?> GetByKeyAsync(string key, CancellationToken cancellationToken = default) =>
+        GetByKeyAsyncCore(NormalizeKey(key), cancellationToken);
 
     public Task<EmbeddingsCacheEntry?> LookupAsync(string input, CancellationToken cancellationToken = default) =>
         GetAsync(input, cancellationToken);
@@ -232,6 +247,18 @@ public sealed class EmbeddingsCache
     {
         return (await LookupAsync(input, modelName, cancellationToken).ConfigureAwait(false))?.Embedding;
     }
+
+    public Task<bool> ExistsAsync(string input, CancellationToken cancellationToken = default) =>
+        ExistsAsyncCore(CreateKey(NormalizeInput(input)), cancellationToken);
+
+    public Task<bool> ExistsAsync(
+        string input,
+        string modelName,
+        CancellationToken cancellationToken = default) =>
+        ExistsAsyncCore(CreateKey(NormalizeInput(input), NormalizeModelName(modelName)), cancellationToken);
+
+    public Task<bool> ExistsByKeyAsync(string key, CancellationToken cancellationToken = default) =>
+        ExistsAsyncCore(NormalizeKey(key), cancellationToken);
 
     internal RedisKey CreateKey(string input) => CreateKey(input, modelName: null);
 
@@ -319,14 +346,46 @@ public sealed class EmbeddingsCache
         CancellationToken cancellationToken)
     {
         var normalizedInput = NormalizeInput(input);
+        var entry = await GetByKeyAsyncCore(CreateKey(normalizedInput, modelName), cancellationToken).ConfigureAwait(false);
 
+        if (entry is null ||
+            !string.Equals(entry.Input, normalizedInput, StringComparison.Ordinal) ||
+            !string.Equals(entry.ModelName, modelName, StringComparison.Ordinal))
+        {
+            return null;
+        }
+
+        return entry;
+    }
+
+    private async Task<EmbeddingsCacheEntry?> GetByKeyAsyncCore(
+        RedisKey key,
+        CancellationToken cancellationToken)
+    {
         cancellationToken.ThrowIfCancellationRequested();
 
         var entries = await _database
-            .HashGetAllAsync(CreateKey(normalizedInput, modelName))
+            .HashGetAllAsync(key)
             .WaitAsync(cancellationToken)
             .ConfigureAwait(false);
 
+        return TryCreateEntry(key, entries);
+    }
+
+    private async Task<bool> ExistsAsyncCore(
+        RedisKey key,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        return await _database
+            .KeyExistsAsync(key)
+            .WaitAsync(cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    private static EmbeddingsCacheEntry? TryCreateEntry(RedisKey key, HashEntry[] entries)
+    {
         if (entries.Length == 0)
         {
             return null;
@@ -363,20 +422,18 @@ public sealed class EmbeddingsCache
             }
         }
 
-        var normalizedCachedModelName = string.IsNullOrEmpty(cachedModelName) ? null : cachedModelName;
-        if (!string.Equals(cachedInput, normalizedInput, StringComparison.Ordinal) ||
-            !string.Equals(normalizedCachedModelName, modelName, StringComparison.Ordinal) ||
-            payload is null)
+        if (string.IsNullOrWhiteSpace(cachedInput) || payload is null)
         {
             return null;
         }
 
+        var normalizedCachedModelName = string.IsNullOrEmpty(cachedModelName) ? null : cachedModelName;
         return new EmbeddingsCacheEntry(
-            normalizedInput,
+            cachedInput,
             DecodeFloat32(payload),
             normalizedCachedModelName,
             metadata,
-            CreateKey(normalizedInput, modelName));
+            key);
     }
 
     private static string NormalizeInput(string input)
@@ -389,6 +446,12 @@ public sealed class EmbeddingsCache
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(modelName);
         return modelName;
+    }
+
+    private static RedisKey NormalizeKey(string key)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(key);
+        return key;
     }
 
     private static void ValidateTimeToLive(TimeSpan? timeToLive)

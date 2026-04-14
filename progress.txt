@@ -6,6 +6,7 @@ Started: Tue Apr 14 14:01:44 EDT 2026
 - Hash-backed cache metadata in this repo is stored as a JSON string serialized with `JsonSerializerDefaults.Web`; richer read models should preserve that payload verbatim instead of trying to deserialize it eagerly.
 - For `EmbeddingsCache` parity work, keep `Store`/`Lookup` as compatibility aliases and layer newer Python-style `Set`/`Get` entry-centric APIs on top so callers can adopt richer results without breaking existing code.
 - `EmbeddingsCache` TTL precedence should be `per-call override ?? cache default`; unit tests can verify this by recording `KeyExpireAsync` arguments in the existing `DispatchProxy` database fake.
+- When adding more `EmbeddingsCache` read variants, route them through a shared hash-to-entry parser so semantic lookups can keep validating input/model identity while direct-key APIs reuse the same decode path.
 
 ---
 
@@ -46,4 +47,17 @@ Started: Tue Apr 14 14:01:44 EDT 2026
   - TTL behavior needs explicit precedence coverage because the cache now supports both constructor-level defaults and per-call overrides on writes.
   - Useful context
   - There are currently no `AGENTS.md` files in this repository, so reusable implementation knowledge for Ralph iterations needs to live in `progress.txt` unless that changes later.
+---
+
+## 2026-04-14 14:13:19 EDT - US-004
+- Implemented key-based `EmbeddingsCache` reads plus semantic and direct-key existence APIs, reusing the existing hash-backed entry model so callers can retrieve entries either by lookup identity or by Redis key.
+- Files changed: `src/RedisVlDotNet/Caches/EmbeddingsCache.cs`, `tests/RedisVlDotNet.Tests/Caches/EmbeddingsCacheTests.cs`, `tests/RedisVlDotNet.Tests/Caches/EmbeddingsCacheIntegrationTests.cs`, `prd.json`, `progress.txt`
+- Quality checks run and result: `dotnet build examples/EmbeddingsCacheExample/EmbeddingsCacheExample.csproj --nologo` passed with 0 warnings and 0 errors; `dotnet test tests/RedisVlDotNet.Tests/RedisVlDotNet.Tests.csproj --filter EmbeddingsCache --nologo` passed with 17 tests passing and 4 Redis integration tests skipped because the integration environment was unavailable.
+- Learnings for future iterations:
+  - Patterns discovered
+  - Direct-key cache reads can share the same hash parsing helper as semantic lookups, with semantic APIs adding a final identity check on the decoded entry.
+  - Gotchas encountered
+  - Running `dotnet build` and `dotnet test` in parallel in this repo can produce harmless file-lock warnings under `obj/Debug`; run them sequentially if you need a warning-free validation pass.
+  - Useful context
+  - `IDatabase.KeyExistsAsync` is sufficient for the new existence APIs because cache entries are single Redis hashes keyed by the same deterministic identity used for writes and lookups.
 ---
