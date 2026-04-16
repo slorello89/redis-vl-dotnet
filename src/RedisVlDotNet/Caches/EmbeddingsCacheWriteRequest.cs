@@ -1,4 +1,4 @@
-namespace RedisVl.Caches;
+namespace RedisVlDotNet.Caches;
 
 public readonly record struct EmbeddingsCacheWriteRequest
 {
