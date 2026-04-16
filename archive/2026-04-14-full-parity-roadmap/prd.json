@@ -1,0 +1,193 @@
+{
+  "project": "redis-vl-dotnet",
+  "branchName": "ralph/antora-docs-and-gh-pages",
+  "description": "Set up Antora documentation and GitHub Pages publishing for redis-vl-dotnet, migrate and expand the current docs into a canonical site, and ensure each major feature area has working example coverage with environment-variable-based provider configuration.",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Scaffold the Antora site structure",
+      "description": "As a maintainer, I want the repository to contain a working Antora scaffold so that documentation has a stable buildable structure.",
+      "acceptanceCriteria": [
+        "Add the Antora playbook, component metadata, and navigation files needed to build the site",
+        "Create Antora sections for getting-started, core-features, extensions, examples, cli, testing, and reference",
+        "Document the local docs build command in the repository",
+        "Typecheck passes"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-002",
+      "title": "Add GitHub Pages publishing workflow",
+      "description": "As a maintainer, I want GitHub Actions to build and publish the Antora site so that documentation is deployed automatically from GitHub.",
+      "acceptanceCriteria": [
+        "Add a GitHub Actions workflow that builds the Antora site on the default branch",
+        "Configure the workflow to publish the generated site to GitHub Pages using supported GitHub Actions deployment steps",
+        "Document required repository Pages settings and workflow permissions",
+        "Ensure failed docs builds stop publishing",
+        "Typecheck passes"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-003",
+      "title": "Add docs and example quality gates",
+      "description": "As a maintainer, I want repeatable docs validation commands and CI gates so that published documentation does not drift away from the codebase.",
+      "acceptanceCriteria": [
+        "Add a docs validation path that builds the Antora site in CI",
+        "Add an example validation sweep that compiles each example project",
+        "Document the local validation commands for docs and examples",
+        "Fail CI when Antora navigation or documented example builds break",
+        "Typecheck passes"
+      ],
+      "priority": 3,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-004",
+      "title": "Migrate repository entry-point docs into Antora",
+      "description": "As a developer, I want the current top-level documentation migrated into Antora so that there is one canonical documentation entry point.",
+      "acceptanceCriteria": [
+        "Migrate or rewrite the current README and core docs entry-point content into Antora landing and overview pages",
+        "Add repository-root links that point users to the Antora docs entry point",
+        "Mark or remove superseded duplicate docs so there is not more than one canonical source for the same guidance",
+        "Typecheck passes"
+      ],
+      "priority": 4,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-005",
+      "title": "Document installation and environment setup",
+      "description": "As a new user, I want clear setup documentation so that I can install prerequisites, start Redis, and configure environment variables without trial-and-error.",
+      "acceptanceCriteria": [
+        "Add a getting-started page covering .NET SDK requirements, Redis prerequisites, and local Redis startup commands",
+        "Document REDIS_VL_REDIS_URL, cluster, Sentinel, and provider environment variables where applicable",
+        "Include copy-paste-ready commands for the default local setup flow",
+        "Link the setup page to example and testing documentation",
+        "Typecheck passes"
+      ],
+      "priority": 5,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-006",
+      "title": "Document core schema and index workflows",
+      "description": "As a .NET developer, I want schema and index lifecycle documentation so that I can define indexes, create them, inspect them, reuse them, and remove them confidently.",
+      "acceptanceCriteria": [
+        "Add Antora pages for SearchSchema, IndexDefinition, field definitions, YAML schema loading, and index lifecycle operations",
+        "Document JSON and HASH storage behavior plus advanced index options supported by the codebase",
+        "Link the schema/index docs to the primary working example for this feature area",
+        "Typecheck passes"
+      ],
+      "priority": 6,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-007",
+      "title": "Document document lifecycle and update workflows",
+      "description": "As a .NET developer, I want document lifecycle documentation so that I can load, fetch, partially update, clear, and drop documents safely.",
+      "acceptanceCriteria": [
+        "Add docs for JSON and HASH document load, fetch, delete, clear, and drop flows",
+        "Document JSON partial updates and HASH partial updates including limitations and key resolution behavior",
+        "Ensure the document lifecycle docs point to a working example that demonstrates create, fetch, update, and cleanup",
+        "Typecheck passes"
+      ],
+      "priority": 7,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-008",
+      "title": "Document query and aggregation workflows",
+      "description": "As a .NET developer, I want each query type documented so that I can choose and apply the correct search and aggregation API without reading internal command builders.",
+      "acceptanceCriteria": [
+        "Add pages for FilterQuery, TextQuery, CountQuery, VectorQuery, VectorRangeQuery, HybridQuery, AggregateHybridQuery, MultiVectorQuery, and aggregation workflows",
+        "Document pagination, batch helpers, typed result mapping, return fields, and runtime vector options",
+        "Link each major query area to a working example or a clearly identified example section",
+        "Typecheck passes"
+      ],
+      "priority": 8,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-009",
+      "title": "Document higher-level cache and workflow APIs",
+      "description": "As an application developer, I want documentation for caches, routers, and message history so that I can build AI-adjacent workflows with the library.",
+      "acceptanceCriteria": [
+        "Add pages for EmbeddingsCache, SemanticCache, SemanticRouter, MessageHistory, and SemanticMessageHistory",
+        "Document thresholds, filters, recency behavior, vectorizer usage, and the obsolete embedding-generator shim where relevant",
+        "Link the cache and workflow docs to working examples for those feature areas",
+        "Typecheck passes"
+      ],
+      "priority": 9,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-010",
+      "title": "Document extension packages and provider-backed examples",
+      "description": "As a developer using provider integrations, I want extension package documentation and runnable examples so that I can configure OpenAI, Hugging Face, and Cohere using environment variables instead of embedded secrets.",
+      "acceptanceCriteria": [
+        "Add docs for vectorizer abstractions, reranker abstractions, OpenAI vectorizer, Hugging Face vectorizer, and Cohere reranker packages",
+        "Document OPENAI_API_KEY, HF_TOKEN, and COHERE_API_KEY as required environment variables where applicable",
+        "Ensure each provider area has a working example project and setup instructions that consume credentials from environment variables",
+        "Document expected behavior when required provider credentials are missing",
+        "Typecheck passes"
+      ],
+      "priority": 10,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-011",
+      "title": "Document CLI workflows",
+      "description": "As an operator or developer, I want CLI documentation so that I can manage indexes and schemas from the terminal without reading the source code.",
+      "acceptanceCriteria": [
+        "Add CLI docs for build/install, command discovery, index lifecycle commands, and schema validate/show flows",
+        "Document required connection arguments and runnable local command examples",
+        "Include troubleshooting notes for connection problems and missing Redis modules",
+        "Typecheck passes"
+      ],
+      "priority": 11,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-012",
+      "title": "Align major feature examples with the docs site",
+      "description": "As a maintainer, I want one working example per major feature area and docs pages that link to them so that readers can move from explanation to runnable code immediately.",
+      "acceptanceCriteria": [
+        "Confirm or add working example coverage for core schema/index/document workflows, query/aggregation workflows, cache workflows, message-history/router workflows, provider vectorizer workflows, reranker workflows, and CLI workflows",
+        "Update example docs so each major feature area has a clear entry point from Antora navigation",
+        "Document required Redis modules and provider env vars for each example where applicable",
+        "Typecheck passes"
+      ],
+      "priority": 12,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-013",
+      "title": "Organize completed planning artifacts",
+      "description": "As a maintainer, I want completed planning artifacts moved into the completed-prds area so that active planning files remain easy to find.",
+      "acceptanceCriteria": [
+        "Create or preserve a completed-prds folder for superseded planning artifacts",
+        "Move the previous root prd.json and superseded PRD markdown files into completed-prds while leaving the active docs PRD in tasks",
+        "Retain historical planning files without deleting their content",
+        "Typecheck passes"
+      ],
+      "priority": 13,
+      "passes": false,
+      "notes": ""
+    }
+  ]
+}
