@@ -71,8 +71,8 @@ Use these runnable examples when validating the documented behavior:
 
 The matching source-backed behavior is also covered in:
 
-* `tests/RedisVlDotNet.Tests/Indexes/SearchIndexIntegrationTests.cs`
-* `tests/RedisVlDotNet.Tests/Indexes/SearchIndexAsyncTests.cs`
+* `tests/RedisVL.Tests/Indexes/SearchIndexIntegrationTests.cs`
+* `tests/RedisVL.Tests/Indexes/SearchIndexAsyncTests.cs`
 
 == Related pages
 

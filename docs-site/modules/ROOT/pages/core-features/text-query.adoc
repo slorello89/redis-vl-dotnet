@@ -33,7 +33,7 @@ The canonical runnable reference is `/examples/JsonStorageExample`.
 * `returnFields` are normalized and deduplicated
 * typed mapping works through `SearchResults.Map<TDocument>()` and `SearchAsync<TDocument>(...)`
 
-If a required projected field is missing or cannot be converted into the target .NET property type, the library throws `SearchResultMappingException`. The mapping contract is covered in `tests/RedisVlDotNet.Tests/Queries/SearchResultMappingTests.cs`.
+If a required projected field is missing or cannot be converted into the target .NET property type, the library throws `SearchResultMappingException`. The mapping contract is covered in `tests/RedisVL.Tests/Queries/SearchResultMappingTests.cs`.
 
 == Batch helpers
 

@@ -25,6 +25,6 @@ GitHub Pages publishing runs from `.github/workflows/docs-pages.yml` on pushes t
 ## Repository Pointers
 
 - Active parity roadmap: [docs/parity-roadmap.md](/Users/steve.lorello/projects/redis/redis-vl-dotnet/docs/parity-roadmap.md)
-- CLI project: `src/RedisVlDotNet.Cli`
+- CLI project: `src/RedisVL.Cli`
 - Solution file: `redis-vl-dotnet.sln`
 - Ralph plan and iteration log: `prd.json`, `progress.txt`

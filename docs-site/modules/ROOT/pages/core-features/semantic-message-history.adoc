@@ -65,7 +65,7 @@ It demonstrates:
 * retrieving the newest turns with `GetRecentAsync`
 * retrieving relevant turns with `GetRelevantAsync`
 
-The API contract and edge cases are covered in `tests/RedisVlDotNet.Tests/Workflows/SemanticMessageHistoryTests.cs` and `tests/RedisVlDotNet.Tests/Workflows/SemanticMessageHistoryIntegrationTests.cs`.
+The API contract and edge cases are covered in `tests/RedisVL.Tests/Workflows/SemanticMessageHistoryTests.cs` and `tests/RedisVL.Tests/Workflows/SemanticMessageHistoryIntegrationTests.cs`.
 
 == Related sections
 

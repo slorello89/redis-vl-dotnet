@@ -1,6 +1,6 @@
 = Reranker Abstractions
 
-`RedisVlDotNet.Rerankers.Abstractions` defines the provider-neutral reranking surface for search result post-processing.
+`RedisVL.Rerankers.Abstractions` defines the provider-neutral reranking surface for search result post-processing.
 
 == Core interfaces and records
 
@@ -27,4 +27,4 @@ The abstraction keeps Redis-specific search logic separate from provider ranking
 == Examples and tests
 
 * `/examples/CohereRerankerExample` shows the canonical pattern of Redis search first, provider reranking second.
-* `tests/RedisVlDotNet.Tests/Rerankers/TextRerankerExtensionsTests.cs` and `tests/RedisVlDotNet.Tests/Rerankers/CohereTextRerankerTests.cs` capture the shape and validation expectations for the current abstraction.
+* `tests/RedisVL.Tests/Rerankers/TextRerankerExtensionsTests.cs` and `tests/RedisVL.Tests/Rerankers/CohereTextRerankerTests.cs` capture the shape and validation expectations for the current abstraction.

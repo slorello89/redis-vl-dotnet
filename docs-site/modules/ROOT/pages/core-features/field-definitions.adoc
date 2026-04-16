@@ -1,6 +1,6 @@
 = Field Definitions
 
-RedisVlDotNet supports text, tag, numeric, geo, and vector field definitions. Each field type maps directly onto RediSearch schema capabilities while keeping validation in .NET code.
+RedisVL supports text, tag, numeric, geo, and vector field definitions. Each field type maps directly onto RediSearch schema capabilities while keeping validation in .NET code.
 
 == Supported field types
 

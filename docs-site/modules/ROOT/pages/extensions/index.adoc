@@ -6,11 +6,11 @@ This section is the canonical overview for optional vectorizer and reranker pack
 
 The repository keeps provider contracts and implementations outside the core package boundary:
 
-* `src/RedisVlDotNet.Vectorizers.Abstractions` for provider-agnostic text vectorizer contracts
-* `src/RedisVlDotNet.Rerankers.Abstractions` for provider-agnostic reranker contracts
-* `src/RedisVlDotNet.Vectorizers.OpenAI` for OpenAI embeddings
-* `src/RedisVlDotNet.Vectorizers.HuggingFace` for Hugging Face `hf-inference` embeddings
-* `src/RedisVlDotNet.Rerankers.Cohere` for Cohere reranking
+* `src/RedisVL.Vectorizers.Abstractions` for provider-agnostic text vectorizer contracts
+* `src/RedisVL.Rerankers.Abstractions` for provider-agnostic reranker contracts
+* `src/RedisVL.Vectorizers.OpenAI` for OpenAI embeddings
+* `src/RedisVL.Vectorizers.HuggingFace` for Hugging Face `hf-inference` embeddings
+* `src/RedisVL.Rerankers.Cohere` for Cohere reranking
 
 == Shared contracts
 
@@ -22,7 +22,7 @@ The current abstractions surface includes:
 * `ITextReranker` for query-plus-candidate reranking
 * `RerankRequest`, `RerankDocument`, and `RerankResult` for provider-neutral reranking payloads
 
-The legacy `RedisVl.Caches.ITextEmbeddingGenerator` interface remains as an obsolete shim over `ITextVectorizer` for incremental migration.
+The legacy `RedisVL.Caches.ITextEmbeddingGenerator` interface remains as an obsolete shim over `ITextVectorizer` for incremental migration.
 
 Read the provider-neutral contract details here:
 

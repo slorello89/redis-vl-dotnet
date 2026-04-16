@@ -1,6 +1,6 @@
 # Cohere Reranker Example
 
-This example combines a Redis text search with `RedisVl.Rerankers.Cohere` so the top Redis candidates can be reranked by Cohere for better relevance.
+This example combines a Redis text search with `RedisVL.Rerankers.Cohere` so the top Redis candidates can be reranked by Cohere for better relevance.
 
 ## Prerequisites
 

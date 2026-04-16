@@ -84,7 +84,7 @@ Common validation failures:
 * vector definitions without `attrs`
 * invalid combinations such as HNSW-only settings on a FLAT vector field
 
-The repository tests under `tests/RedisVlDotNet.Tests/Schema` cover both accepted and rejected YAML shapes. The fixture `advanced-schema.yaml` is the best reference when you need every supported index-level toggle in one file.
+The repository tests under `tests/RedisVL.Tests/Schema` cover both accepted and rejected YAML shapes. The fixture `advanced-schema.yaml` is the best reference when you need every supported index-level toggle in one file.
 
 == When to prefer YAML
 

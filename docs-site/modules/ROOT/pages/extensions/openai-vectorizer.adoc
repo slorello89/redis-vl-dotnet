@@ -1,6 +1,6 @@
 = OpenAI Vectorizer
 
-`RedisVlDotNet.Vectorizers.OpenAI` provides `OpenAiTextVectorizer`, a batch-capable `IBatchTextVectorizer` backed by the OpenAI embeddings client.
+`RedisVL.Vectorizers.OpenAI` provides `OpenAiTextVectorizer`, a batch-capable `IBatchTextVectorizer` backed by the OpenAI embeddings client.
 
 == Package contents
 
@@ -51,5 +51,5 @@ dotnet run --project examples/OpenAiVectorizerExample/OpenAiVectorizerExample.cs
 
 == Validation references
 
-* `tests/RedisVlDotNet.Tests/Vectorizers/OpenAiTextVectorizerTests.cs` covers constructor and response-shape validation
-* `tests/RedisVlDotNet.Tests/Vectorizers/OpenAiTextVectorizerSmokeTests.cs` is the live-provider smoke test gate
+* `tests/RedisVL.Tests/Vectorizers/OpenAiTextVectorizerTests.cs` covers constructor and response-shape validation
+* `tests/RedisVL.Tests/Vectorizers/OpenAiTextVectorizerSmokeTests.cs` is the live-provider smoke test gate

@@ -1,8 +1,8 @@
-using RedisVl.Caches;
-using RedisVl.Indexes;
-using RedisVl.Schema;
-using RedisVl.Vectorizers;
-using RedisVl.Workflows;
+using RedisVL.Caches;
+using RedisVL.Indexes;
+using RedisVL.Schema;
+using RedisVL.Vectorizers;
+using RedisVL.Workflows;
 using StackExchange.Redis;
 
 var redisUrl = Environment.GetEnvironmentVariable("REDIS_VL_REDIS_URL") ?? "localhost:6379";

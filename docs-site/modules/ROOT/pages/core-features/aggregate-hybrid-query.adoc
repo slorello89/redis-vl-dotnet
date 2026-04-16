@@ -42,7 +42,7 @@ Unlike `HybridQuery`, aggregate paging applies to the aggregation rows through t
 
 == Typed row mapping and batches
 
-Use `AggregateAsync<TDocument>` to map rows into projection types and `AggregateBatchesAsync<TDocument>` to stream multi-page result sets. Both behaviors are covered in `tests/RedisVlDotNet.Tests/Indexes/SearchIndexAsyncTests.cs`.
+Use `AggregateAsync<TDocument>` to map rows into projection types and `AggregateBatchesAsync<TDocument>` to stream multi-page result sets. Both behaviors are covered in `tests/RedisVL.Tests/Indexes/SearchIndexAsyncTests.cs`.
 
 == Related pages
 

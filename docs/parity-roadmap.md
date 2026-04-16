@@ -50,7 +50,7 @@ As of 2026-04-13, the core parity wave is largely implemented and this file shou
 | Built-in rerankers | Yes via extensions | Yes | Yes | Implemented | Shipped as optional extension packages, not in the core assembly. |
 | LangCache-style integrations | No | Yes | Yes | Deferred | Still a useful follow-on integration layer. |
 | Redis topology breadth (Sentinel / cluster helpers) | Yes | Yes | Yes | Implemented | Cluster and Sentinel connection helpers and tests are present. |
-| CLI | Yes | No repo CLI found | Yes | Implemented | Schema and index workflows are available through `RedisVlDotNet.Cli`. |
+| CLI | Yes | No repo CLI found | Yes | Implemented | Schema and index workflows are available through `RedisVL.Cli`. |
 
 ## Intentional .NET-Native Differences
 

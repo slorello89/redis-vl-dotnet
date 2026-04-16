@@ -57,7 +57,7 @@ It demonstrates:
 * routing a new utterance to the nearest stored reference
 * cleaning up the router index and documents
 
-The contract details are also covered in `tests/RedisVlDotNet.Tests/Workflows/SemanticRouterTests.cs` and `tests/RedisVlDotNet.Tests/Workflows/SemanticRouterIntegrationTests.cs`.
+The contract details are also covered in `tests/RedisVL.Tests/Workflows/SemanticRouterTests.cs` and `tests/RedisVL.Tests/Workflows/SemanticRouterIntegrationTests.cs`.
 
 == Related sections
 

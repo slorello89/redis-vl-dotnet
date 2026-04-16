@@ -1,6 +1,6 @@
-using RedisVl.Caches;
-using RedisVl.Schema;
-using RedisVl.Vectorizers.HuggingFace;
+using RedisVL.Caches;
+using RedisVL.Schema;
+using RedisVL.Vectorizers.HuggingFace;
 using StackExchange.Redis;
 
 var apiKey = Environment.GetEnvironmentVariable("HF_TOKEN");

@@ -12,8 +12,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\RedisVlDotNet\RedisVlDotNet.csproj" />
-    <ProjectReference Include="..\..\src\RedisVlDotNet.Vectorizers.HuggingFace\RedisVlDotNet.Vectorizers.HuggingFace.csproj" />
+    <ProjectReference Include="..\..\src\RedisVL\RedisVL.csproj" />
+    <ProjectReference Include="..\..\src\RedisVL.Vectorizers.HuggingFace\RedisVL.Vectorizers.HuggingFace.csproj" />
   </ItemGroup>
 
 </Project>

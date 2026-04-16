@@ -15,8 +15,8 @@ Started: Tue Apr 14 14:01:44 EDT 2026
 
 ## 2026-04-14 14:03:42 EDT - US-001
 - Implemented model-aware `EmbeddingsCache` store and lookup overloads so the cache key incorporates model identity when provided, while preserving the legacy input-only key path for existing callers.
-- Files changed: `src/RedisVlDotNet/Caches/EmbeddingsCache.cs`, `tests/RedisVlDotNet.Tests/Caches/EmbeddingsCacheTests.cs`, `tests/RedisVlDotNet.Tests/Caches/EmbeddingsCacheIntegrationTests.cs`, `prd.json`, `progress.txt`
-- Quality checks run and result: `dotnet test tests/RedisVlDotNet.Tests/RedisVlDotNet.Tests.csproj --filter EmbeddingsCache --nologo` passed with 6 tests passing; 2 Redis Search integration tests were skipped because the integration environment was unavailable.
+- Files changed: `src/RedisVL/Caches/EmbeddingsCache.cs`, `tests/RedisVL.Tests/Caches/EmbeddingsCacheTests.cs`, `tests/RedisVL.Tests/Caches/EmbeddingsCacheIntegrationTests.cs`, `prd.json`, `progress.txt`
+- Quality checks run and result: `dotnet test tests/RedisVL.Tests/RedisVL.Tests.csproj --filter EmbeddingsCache --nologo` passed with 6 tests passing; 2 Redis Search integration tests were skipped because the integration environment was unavailable.
 - Learnings for future iterations:
   - Patterns discovered
   - Preserve legacy cache identity for input-only callers and add Python-parity behavior through explicit model-aware overloads.
@@ -28,8 +28,8 @@ Started: Tue Apr 14 14:01:44 EDT 2026
 
 ## 2026-04-14 14:19:10 EDT - US-002
 - Implemented rich `EmbeddingsCache` entries with persisted `input`, `model_name`, `embedding`, and optional JSON metadata fields, updated lookups to return the new entry model, and added embedding-only compatibility helpers plus an updated example.
-- Files changed: `src/RedisVlDotNet/Caches/EmbeddingsCache.cs`, `src/RedisVlDotNet/Caches/EmbeddingsCacheEntry.cs`, `tests/RedisVlDotNet.Tests/Caches/EmbeddingsCacheTests.cs`, `tests/RedisVlDotNet.Tests/Caches/EmbeddingsCacheIntegrationTests.cs`, `examples/EmbeddingsCacheExample/Program.cs`, `prd.json`, `progress.txt`
-- Quality checks run and result: `dotnet test tests/RedisVlDotNet.Tests/RedisVlDotNet.Tests.csproj --filter EmbeddingsCache --nologo` passed with 7 tests passing and 3 Redis integration tests skipped because the integration environment was unavailable; `dotnet build examples/EmbeddingsCacheExample/EmbeddingsCacheExample.csproj --nologo` passed.
+- Files changed: `src/RedisVL/Caches/EmbeddingsCache.cs`, `src/RedisVL/Caches/EmbeddingsCacheEntry.cs`, `tests/RedisVL.Tests/Caches/EmbeddingsCacheTests.cs`, `tests/RedisVL.Tests/Caches/EmbeddingsCacheIntegrationTests.cs`, `examples/EmbeddingsCacheExample/Program.cs`, `prd.json`, `progress.txt`
+- Quality checks run and result: `dotnet test tests/RedisVL.Tests/RedisVL.Tests.csproj --filter EmbeddingsCache --nologo` passed with 7 tests passing and 3 Redis integration tests skipped because the integration environment was unavailable; `dotnet build examples/EmbeddingsCacheExample/EmbeddingsCacheExample.csproj --nologo` passed.
 - Learnings for future iterations:
   - Patterns discovered
   - `EmbeddingsCache` parity fields are stored as plain Redis hash entries using snake_case names (`input`, `model_name`, `embedding`, `metadata`) and returned through a dedicated result model.
@@ -41,8 +41,8 @@ Started: Tue Apr 14 14:01:44 EDT 2026
 
 ## 2026-04-14 14:10:50 EDT - US-003
 - Implemented Python-parity single-entry cache APIs by adding `Set`/`SetAsync` write methods that return `EmbeddingsCacheEntry` with the Redis key, `Get`/`GetAsync` read aliases, and per-call TTL overrides while keeping legacy `Store`/`Lookup` methods working as compatibility wrappers.
-- Files changed: `src/RedisVlDotNet/Caches/EmbeddingsCache.cs`, `tests/RedisVlDotNet.Tests/Caches/EmbeddingsCacheTests.cs`, `examples/EmbeddingsCacheExample/Program.cs`, `examples/EmbeddingsCacheExample/README.md`, `docs-site/modules/ROOT/pages/core-features/embeddings-cache.adoc`, `prd.json`, `progress.txt`
-- Quality checks run and result: `dotnet test tests/RedisVlDotNet.Tests/RedisVlDotNet.Tests.csproj --filter EmbeddingsCache --nologo` passed with 11 tests passing and 3 Redis integration tests skipped because the integration environment was unavailable; `dotnet build examples/EmbeddingsCacheExample/EmbeddingsCacheExample.csproj --nologo` passed.
+- Files changed: `src/RedisVL/Caches/EmbeddingsCache.cs`, `tests/RedisVL.Tests/Caches/EmbeddingsCacheTests.cs`, `examples/EmbeddingsCacheExample/Program.cs`, `examples/EmbeddingsCacheExample/README.md`, `docs-site/modules/ROOT/pages/core-features/embeddings-cache.adoc`, `prd.json`, `progress.txt`
+- Quality checks run and result: `dotnet test tests/RedisVL.Tests/RedisVL.Tests.csproj --filter EmbeddingsCache --nologo` passed with 11 tests passing and 3 Redis integration tests skipped because the integration environment was unavailable; `dotnet build examples/EmbeddingsCacheExample/EmbeddingsCacheExample.csproj --nologo` passed.
 - Learnings for future iterations:
   - Patterns discovered
   - `EmbeddingsCache` can expose richer Python-style entry APIs non-disruptively by routing new `Set`/`Get` methods through the same hash storage path and leaving `Store`/`Lookup` as thin wrappers.
@@ -54,8 +54,8 @@ Started: Tue Apr 14 14:01:44 EDT 2026
 
 ## 2026-04-14 14:13:19 EDT - US-004
 - Implemented key-based `EmbeddingsCache` reads plus semantic and direct-key existence APIs, reusing the existing hash-backed entry model so callers can retrieve entries either by lookup identity or by Redis key.
-- Files changed: `src/RedisVlDotNet/Caches/EmbeddingsCache.cs`, `tests/RedisVlDotNet.Tests/Caches/EmbeddingsCacheTests.cs`, `tests/RedisVlDotNet.Tests/Caches/EmbeddingsCacheIntegrationTests.cs`, `prd.json`, `progress.txt`
-- Quality checks run and result: `dotnet build examples/EmbeddingsCacheExample/EmbeddingsCacheExample.csproj --nologo` passed with 0 warnings and 0 errors; `dotnet test tests/RedisVlDotNet.Tests/RedisVlDotNet.Tests.csproj --filter EmbeddingsCache --nologo` passed with 17 tests passing and 4 Redis integration tests skipped because the integration environment was unavailable.
+- Files changed: `src/RedisVL/Caches/EmbeddingsCache.cs`, `tests/RedisVL.Tests/Caches/EmbeddingsCacheTests.cs`, `tests/RedisVL.Tests/Caches/EmbeddingsCacheIntegrationTests.cs`, `prd.json`, `progress.txt`
+- Quality checks run and result: `dotnet build examples/EmbeddingsCacheExample/EmbeddingsCacheExample.csproj --nologo` passed with 0 warnings and 0 errors; `dotnet test tests/RedisVL.Tests/RedisVL.Tests.csproj --filter EmbeddingsCache --nologo` passed with 17 tests passing and 4 Redis integration tests skipped because the integration environment was unavailable.
 - Learnings for future iterations:
   - Patterns discovered
   - Direct-key cache reads can share the same hash parsing helper as semantic lookups, with semantic APIs adding a final identity check on the decoded entry.
@@ -67,8 +67,8 @@ Started: Tue Apr 14 14:01:44 EDT 2026
 
 ## 2026-04-14 14:15:24 EDT - US-005
 - Implemented `EmbeddingsCache` delete APIs for semantic lookups and direct Redis keys, keeping the sync/async parity surface aligned with the existing get and exists methods.
-- Files changed: `src/RedisVlDotNet/Caches/EmbeddingsCache.cs`, `tests/RedisVlDotNet.Tests/Caches/EmbeddingsCacheTests.cs`, `tests/RedisVlDotNet.Tests/Caches/EmbeddingsCacheIntegrationTests.cs`, `prd.json`, `progress.txt`
-- Quality checks run and result: `dotnet test tests/RedisVlDotNet.Tests/RedisVlDotNet.Tests.csproj --filter EmbeddingsCache --nologo` passed with 20 tests passing and 5 Redis integration tests skipped because the integration environment was unavailable.
+- Files changed: `src/RedisVL/Caches/EmbeddingsCache.cs`, `tests/RedisVL.Tests/Caches/EmbeddingsCacheTests.cs`, `tests/RedisVL.Tests/Caches/EmbeddingsCacheIntegrationTests.cs`, `prd.json`, `progress.txt`
+- Quality checks run and result: `dotnet test tests/RedisVL.Tests/RedisVL.Tests.csproj --filter EmbeddingsCache --nologo` passed with 20 tests passing and 5 Redis integration tests skipped because the integration environment was unavailable.
 - Learnings for future iterations:
   - Patterns discovered
   - Single-entry cache lifecycle operations fit the existing API better as `bool` wrappers over Redis single-key commands, leaving count-oriented returns for future batch methods.
@@ -80,8 +80,8 @@ Started: Tue Apr 14 14:01:44 EDT 2026
 
 ## 2026-04-14 14:18:52 EDT - US-006
 - Implemented batch `EmbeddingsCache` write, read, existence, and delete APIs for semantic lookups and direct Redis keys, including dedicated batch request models and Python-style `LookupMany` compatibility aliases.
-- Files changed: `src/RedisVlDotNet/Caches/EmbeddingsCache.cs`, `src/RedisVlDotNet/Caches/EmbeddingsCacheLookup.cs`, `src/RedisVlDotNet/Caches/EmbeddingsCacheWriteRequest.cs`, `tests/RedisVlDotNet.Tests/Caches/EmbeddingsCacheTests.cs`, `tests/RedisVlDotNet.Tests/Caches/EmbeddingsCacheIntegrationTests.cs`, `docs-site/modules/ROOT/pages/core-features/embeddings-cache.adoc`, `examples/EmbeddingsCacheExample/README.md`, `prd.json`, `progress.txt`
-- Quality checks run and result: `dotnet test tests/RedisVlDotNet.Tests/RedisVlDotNet.Tests.csproj --filter EmbeddingsCache --nologo` passed with 27 tests passing and 6 Redis integration tests skipped because the integration environment was unavailable; `dotnet build examples/EmbeddingsCacheExample/EmbeddingsCacheExample.csproj --nologo` passed.
+- Files changed: `src/RedisVL/Caches/EmbeddingsCache.cs`, `src/RedisVL/Caches/EmbeddingsCacheLookup.cs`, `src/RedisVL/Caches/EmbeddingsCacheWriteRequest.cs`, `tests/RedisVL.Tests/Caches/EmbeddingsCacheTests.cs`, `tests/RedisVL.Tests/Caches/EmbeddingsCacheIntegrationTests.cs`, `docs-site/modules/ROOT/pages/core-features/embeddings-cache.adoc`, `examples/EmbeddingsCacheExample/README.md`, `prd.json`, `progress.txt`
+- Quality checks run and result: `dotnet test tests/RedisVL.Tests/RedisVL.Tests.csproj --filter EmbeddingsCache --nologo` passed with 27 tests passing and 6 Redis integration tests skipped because the integration environment was unavailable; `dotnet build examples/EmbeddingsCacheExample/EmbeddingsCacheExample.csproj --nologo` passed.
 - Learnings for future iterations:
   - Patterns discovered
   - Batch cache methods in this repo should keep one output slot per requested lookup or key so callers can safely correlate results by index even when some entries miss.
@@ -94,7 +94,7 @@ Started: Tue Apr 14 14:01:44 EDT 2026
 ## 2026-04-14 14:21:03 EDT - US-007
 - Updated the EmbeddingsCache docs to cover model-aware keys, hash-backed rich entry payloads, TTL precedence, lifecycle operations, and a fuller Python-to-.NET parity mapping.
 - Files changed: `docs-site/modules/ROOT/pages/core-features/embeddings-cache.adoc`, `examples/EmbeddingsCacheExample/Program.cs`, `examples/EmbeddingsCacheExample/README.md`, `prd.json`, `progress.txt`
-- Quality checks run and result: `dotnet build examples/EmbeddingsCacheExample/EmbeddingsCacheExample.csproj --nologo` passed with 0 warnings and 0 errors; `dotnet test tests/RedisVlDotNet.Tests/RedisVlDotNet.Tests.csproj --filter EmbeddingsCache --nologo` passed with 27 tests passing and 6 Redis integration tests skipped because the integration environment was unavailable.
+- Quality checks run and result: `dotnet build examples/EmbeddingsCacheExample/EmbeddingsCacheExample.csproj --nologo` passed with 0 warnings and 0 errors; `dotnet test tests/RedisVL.Tests/RedisVL.Tests.csproj --filter EmbeddingsCache --nologo` passed with 27 tests passing and 6 Redis integration tests skipped because the integration environment was unavailable.
 - Learnings for future iterations:
   - Patterns discovered
   - Keep `EmbeddingsCache` parity documentation synchronized across the Antora page and the runnable example assets so API additions are shown both as reference material and executable usage.

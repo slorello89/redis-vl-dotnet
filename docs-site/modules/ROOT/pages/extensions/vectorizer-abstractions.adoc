@@ -1,6 +1,6 @@
 = Vectorizer Abstractions
 
-`RedisVlDotNet.Vectorizers.Abstractions` defines the provider-neutral contracts used by caches and workflow APIs.
+`RedisVL.Vectorizers.Abstractions` defines the provider-neutral contracts used by caches and workflow APIs.
 
 == Core interfaces
 
@@ -20,13 +20,13 @@ Use `TextVectorizerExtensions.VectorizeManyAsync(...)` when higher-level code sh
 
 == Relationship to older APIs
 
-`RedisVl.Caches.ITextEmbeddingGenerator` remains in the core package as an obsolete migration shim over `ITextVectorizer`.
+`RedisVL.Caches.ITextEmbeddingGenerator` remains in the core package as an obsolete migration shim over `ITextVectorizer`.
 
 Prefer new code to depend on `ITextVectorizer` directly so vectorizer packages can plug into `SemanticCache`, `SemanticRouter`, and `SemanticMessageHistory` without adapter code.
 
 == Examples and tests
 
-* xref:extensions/openai-vectorizer.adoc[OpenAI vectorizer] is the batch-capable reference implementation under `src/RedisVlDotNet.Vectorizers.OpenAI`.
-* xref:extensions/huggingface-vectorizer.adoc[Hugging Face vectorizer] is the HTTP-based reference implementation under `src/RedisVlDotNet.Vectorizers.HuggingFace`.
+* xref:extensions/openai-vectorizer.adoc[OpenAI vectorizer] is the batch-capable reference implementation under `src/RedisVL.Vectorizers.OpenAI`.
+* xref:extensions/huggingface-vectorizer.adoc[Hugging Face vectorizer] is the HTTP-based reference implementation under `src/RedisVL.Vectorizers.HuggingFace`.
 * `/examples/OpenAiVectorizerExample` and `/examples/HuggingFaceVectorizerExample` show environment-based provider setup.
-* `tests/RedisVlDotNet.Tests/Vectorizers/TextVectorizerExtensionsTests.cs` captures the batch fallback contract.
+* `tests/RedisVL.Tests/Vectorizers/TextVectorizerExtensionsTests.cs` captures the batch fallback contract.

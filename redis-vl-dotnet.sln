@@ -5,11 +5,11 @@ VisualStudioVersion = 17.0.31903.59
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{827E0CD3-B72D-47B6-A68D-7590B98EB39B}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RedisVlDotNet", "src\RedisVlDotNet\RedisVlDotNet.csproj", "{C0394A8B-ABCD-43BE-947E-AB39DA0502A3}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RedisVL", "src\RedisVL\RedisVL.csproj", "{C0394A8B-ABCD-43BE-947E-AB39DA0502A3}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{59F8C612-13A7-4338-921B-489B69FC708B}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RedisVlDotNet.Tests", "tests\RedisVlDotNet.Tests\RedisVlDotNet.Tests.csproj", "{A0E7D2B8-239A-4348-A99D-7E494478C1DF}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RedisVL.Tests", "tests\RedisVL.Tests\RedisVL.Tests.csproj", "{A0E7D2B8-239A-4348-A99D-7E494478C1DF}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "examples", "examples", "{B36A84DF-456D-A817-6EDD-3EC3E7F6E11F}"
 EndProject
@@ -21,21 +21,21 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SemanticCacheExample", "exa
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenAiVectorizerExample", "examples\OpenAiVectorizerExample\OpenAiVectorizerExample.csproj", "{C9684BEA-FD94-48C9-894C-425C231E7290}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RedisVlDotNet.Vectorizers.Abstractions", "src\RedisVlDotNet.Vectorizers.Abstractions\RedisVlDotNet.Vectorizers.Abstractions.csproj", "{74AAC802-B38D-4B67-ADCB-796521942259}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RedisVL.Vectorizers.Abstractions", "src\RedisVL.Vectorizers.Abstractions\RedisVL.Vectorizers.Abstractions.csproj", "{74AAC802-B38D-4B67-ADCB-796521942259}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RedisVlDotNet.Rerankers.Abstractions", "src\RedisVlDotNet.Rerankers.Abstractions\RedisVlDotNet.Rerankers.Abstractions.csproj", "{0D0FD47A-1B9C-4696-9142-247F64B44B6F}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RedisVL.Rerankers.Abstractions", "src\RedisVL.Rerankers.Abstractions\RedisVL.Rerankers.Abstractions.csproj", "{0D0FD47A-1B9C-4696-9142-247F64B44B6F}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RedisVlDotNet.Vectorizers.OpenAI", "src\RedisVlDotNet.Vectorizers.OpenAI\RedisVlDotNet.Vectorizers.OpenAI.csproj", "{BA982FE6-5CFB-4DE4-9DF6-DD7B080A797A}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RedisVL.Vectorizers.OpenAI", "src\RedisVL.Vectorizers.OpenAI\RedisVL.Vectorizers.OpenAI.csproj", "{BA982FE6-5CFB-4DE4-9DF6-DD7B080A797A}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RedisVlDotNet.Vectorizers.HuggingFace", "src\RedisVlDotNet.Vectorizers.HuggingFace\RedisVlDotNet.Vectorizers.HuggingFace.csproj", "{C3BEFA97-2E29-470C-91BE-74777CBB111E}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RedisVL.Vectorizers.HuggingFace", "src\RedisVL.Vectorizers.HuggingFace\RedisVL.Vectorizers.HuggingFace.csproj", "{C3BEFA97-2E29-470C-91BE-74777CBB111E}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RedisVlDotNet.Rerankers.Cohere", "src\RedisVlDotNet.Rerankers.Cohere\RedisVlDotNet.Rerankers.Cohere.csproj", "{C2B41A85-BEA7-4B4B-ABEA-989BF522C8F1}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RedisVL.Rerankers.Cohere", "src\RedisVL.Rerankers.Cohere\RedisVL.Rerankers.Cohere.csproj", "{C2B41A85-BEA7-4B4B-ABEA-989BF522C8F1}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HuggingFaceVectorizerExample", "examples\HuggingFaceVectorizerExample\HuggingFaceVectorizerExample.csproj", "{141F71A7-4AF1-4A3F-9E05-46D2861B958D}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CohereRerankerExample", "examples\CohereRerankerExample\CohereRerankerExample.csproj", "{CA1AC120-FCAF-4288-B2FF-0D3E8879E668}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RedisVlDotNet.Cli", "src\RedisVlDotNet.Cli\RedisVlDotNet.Cli.csproj", "{F0D4BB0F-6CCE-49D5-8905-8535586F91A7}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RedisVL.Cli", "src\RedisVL.Cli\RedisVL.Cli.csproj", "{F0D4BB0F-6CCE-49D5-8905-8535586F91A7}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EmbeddingsCacheExample", "examples\EmbeddingsCacheExample\EmbeddingsCacheExample.csproj", "{66F4469D-4CBE-47CD-8C57-020B14F3794C}"
 EndProject

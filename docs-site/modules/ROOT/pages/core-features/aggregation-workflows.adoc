@@ -70,9 +70,9 @@ Use `AggregateBatchesAsync` and `AggregateBatchesAsync<TDocument>` to stream mul
 Use these sources together when documenting or validating behavior:
 
 * `/examples/JsonStorageExample` for end-to-end grouping and typed aggregate mapping
-* `tests/RedisVlDotNet.Tests/Indexes/SearchQueryCommandBuilderTests.cs` for query-shape and alias normalization
-* `tests/RedisVlDotNet.Tests/Indexes/SearchIndexAsyncTests.cs` for aggregate execution and batching
-* `tests/RedisVlDotNet.Tests/Queries/SearchResultMappingTests.cs` for typed row mapping failures and successes
+* `tests/RedisVL.Tests/Indexes/SearchQueryCommandBuilderTests.cs` for query-shape and alias normalization
+* `tests/RedisVL.Tests/Indexes/SearchIndexAsyncTests.cs` for aggregate execution and batching
+* `tests/RedisVL.Tests/Queries/SearchResultMappingTests.cs` for typed row mapping failures and successes
 
 == Related pages
 

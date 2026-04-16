@@ -1,6 +1,6 @@
-using RedisVl.Caches;
-using RedisVl.Schema;
-using RedisVl.Vectorizers.OpenAI;
+using RedisVL.Caches;
+using RedisVL.Schema;
+using RedisVL.Vectorizers.OpenAI;
 using StackExchange.Redis;
 
 var apiKey = Environment.GetEnvironmentVariable("OPENAI_API_KEY");

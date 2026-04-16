@@ -21,9 +21,9 @@ Use this landing page when you need the fastest path into the repository:
 
 The current workspace is organized around a few primary entry points:
 
-* `src/RedisVlDotNet` contains the core library surface for schema definitions, index operations, queries, caches, and workflow APIs
-* `src/RedisVlDotNet.Cli` contains the command-line app for index and schema lifecycle commands
-* `src/RedisVlDotNet.Vectorizers.*` and `src/RedisVlDotNet.Rerankers.*` contain optional provider abstractions and implementations
+* `src/RedisVL` contains the core library surface for schema definitions, index operations, queries, caches, and workflow APIs
+* `src/RedisVL.Cli` contains the command-line app for index and schema lifecycle commands
+* `src/RedisVL.Vectorizers.*` and `src/RedisVL.Rerankers.*` contain optional provider abstractions and implementations
 * `examples/` contains runnable sample projects for JSON, vector, semantic workflow, and provider-backed scenarios
 * `docs/parity-roadmap.md` tracks cross-language parity scope, intentional .NET differences, and the current roadmap contract
 

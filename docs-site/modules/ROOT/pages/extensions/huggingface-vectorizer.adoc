@@ -1,6 +1,6 @@
 = Hugging Face Vectorizer
 
-`RedisVlDotNet.Vectorizers.HuggingFace` provides `HuggingFaceTextVectorizer`, a batch-capable `IBatchTextVectorizer` backed by the Hugging Face `hf-inference` feature-extraction API.
+`RedisVL.Vectorizers.HuggingFace` provides `HuggingFaceTextVectorizer`, a batch-capable `IBatchTextVectorizer` backed by the Hugging Face `hf-inference` feature-extraction API.
 
 == Package contents
 
@@ -49,5 +49,5 @@ dotnet run --project examples/HuggingFaceVectorizerExample/HuggingFaceVectorizer
 
 == Validation references
 
-* `tests/RedisVlDotNet.Tests/Vectorizers/HuggingFaceTextVectorizerTests.cs` covers request construction and response parsing
-* `tests/RedisVlDotNet.Tests/Vectorizers/HuggingFaceTextVectorizerSmokeTests.cs` is the live-provider smoke test gate
+* `tests/RedisVL.Tests/Vectorizers/HuggingFaceTextVectorizerTests.cs` covers request construction and response parsing
+* `tests/RedisVL.Tests/Vectorizers/HuggingFaceTextVectorizerSmokeTests.cs` is the live-provider smoke test gate

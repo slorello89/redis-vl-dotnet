@@ -17,7 +17,7 @@ var nearbyResults = await index.SearchAsync(
         runtimeOptions: new VectorRangeRuntimeOptions(epsilon: 0.01)));
 ----
 
-This behavior is covered directly in `tests/RedisVlDotNet.Tests/Indexes/SearchQueryCommandBuilderTests.cs` and in the semantic cache/message history workflows that use vector range matching internally.
+This behavior is covered directly in `tests/RedisVL.Tests/Indexes/SearchQueryCommandBuilderTests.cs` and in the semantic cache/message history workflows that use vector range matching internally.
 
 == Behavior
 

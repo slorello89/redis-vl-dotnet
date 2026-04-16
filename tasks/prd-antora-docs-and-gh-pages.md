@@ -179,7 +179,7 @@ The goal is documentation and documentation infrastructure. This PRD does not ch
 - Provider-backed examples must consume credentials from environment variables and should document expected behavior when variables are unset.
 - Example coverage should align with current project structure to avoid creating redundant samples that drift from real code.
 - Docs validation should fit alongside the current .NET build and test workflows without requiring maintainers to manage a second opaque pipeline.
-- The namespace rename from `RedisVlDotNet` to `RedisVl` in public code should be reflected consistently in all user-facing code snippets while project-path references remain accurate.
+- The namespace rename from `RedisVL` to `RedisVL` in public code should be reflected consistently in all user-facing code snippets while project-path references remain accurate.
 
 ## Success Metrics
 

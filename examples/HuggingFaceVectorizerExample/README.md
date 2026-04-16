@@ -1,6 +1,6 @@
 # Hugging Face Vectorizer Example
 
-This example uses `RedisVl.Vectorizers.HuggingFace` to generate embeddings through the Hugging Face `hf-inference` feature-extraction API and then queries a `SemanticCache` with the resulting vectors.
+This example uses `RedisVL.Vectorizers.HuggingFace` to generate embeddings through the Hugging Face `hf-inference` feature-extraction API and then queries a `SemanticCache` with the resulting vectors.
 
 ## Prerequisites
 

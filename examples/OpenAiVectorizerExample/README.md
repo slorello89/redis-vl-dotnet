@@ -1,6 +1,6 @@
 # OpenAiVectorizerExample
 
-This example demonstrates using `RedisVl.Vectorizers.OpenAI` with `SemanticCache`.
+This example demonstrates using `RedisVL.Vectorizers.OpenAI` with `SemanticCache`.
 
 It:
 

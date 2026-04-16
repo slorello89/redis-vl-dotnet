@@ -143,7 +143,7 @@ It demonstrates:
 * reading mixed-hit batches while preserving request order
 * overwriting an existing embedding entry and applying a per-call TTL override
 
-The exact behavior is also covered in `tests/RedisVlDotNet.Tests/Caches/EmbeddingsCacheTests.cs` and `tests/RedisVlDotNet.Tests/Caches/EmbeddingsCacheIntegrationTests.cs`.
+The exact behavior is also covered in `tests/RedisVL.Tests/Caches/EmbeddingsCacheTests.cs` and `tests/RedisVL.Tests/Caches/EmbeddingsCacheIntegrationTests.cs`.
 
 == Related sections
 

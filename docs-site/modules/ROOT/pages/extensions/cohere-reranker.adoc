@@ -1,6 +1,6 @@
 = Cohere Reranker
 
-`RedisVlDotNet.Rerankers.Cohere` provides `CohereTextReranker`, an `ITextReranker` implementation backed by Cohere's rerank API.
+`RedisVL.Rerankers.Cohere` provides `CohereTextReranker`, an `ITextReranker` implementation backed by Cohere's rerank API.
 
 == Package contents
 
@@ -48,5 +48,5 @@ dotnet run --project examples/CohereRerankerExample/CohereRerankerExample.csproj
 
 == Validation references
 
-* `tests/RedisVlDotNet.Tests/Rerankers/CohereTextRerankerTests.cs` covers request construction and response validation
-* `tests/RedisVlDotNet.Tests/Rerankers/CohereTextRerankerSmokeTests.cs` is the live-provider smoke test gate
+* `tests/RedisVL.Tests/Rerankers/CohereTextRerankerTests.cs` covers request construction and response validation
+* `tests/RedisVL.Tests/Rerankers/CohereTextRerankerSmokeTests.cs` is the live-provider smoke test gate

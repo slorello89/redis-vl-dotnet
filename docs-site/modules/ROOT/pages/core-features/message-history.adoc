@@ -43,7 +43,7 @@ This API does not do semantic retrieval. Use xref:core-features/semantic-message
 
 Use `/examples/MessageHistoryExample` for the runnable history workflow in this repo.
 
-That sample uses `SemanticMessageHistory`, but it demonstrates the same recency retrieval pattern through `GetRecentAsync` and the same session-oriented append model. For the exact non-vector API contract, use `tests/RedisVlDotNet.Tests/Workflows/MessageHistoryTests.cs` and `tests/RedisVlDotNet.Tests/Workflows/MessageHistoryIntegrationTests.cs`.
+That sample uses `SemanticMessageHistory`, but it demonstrates the same recency retrieval pattern through `GetRecentAsync` and the same session-oriented append model. For the exact non-vector API contract, use `tests/RedisVL.Tests/Workflows/MessageHistoryTests.cs` and `tests/RedisVL.Tests/Workflows/MessageHistoryIntegrationTests.cs`.
 
 == Related sections
 

@@ -269,7 +269,7 @@ Every missing feature in scope must include:
 ## Non-Goals
 
 - No commitment to implement every provider available in Java or Python in the first parity wave.
-- No requirement to place provider SDK dependencies into the core `RedisVlDotNet` package.
+- No requirement to place provider SDK dependencies into the core `RedisVL` package.
 - No requirement to reproduce Python or Java APIs verbatim when a more idiomatic .NET shape is better.
 - No requirement to add UI or browser-based tooling.
 - No requirement to guarantee identical performance characteristics across all languages.

@@ -6,11 +6,11 @@ This section holds repository-oriented reference pointers until the API and beha
 
 Use these locations when navigating the codebase:
 
-* `src/RedisVlDotNet` for the core library
-* `src/RedisVlDotNet.Cli` for the command-line app
-* `src/RedisVlDotNet.Vectorizers.*` for vectorizer abstractions and providers
-* `src/RedisVlDotNet.Rerankers.*` for reranker abstractions and providers
-* `tests/RedisVlDotNet.Tests` for unit and integration coverage
+* `src/RedisVL` for the core library
+* `src/RedisVL.Cli` for the command-line app
+* `src/RedisVL.Vectorizers.*` for vectorizer abstractions and providers
+* `src/RedisVL.Rerankers.*` for reranker abstractions and providers
+* `tests/RedisVL.Tests` for unit and integration coverage
 * `examples/` for runnable samples
 * `docs-site/` for the canonical Antora docs source
 

@@ -69,7 +69,7 @@ Examples that use JSON storage also require RedisJSON. Provider-backed examples 
 
 | CLI workflows
 | xref:../cli/index.adoc[CLI]
-| `dotnet run --project src/RedisVlDotNet.Cli -- ...`
+| `dotnet run --project src/RedisVL.Cli -- ...`
 | Index commands require RediSearch plus `--redis` or `REDIS_VL_REDIS_URL`. JSON-backed index creation also requires RedisJSON. Schema commands run locally without Redis.
 |===
 

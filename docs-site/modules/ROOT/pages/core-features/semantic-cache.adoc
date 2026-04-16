@@ -39,7 +39,7 @@ Important constraints:
 * filterable fields cannot use aliases
 * query filters and stored filter values are only allowed when `FilterableFields` are configured
 
-The cache supports both raw embeddings and `ITextVectorizer` overloads. Prefer `RedisVl.Vectorizers.ITextVectorizer`; the legacy `RedisVl.Caches.ITextEmbeddingGenerator` interface remains only as an obsolete compatibility shim.
+The cache supports both raw embeddings and `ITextVectorizer` overloads. Prefer `RedisVL.Vectorizers.ITextVectorizer`; the legacy `RedisVL.Caches.ITextEmbeddingGenerator` interface remains only as an obsolete compatibility shim.
 
 == Store and check behavior
 
@@ -80,7 +80,7 @@ Provider-backed vectorizer examples also use this API:
 * `/examples/OpenAiVectorizerExample`
 * `/examples/HuggingFaceVectorizerExample`
 
-The detailed edge cases live in `tests/RedisVlDotNet.Tests/Caches/SemanticCacheTests.cs` and `tests/RedisVlDotNet.Tests/Caches/SemanticCacheIntegrationTests.cs`.
+The detailed edge cases live in `tests/RedisVL.Tests/Caches/SemanticCacheTests.cs` and `tests/RedisVL.Tests/Caches/SemanticCacheIntegrationTests.cs`.
 
 == Related sections
 

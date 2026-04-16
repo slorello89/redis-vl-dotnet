@@ -36,13 +36,13 @@ Primary .NET sources reviewed:
 
 - `prd.json`
 - `docs/v1-architecture.md`
-- `src/RedisVlDotNet/Indexes/SearchIndex.cs`
-- `src/RedisVlDotNet/Indexes/SearchQueryCommandBuilder.cs`
-- `src/RedisVlDotNet/Schema/SearchSchema.cs`
-- `src/RedisVlDotNet/Caches/EmbeddingsCache.cs`
-- `src/RedisVlDotNet/Caches/SemanticCache.cs`
-- `src/RedisVlDotNet/Workflows/SemanticRouter.cs`
-- `tests/RedisVlDotNet.Tests/**/*`
+- `src/RedisVL/Indexes/SearchIndex.cs`
+- `src/RedisVL/Indexes/SearchQueryCommandBuilder.cs`
+- `src/RedisVL/Schema/SearchSchema.cs`
+- `src/RedisVL/Caches/EmbeddingsCache.cs`
+- `src/RedisVL/Caches/SemanticCache.cs`
+- `src/RedisVL/Workflows/SemanticRouter.cs`
+- `tests/RedisVL.Tests/**/*`
 
 Primary Python sources reviewed:
 

@@ -41,7 +41,7 @@ Projection behavior differs slightly from `VectorQuery`:
 * the combined `scoreAlias` is appended automatically
 * final ordering is deterministic across equal combined scores
 
-That deterministic merge behavior is covered in `tests/RedisVlDotNet.Tests/Indexes/SearchIndexAsyncTests.cs`.
+That deterministic merge behavior is covered in `tests/RedisVL.Tests/Indexes/SearchIndexAsyncTests.cs`.
 
 == Batch helpers
 

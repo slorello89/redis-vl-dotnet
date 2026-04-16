@@ -8,22 +8,22 @@ Build the CLI project from the repository root:
 
 [source,bash]
 ----
-dotnet build src/RedisVlDotNet.Cli/RedisVlDotNet.Cli.csproj
+dotnet build src/RedisVL.Cli/RedisVL.Cli.csproj
 ----
 
 Run commands directly from source during local development:
 
 [source,bash]
 ----
-dotnet run --project src/RedisVlDotNet.Cli -- --help
+dotnet run --project src/RedisVL.Cli -- --help
 ----
 
-If you want a reusable local executable, publish the CLI into a local folder and invoke the generated `RedisVlDotNet.Cli.dll` with `dotnet`:
+If you want a reusable local executable, publish the CLI into a local folder and invoke the generated `RedisVL.Cli.dll` with `dotnet`:
 
 [source,bash]
 ----
-dotnet publish src/RedisVlDotNet.Cli/RedisVlDotNet.Cli.csproj -c Release -o .artifacts/redisvl-cli
-dotnet .artifacts/redisvl-cli/RedisVlDotNet.Cli.dll --help
+dotnet publish src/RedisVL.Cli/RedisVL.Cli.csproj -c Release -o .artifacts/redisvl-cli
+dotnet .artifacts/redisvl-cli/RedisVL.Cli.dll --help
 ----
 
 == Discover commands
@@ -37,15 +37,15 @@ Show the top-level command tree:
 
 [source,bash]
 ----
-dotnet run --project src/RedisVlDotNet.Cli -- --help
+dotnet run --project src/RedisVL.Cli -- --help
 ----
 
 Inspect a command group before running it:
 
 [source,bash]
 ----
-dotnet run --project src/RedisVlDotNet.Cli -- index --help
-dotnet run --project src/RedisVlDotNet.Cli -- schema --help
+dotnet run --project src/RedisVL.Cli -- index --help
+dotnet run --project src/RedisVL.Cli -- schema --help
 ----
 
 == Connection arguments
@@ -54,7 +54,7 @@ All `index` commands need a Redis connection string. Pass it explicitly with `--
 
 [source,bash]
 ----
-dotnet run --project src/RedisVlDotNet.Cli -- index list --redis localhost:6379
+dotnet run --project src/RedisVL.Cli -- index list --redis localhost:6379
 ----
 
 Or set `REDIS_VL_REDIS_URL` once for the shell session and let the CLI reuse it:
@@ -62,7 +62,7 @@ Or set `REDIS_VL_REDIS_URL` once for the shell session and let the CLI reuse it:
 [source,bash]
 ----
 export REDIS_VL_REDIS_URL=localhost:6379
-dotnet run --project src/RedisVlDotNet.Cli -- index list
+dotnet run --project src/RedisVL.Cli -- index list
 ----
 
 When neither `--redis` nor `REDIS_VL_REDIS_URL` is set, the CLI exits with an error before connecting.
@@ -73,7 +73,7 @@ Validate a YAML schema file before using it to create an index:
 
 [source,bash]
 ----
-dotnet run --project src/RedisVlDotNet.Cli -- schema validate \
+dotnet run --project src/RedisVL.Cli -- schema validate \
   --file examples/JsonStorageExample/schema.yaml
 ----
 
@@ -81,7 +81,7 @@ Show the parsed schema as JSON when you want to inspect the normalized index and
 
 [source,bash]
 ----
-dotnet run --project src/RedisVlDotNet.Cli -- schema show \
+dotnet run --project src/RedisVL.Cli -- schema show \
   --file examples/JsonStorageExample/schema.yaml
 ----
 
@@ -93,14 +93,14 @@ List the current RediSearch indexes:
 
 [source,bash]
 ----
-dotnet run --project src/RedisVlDotNet.Cli -- index list --redis localhost:6379
+dotnet run --project src/RedisVL.Cli -- index list --redis localhost:6379
 ----
 
 Inspect one index and print the discovered schema plus scalar `FT.INFO` attributes as JSON:
 
 [source,bash]
 ----
-dotnet run --project src/RedisVlDotNet.Cli -- index info \
+dotnet run --project src/RedisVL.Cli -- index info \
   --redis localhost:6379 \
   --name movies-cli-idx
 ----
@@ -109,7 +109,7 @@ Create an index from a YAML schema file:
 
 [source,bash]
 ----
-dotnet run --project src/RedisVlDotNet.Cli -- index create \
+dotnet run --project src/RedisVL.Cli -- index create \
   --redis localhost:6379 \
   --schema examples/JsonStorageExample/schema.yaml
 ----
@@ -118,7 +118,7 @@ Create an index inline when you want a quick HASH- or JSON-backed shape without 
 
 [source,bash]
 ----
-dotnet run --project src/RedisVlDotNet.Cli -- index create \
+dotnet run --project src/RedisVL.Cli -- index create \
   --redis localhost:6379 \
   --name movies-cli-idx \
   --prefix movie: \
@@ -140,7 +140,7 @@ Clear documents from an index while keeping the index definition:
 
 [source,bash]
 ----
-dotnet run --project src/RedisVlDotNet.Cli -- index clear \
+dotnet run --project src/RedisVL.Cli -- index clear \
   --redis localhost:6379 \
   --name movies-cli-idx \
   --batch-size 500
@@ -150,7 +150,7 @@ Delete an index definition:
 
 [source,bash]
 ----
-dotnet run --project src/RedisVlDotNet.Cli -- index delete \
+dotnet run --project src/RedisVL.Cli -- index delete \
   --redis localhost:6379 \
   --name movies-cli-idx
 ----
@@ -159,7 +159,7 @@ Delete the index and the indexed documents in one step:
 
 [source,bash]
 ----
-dotnet run --project src/RedisVlDotNet.Cli -- index delete \
+dotnet run --project src/RedisVL.Cli -- index delete \
   --redis localhost:6379 \
   --name movies-cli-idx \
   --drop-documents
