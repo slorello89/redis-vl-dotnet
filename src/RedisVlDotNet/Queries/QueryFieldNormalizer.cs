@@ -1,6 +1,6 @@
-using RedisVlDotNet.Filters;
+using RedisVl.Filters;
 
-namespace RedisVlDotNet.Queries;
+namespace RedisVl.Queries;
 
 internal static class QueryFieldNormalizer
 {

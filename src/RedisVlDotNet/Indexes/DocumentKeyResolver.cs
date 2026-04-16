@@ -1,7 +1,7 @@
 using System.Reflection;
-using RedisVlDotNet.Schema;
+using RedisVl.Schema;
 
-namespace RedisVlDotNet.Indexes;
+namespace RedisVl.Indexes;
 
 internal static class DocumentKeyResolver
 {

@@ -1,8 +1,8 @@
-using RedisVlDotNet.Indexes;
+using RedisVl.Indexes;
 using System.Globalization;
 using StackExchange.Redis;
 
-namespace RedisVlDotNet.Tests.Indexes;
+namespace RedisVl.Tests.Indexes;
 
 internal static class RedisSearchTestEnvironment
 {

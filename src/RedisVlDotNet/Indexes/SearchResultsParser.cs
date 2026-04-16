@@ -1,7 +1,7 @@
-using RedisVlDotNet.Queries;
+using RedisVl.Queries;
 using StackExchange.Redis;
 
-namespace RedisVlDotNet.Indexes;
+namespace RedisVl.Indexes;
 
 internal static class SearchResultsParser
 {

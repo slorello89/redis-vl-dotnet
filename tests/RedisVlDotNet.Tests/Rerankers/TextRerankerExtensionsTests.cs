@@ -1,6 +1,6 @@
-using RedisVlDotNet.Rerankers;
+using RedisVl.Rerankers;
 
-namespace RedisVlDotNet.Tests.Rerankers;
+namespace RedisVl.Tests.Rerankers;
 
 public sealed class TextRerankerExtensionsTests
 {

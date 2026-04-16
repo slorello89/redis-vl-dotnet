@@ -1,8 +1,8 @@
-using RedisVlDotNet.Cli;
-using RedisVlDotNet.Indexes;
-using RedisVlDotNet.Tests.Indexes;
+using RedisVl.Cli;
+using RedisVl.Indexes;
+using RedisVl.Tests.Indexes;
 
-namespace RedisVlDotNet.Tests.Cli;
+namespace RedisVl.Tests.Cli;
 
 public sealed class RedisVlCliIntegrationTests
 {

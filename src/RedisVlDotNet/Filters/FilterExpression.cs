@@ -1,7 +1,7 @@
 using System.Globalization;
 using System.Text;
 
-namespace RedisVlDotNet.Filters;
+namespace RedisVl.Filters;
 
 public abstract class FilterExpression
 {

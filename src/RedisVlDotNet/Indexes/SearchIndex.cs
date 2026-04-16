@@ -1,11 +1,11 @@
-using RedisVlDotNet.Schema;
-using RedisVlDotNet.Queries;
+using RedisVl.Schema;
+using RedisVl.Queries;
 using StackExchange.Redis;
 using System.Globalization;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
 
-namespace RedisVlDotNet.Indexes;
+namespace RedisVl.Indexes;
 
 public sealed class SearchIndex
 {

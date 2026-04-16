@@ -1,10 +1,10 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Text;
-using RedisVlDotNet.Rerankers;
-using RedisVlDotNet.Rerankers.Cohere;
+using RedisVl.Rerankers;
+using RedisVl.Rerankers.Cohere;
 
-namespace RedisVlDotNet.Tests.Rerankers;
+namespace RedisVl.Tests.Rerankers;
 
 public sealed class CohereTextRerankerTests
 {

@@ -1,6 +1,6 @@
-using RedisVlDotNet.Vectorizers.HuggingFace;
+using RedisVl.Vectorizers.HuggingFace;
 
-namespace RedisVlDotNet.Tests.Vectorizers;
+namespace RedisVl.Tests.Vectorizers;
 
 public sealed class HuggingFaceTextVectorizerSmokeTests
 {

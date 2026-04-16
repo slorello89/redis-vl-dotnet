@@ -1,4 +1,4 @@
-namespace RedisVlDotNet.Schema;
+namespace RedisVl.Schema;
 
 public enum VectorDataType
 {

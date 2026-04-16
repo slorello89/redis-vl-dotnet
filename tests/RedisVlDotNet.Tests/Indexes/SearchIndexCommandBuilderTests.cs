@@ -1,8 +1,8 @@
-using RedisVlDotNet.Indexes;
-using RedisVlDotNet.Schema;
+using RedisVl.Indexes;
+using RedisVl.Schema;
 using StackExchange.Redis;
 
-namespace RedisVlDotNet.Tests.Indexes;
+namespace RedisVl.Tests.Indexes;
 
 public sealed class SearchIndexCommandBuilderTests
 {

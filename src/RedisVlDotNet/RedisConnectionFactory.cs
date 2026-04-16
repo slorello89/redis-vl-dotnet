@@ -1,6 +1,6 @@
 using StackExchange.Redis;
 
-namespace RedisVlDotNet;
+namespace RedisVl;
 
 public static class RedisConnectionFactory
 {

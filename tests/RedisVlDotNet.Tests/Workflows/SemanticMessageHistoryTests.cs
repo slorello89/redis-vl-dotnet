@@ -1,13 +1,13 @@
 using System.Reflection;
 using System.Security.Cryptography;
 using System.Text;
-using RedisVlDotNet.Caches;
-using RedisVlDotNet.Schema;
-using RedisVlDotNet.Vectorizers;
-using RedisVlDotNet.Workflows;
+using RedisVl.Caches;
+using RedisVl.Schema;
+using RedisVl.Vectorizers;
+using RedisVl.Workflows;
 using StackExchange.Redis;
 
-namespace RedisVlDotNet.Tests.Workflows;
+namespace RedisVl.Tests.Workflows;
 
 public sealed class SemanticMessageHistoryTests
 {

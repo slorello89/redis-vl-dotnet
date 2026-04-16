@@ -1,10 +1,10 @@
 using System.Collections.ObjectModel;
 using System.Globalization;
-using RedisVlDotNet.Indexes;
-using RedisVlDotNet.Schema;
+using RedisVl.Indexes;
+using RedisVl.Schema;
 using StackExchange.Redis;
 
-namespace RedisVlDotNet.Cli;
+namespace RedisVl.Cli;
 
 public sealed class RedisVlCliService : IRedisVlCliService
 {

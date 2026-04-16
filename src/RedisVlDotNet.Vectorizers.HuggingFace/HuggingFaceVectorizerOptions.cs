@@ -1,4 +1,4 @@
-namespace RedisVlDotNet.Vectorizers.HuggingFace;
+namespace RedisVl.Vectorizers.HuggingFace;
 
 public sealed class HuggingFaceVectorizerOptions
 {

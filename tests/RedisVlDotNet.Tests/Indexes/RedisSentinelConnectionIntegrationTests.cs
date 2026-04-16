@@ -1,8 +1,8 @@
-using RedisVlDotNet.Indexes;
-using RedisVlDotNet.Queries;
-using RedisVlDotNet.Schema;
+using RedisVl.Indexes;
+using RedisVl.Queries;
+using RedisVl.Schema;
 
-namespace RedisVlDotNet.Tests.Indexes;
+namespace RedisVl.Tests.Indexes;
 
 public sealed class RedisSentinelConnectionIntegrationTests
 {

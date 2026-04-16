@@ -1,4 +1,4 @@
-namespace RedisVlDotNet.Tests.Indexes;
+namespace RedisVl.Tests.Indexes;
 
 internal sealed class RedisSentinelIntegrationFactAttribute : FactAttribute
 {

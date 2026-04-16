@@ -1,4 +1,4 @@
-namespace RedisVlDotNet.Queries;
+namespace RedisVl.Queries;
 
 public sealed class AggregationApply
 {

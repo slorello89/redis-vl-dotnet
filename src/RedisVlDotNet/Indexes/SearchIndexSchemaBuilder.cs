@@ -1,9 +1,9 @@
 using System.Collections.ObjectModel;
 using System.Globalization;
-using RedisVlDotNet.Schema;
+using RedisVl.Schema;
 using StackExchange.Redis;
 
-namespace RedisVlDotNet.Indexes;
+namespace RedisVl.Indexes;
 
 internal static class SearchIndexSchemaBuilder
 {

@@ -1,8 +1,8 @@
 using System.Globalization;
-using RedisVlDotNet.Queries;
-using RedisVlDotNet.Schema;
+using RedisVl.Queries;
+using RedisVl.Schema;
 
-namespace RedisVlDotNet.Indexes;
+namespace RedisVl.Indexes;
 
 internal static class SearchQueryCommandBuilder
 {

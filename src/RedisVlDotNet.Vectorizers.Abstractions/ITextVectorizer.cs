@@ -1,4 +1,4 @@
-namespace RedisVlDotNet.Vectorizers;
+namespace RedisVl.Vectorizers;
 
 public interface ITextVectorizer
 {

@@ -2,12 +2,12 @@ using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
-using RedisVlDotNet.Filters;
-using RedisVlDotNet.Indexes;
-using RedisVlDotNet.Schema;
+using RedisVl.Filters;
+using RedisVl.Indexes;
+using RedisVl.Schema;
 using StackExchange.Redis;
 
-namespace RedisVlDotNet.Workflows;
+namespace RedisVl.Workflows;
 
 public sealed class MessageHistory
 {

@@ -1,4 +1,4 @@
-namespace RedisVlDotNet.Vectorizers.OpenAI;
+namespace RedisVl.Vectorizers.OpenAI;
 
 public sealed class OpenAiVectorizerOptions
 {

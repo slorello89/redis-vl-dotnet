@@ -1,7 +1,7 @@
 using System.Collections.ObjectModel;
-using RedisVlDotNet.Schema;
+using RedisVl.Schema;
 
-namespace RedisVlDotNet.Caches;
+namespace RedisVl.Caches;
 
 public sealed class SemanticCacheOptions
 {

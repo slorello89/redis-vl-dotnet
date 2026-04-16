@@ -1,6 +1,6 @@
-using RedisVlDotNet.Filters;
+using RedisVl.Filters;
 
-namespace RedisVlDotNet.Tests.Filters;
+namespace RedisVl.Tests.Filters;
 
 public sealed class FilterExpressionTests
 {

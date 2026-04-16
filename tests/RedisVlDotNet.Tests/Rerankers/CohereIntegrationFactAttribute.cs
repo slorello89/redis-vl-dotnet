@@ -1,4 +1,4 @@
-namespace RedisVlDotNet.Tests.Rerankers;
+namespace RedisVl.Tests.Rerankers;
 
 [AttributeUsage(AttributeTargets.Method)]
 internal sealed class CohereIntegrationFactAttribute : FactAttribute

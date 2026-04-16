@@ -1,10 +1,10 @@
-using RedisVlDotNet.Indexes;
-using RedisVlDotNet.Filters;
-using RedisVlDotNet.Queries;
-using RedisVlDotNet.Schema;
+using RedisVl.Indexes;
+using RedisVl.Filters;
+using RedisVl.Queries;
+using RedisVl.Schema;
 using StackExchange.Redis;
 
-namespace RedisVlDotNet.Tests.Indexes;
+namespace RedisVl.Tests.Indexes;
 
 public sealed class SearchIndexIntegrationTests
 {
@@ -728,7 +728,7 @@ public sealed class SearchIndexIntegrationTests
                 ["title"],
                 limit: 10));
             var geoResults = await index.SearchAsync(new FilterQuery(
-                Filter.Geo("location").WithinRadius(-118.2437, 34.0522, 50, RedisVlDotNet.Filters.GeoUnit.Miles),
+                Filter.Geo("location").WithinRadius(-118.2437, 34.0522, 50, RedisVl.Filters.GeoUnit.Miles),
                 ["title"],
                 limit: 10));
             var crimeCount = await index.CountAsync(new CountQuery(Filter.Tag("genre").Eq("crime")));

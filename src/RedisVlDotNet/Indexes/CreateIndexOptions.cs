@@ -1,4 +1,4 @@
-namespace RedisVlDotNet.Indexes;
+namespace RedisVl.Indexes;
 
 public sealed record CreateIndexOptions
 {

@@ -1,10 +1,10 @@
-using RedisVlDotNet.Filters;
-using RedisVlDotNet.Indexes;
-using RedisVlDotNet.Queries;
-using RedisVlDotNet.Schema;
+using RedisVl.Filters;
+using RedisVl.Indexes;
+using RedisVl.Queries;
+using RedisVl.Schema;
 using StackExchange.Redis;
 
-namespace RedisVlDotNet.Tests.Indexes;
+namespace RedisVl.Tests.Indexes;
 
 public sealed class SearchQueryCommandBuilderTests
 {
