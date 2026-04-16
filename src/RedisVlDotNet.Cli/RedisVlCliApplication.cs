@@ -1,8 +1,8 @@
 using System.Globalization;
 using System.Text.Json;
-using RedisVlDotNet.Schema;
+using RedisVl.Schema;
 
-namespace RedisVlDotNet.Cli;
+namespace RedisVl.Cli;
 
 public sealed class RedisVlCliApplication
 {

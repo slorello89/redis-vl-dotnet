@@ -1,6 +1,6 @@
 using StackExchange.Redis;
 
-namespace RedisVlDotNet.Tests.Indexes;
+namespace RedisVl.Tests.Indexes;
 
 internal static class RedisSentinelTestEnvironment
 {

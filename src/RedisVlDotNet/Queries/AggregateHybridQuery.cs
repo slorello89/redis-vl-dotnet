@@ -1,7 +1,7 @@
 using System.Runtime.InteropServices;
-using RedisVlDotNet.Filters;
+using RedisVl.Filters;
 
-namespace RedisVlDotNet.Queries;
+namespace RedisVl.Queries;
 
 public sealed class AggregateHybridQuery
 {

@@ -1,6 +1,6 @@
-using RedisVlDotNet.Vectorizers;
+using RedisVl.Vectorizers;
 
-namespace RedisVlDotNet.Tests.Vectorizers;
+namespace RedisVl.Tests.Vectorizers;
 
 public sealed class TextVectorizerExtensionsTests
 {

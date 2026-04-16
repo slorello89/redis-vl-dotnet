@@ -1,9 +1,9 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Text;
-using RedisVlDotNet.Vectorizers.HuggingFace;
+using RedisVl.Vectorizers.HuggingFace;
 
-namespace RedisVlDotNet.Tests.Vectorizers;
+namespace RedisVl.Tests.Vectorizers;
 
 public sealed class HuggingFaceTextVectorizerTests
 {

@@ -1,4 +1,4 @@
-namespace RedisVlDotNet.Tests.Vectorizers;
+namespace RedisVl.Tests.Vectorizers;
 
 [AttributeUsage(AttributeTargets.Method)]
 internal sealed class HuggingFaceIntegrationFactAttribute : FactAttribute

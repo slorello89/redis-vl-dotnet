@@ -5,7 +5,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using StackExchange.Redis;
 
-namespace RedisVlDotNet.Queries;
+namespace RedisVl.Queries;
 
 internal static class SearchResultMapper
 {

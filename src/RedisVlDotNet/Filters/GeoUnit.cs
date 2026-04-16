@@ -1,4 +1,4 @@
-namespace RedisVlDotNet.Filters;
+namespace RedisVl.Filters;
 
 public enum GeoUnit
 {

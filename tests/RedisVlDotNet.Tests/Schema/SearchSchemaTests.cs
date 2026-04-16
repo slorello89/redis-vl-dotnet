@@ -1,6 +1,6 @@
-using RedisVlDotNet.Schema;
+using RedisVl.Schema;
 
-namespace RedisVlDotNet.Tests.Schema;
+namespace RedisVl.Tests.Schema;
 
 public sealed class SearchSchemaTests
 {

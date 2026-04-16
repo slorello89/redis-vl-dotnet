@@ -1,7 +1,7 @@
-using RedisVlDotNet.Tests.Indexes;
-using RedisVlDotNet.Workflows;
+using RedisVl.Tests.Indexes;
+using RedisVl.Workflows;
 
-namespace RedisVlDotNet.Tests.Workflows;
+namespace RedisVl.Tests.Workflows;
 
 public sealed class MessageHistoryIntegrationTests
 {
@@ -16,7 +16,7 @@ public sealed class MessageHistoryIntegrationTests
 
         try
         {
-            await history.CreateAsync(new RedisVlDotNet.Indexes.CreateIndexOptions(overwrite: true, dropExistingDocuments: true));
+            await history.CreateAsync(new RedisVl.Indexes.CreateIndexOptions(overwrite: true, dropExistingDocuments: true));
             await history.AppendAsync(
                 "session-a",
                 "user",

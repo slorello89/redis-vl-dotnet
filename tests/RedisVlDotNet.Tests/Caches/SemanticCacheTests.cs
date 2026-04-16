@@ -1,11 +1,11 @@
 using System.Reflection;
-using RedisVlDotNet.Caches;
-using RedisVlDotNet.Filters;
-using RedisVlDotNet.Schema;
-using RedisVlDotNet.Vectorizers;
+using RedisVl.Caches;
+using RedisVl.Filters;
+using RedisVl.Schema;
+using RedisVl.Vectorizers;
 using StackExchange.Redis;
 
-namespace RedisVlDotNet.Tests.Caches;
+namespace RedisVl.Tests.Caches;
 
 public sealed class SemanticCacheTests
 {

@@ -1,4 +1,4 @@
-namespace RedisVlDotNet.Tests.Rerankers;
+namespace RedisVl.Tests.Rerankers;
 
 internal static class CohereTestEnvironment
 {

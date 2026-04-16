@@ -1,8 +1,8 @@
-using RedisVlDotNet.Vectorizers;
+using RedisVl.Vectorizers;
 
-namespace RedisVlDotNet.Caches;
+namespace RedisVl.Caches;
 
-[Obsolete("Use RedisVlDotNet.Vectorizers.ITextVectorizer from the RedisVlDotNet.Vectorizers.Abstractions package.")]
+[Obsolete("Use RedisVl.Vectorizers.ITextVectorizer from the RedisVl.Vectorizers.Abstractions package.")]
 public interface ITextEmbeddingGenerator : ITextVectorizer
 {
     Task<float[]> GenerateAsync(string input, CancellationToken cancellationToken = default);

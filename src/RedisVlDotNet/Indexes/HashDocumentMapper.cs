@@ -4,7 +4,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using StackExchange.Redis;
 
-namespace RedisVlDotNet.Indexes;
+namespace RedisVl.Indexes;
 
 internal static class HashDocumentMapper
 {

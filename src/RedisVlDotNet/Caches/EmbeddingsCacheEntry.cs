@@ -1,4 +1,4 @@
-namespace RedisVlDotNet.Caches;
+namespace RedisVl.Caches;
 
 public sealed class EmbeddingsCacheEntry
 {

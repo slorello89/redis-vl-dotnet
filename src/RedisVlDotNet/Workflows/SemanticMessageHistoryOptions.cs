@@ -1,6 +1,6 @@
-using RedisVlDotNet.Schema;
+using RedisVl.Schema;
 
-namespace RedisVlDotNet.Workflows;
+namespace RedisVl.Workflows;
 
 public sealed class SemanticMessageHistoryOptions
 {

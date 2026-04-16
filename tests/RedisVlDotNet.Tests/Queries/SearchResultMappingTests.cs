@@ -1,9 +1,9 @@
 using System.Runtime.InteropServices;
 using System.Text.Json.Serialization;
-using RedisVlDotNet.Queries;
+using RedisVl.Queries;
 using StackExchange.Redis;
 
-namespace RedisVlDotNet.Tests.Queries;
+namespace RedisVl.Tests.Queries;
 
 public sealed class SearchResultMappingTests
 {

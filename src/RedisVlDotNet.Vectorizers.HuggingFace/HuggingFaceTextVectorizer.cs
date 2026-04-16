@@ -2,9 +2,9 @@ using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using RedisVlDotNet.Vectorizers;
+using RedisVl.Vectorizers;
 
-namespace RedisVlDotNet.Vectorizers.HuggingFace;
+namespace RedisVl.Vectorizers.HuggingFace;
 
 public sealed class HuggingFaceTextVectorizer : IBatchTextVectorizer
 {

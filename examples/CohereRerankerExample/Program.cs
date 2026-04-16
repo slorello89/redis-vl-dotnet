@@ -1,8 +1,8 @@
-using RedisVlDotNet.Indexes;
-using RedisVlDotNet.Queries;
-using RedisVlDotNet.Rerankers;
-using RedisVlDotNet.Rerankers.Cohere;
-using RedisVlDotNet.Schema;
+using RedisVl.Indexes;
+using RedisVl.Queries;
+using RedisVl.Rerankers;
+using RedisVl.Rerankers.Cohere;
+using RedisVl.Schema;
 using StackExchange.Redis;
 
 var apiKey = Environment.GetEnvironmentVariable("COHERE_API_KEY");

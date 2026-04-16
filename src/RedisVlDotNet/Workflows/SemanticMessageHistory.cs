@@ -2,15 +2,15 @@ using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
-using RedisVlDotNet.Caches;
-using RedisVlDotNet.Filters;
-using RedisVlDotNet.Indexes;
-using RedisVlDotNet.Queries;
-using RedisVlDotNet.Schema;
-using RedisVlDotNet.Vectorizers;
+using RedisVl.Caches;
+using RedisVl.Filters;
+using RedisVl.Indexes;
+using RedisVl.Queries;
+using RedisVl.Schema;
+using RedisVl.Vectorizers;
 using StackExchange.Redis;
 
-namespace RedisVlDotNet.Workflows;
+namespace RedisVl.Workflows;
 
 public sealed class SemanticMessageHistory
 {

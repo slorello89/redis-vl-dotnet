@@ -4,7 +4,7 @@ using YamlDotNet.Core;
 using YamlDotNet.Serialization;
 using YamlDotNet.Serialization.NamingConventions;
 
-namespace RedisVlDotNet.Schema;
+namespace RedisVl.Schema;
 
 public sealed record SearchSchema
 {

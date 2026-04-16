@@ -1,4 +1,4 @@
-namespace RedisVlDotNet.Tests.Vectorizers;
+namespace RedisVl.Tests.Vectorizers;
 
 internal static class OpenAiTestEnvironment
 {

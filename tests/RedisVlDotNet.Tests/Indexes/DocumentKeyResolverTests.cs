@@ -1,7 +1,7 @@
-using RedisVlDotNet.Indexes;
-using RedisVlDotNet.Schema;
+using RedisVl.Indexes;
+using RedisVl.Schema;
 
-namespace RedisVlDotNet.Tests.Indexes;
+namespace RedisVl.Tests.Indexes;
 
 public sealed class DocumentKeyResolverTests
 {

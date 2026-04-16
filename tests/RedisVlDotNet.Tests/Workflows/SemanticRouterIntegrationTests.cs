@@ -1,9 +1,9 @@
-using RedisVlDotNet.Schema;
-using RedisVlDotNet.Tests.Indexes;
-using RedisVlDotNet.Workflows;
+using RedisVl.Schema;
+using RedisVl.Tests.Indexes;
+using RedisVl.Workflows;
 using StackExchange.Redis;
 
-namespace RedisVlDotNet.Tests.Workflows;
+namespace RedisVl.Tests.Workflows;
 
 public sealed class SemanticRouterIntegrationTests
 {

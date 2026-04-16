@@ -2,14 +2,14 @@ using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
-using RedisVlDotNet.Filters;
-using RedisVlDotNet.Indexes;
-using RedisVlDotNet.Queries;
-using RedisVlDotNet.Schema;
-using RedisVlDotNet.Vectorizers;
+using RedisVl.Filters;
+using RedisVl.Indexes;
+using RedisVl.Queries;
+using RedisVl.Schema;
+using RedisVl.Vectorizers;
 using StackExchange.Redis;
 
-namespace RedisVlDotNet.Caches;
+namespace RedisVl.Caches;
 
 public sealed class SemanticCache
 {

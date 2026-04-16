@@ -1,7 +1,7 @@
-using RedisVlDotNet.Rerankers;
-using RedisVlDotNet.Rerankers.Cohere;
+using RedisVl.Rerankers;
+using RedisVl.Rerankers.Cohere;
 
-namespace RedisVlDotNet.Tests.Rerankers;
+namespace RedisVl.Tests.Rerankers;
 
 public sealed class CohereTextRerankerSmokeTests
 {

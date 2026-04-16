@@ -1,7 +1,7 @@
 using System.Net;
 using StackExchange.Redis;
 
-namespace RedisVlDotNet.Tests;
+namespace RedisVl.Tests;
 
 public sealed class RedisConnectionFactoryTests
 {

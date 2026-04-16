@@ -1,4 +1,4 @@
-namespace RedisVlDotNet.Rerankers.Cohere;
+namespace RedisVl.Rerankers.Cohere;
 
 /// <summary>
 /// Entry point marker for the Cohere reranker extension package.

@@ -1,9 +1,9 @@
 using System.ClientModel;
 using System.ClientModel.Primitives;
 using OpenAI.Embeddings;
-using RedisVlDotNet.Vectorizers.OpenAI;
+using RedisVl.Vectorizers.OpenAI;
 
-namespace RedisVlDotNet.Tests.Vectorizers;
+namespace RedisVl.Tests.Vectorizers;
 
 public sealed class OpenAiTextVectorizerTests
 {

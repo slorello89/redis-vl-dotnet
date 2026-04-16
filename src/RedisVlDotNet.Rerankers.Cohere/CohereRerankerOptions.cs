@@ -1,4 +1,4 @@
-namespace RedisVlDotNet.Rerankers.Cohere;
+namespace RedisVl.Rerankers.Cohere;
 
 public sealed class CohereRerankerOptions
 {

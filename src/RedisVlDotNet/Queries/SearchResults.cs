@@ -1,7 +1,7 @@
 using StackExchange.Redis;
 using System.Text.Json;
 
-namespace RedisVlDotNet.Queries;
+namespace RedisVl.Queries;
 
 public sealed class SearchResults
 {

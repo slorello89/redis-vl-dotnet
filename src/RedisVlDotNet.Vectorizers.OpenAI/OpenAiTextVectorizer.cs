@@ -1,9 +1,9 @@
 using System.ClientModel;
 using OpenAI;
 using OpenAI.Embeddings;
-using RedisVlDotNet.Vectorizers;
+using RedisVl.Vectorizers;
 
-namespace RedisVlDotNet.Vectorizers.OpenAI;
+namespace RedisVl.Vectorizers.OpenAI;
 
 public sealed class OpenAiTextVectorizer : IBatchTextVectorizer
 {

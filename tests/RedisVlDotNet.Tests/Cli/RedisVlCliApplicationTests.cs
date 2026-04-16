@@ -1,8 +1,8 @@
 using System.Text;
-using RedisVlDotNet.Cli;
-using RedisVlDotNet.Schema;
+using RedisVl.Cli;
+using RedisVl.Schema;
 
-namespace RedisVlDotNet.Tests.Cli;
+namespace RedisVl.Tests.Cli;
 
 public sealed class RedisVlCliApplicationTests
 {

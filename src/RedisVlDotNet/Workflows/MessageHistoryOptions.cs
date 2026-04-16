@@ -1,4 +1,4 @@
-namespace RedisVlDotNet.Workflows;
+namespace RedisVl.Workflows;
 
 public sealed class MessageHistoryOptions
 {

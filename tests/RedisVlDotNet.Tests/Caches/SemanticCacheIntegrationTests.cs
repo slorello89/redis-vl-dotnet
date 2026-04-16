@@ -1,10 +1,10 @@
-using RedisVlDotNet.Caches;
-using RedisVlDotNet.Filters;
-using RedisVlDotNet.Indexes;
-using RedisVlDotNet.Schema;
-using RedisVlDotNet.Tests.Indexes;
+using RedisVl.Caches;
+using RedisVl.Filters;
+using RedisVl.Indexes;
+using RedisVl.Schema;
+using RedisVl.Tests.Indexes;
 
-namespace RedisVlDotNet.Tests.Caches;
+namespace RedisVl.Tests.Caches;
 
 public sealed class SemanticCacheIntegrationTests
 {

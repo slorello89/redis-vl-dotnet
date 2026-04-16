@@ -2,9 +2,9 @@ using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using RedisVlDotNet.Rerankers;
+using RedisVl.Rerankers;
 
-namespace RedisVlDotNet.Rerankers.Cohere;
+namespace RedisVl.Rerankers.Cohere;
 
 public sealed class CohereTextReranker : ITextReranker
 {

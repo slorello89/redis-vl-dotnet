@@ -1,10 +1,10 @@
 using System.Reflection;
 using System.Security.Cryptography;
 using System.Text;
-using RedisVlDotNet.Workflows;
+using RedisVl.Workflows;
 using StackExchange.Redis;
 
-namespace RedisVlDotNet.Tests.Workflows;
+namespace RedisVl.Tests.Workflows;
 
 public sealed class MessageHistoryTests
 {

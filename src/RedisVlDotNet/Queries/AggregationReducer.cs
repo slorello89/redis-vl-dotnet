@@ -1,6 +1,6 @@
 using System.Globalization;
 
-namespace RedisVlDotNet.Queries;
+namespace RedisVl.Queries;
 
 public sealed class AggregationReducer
 {

@@ -1,6 +1,6 @@
 using StackExchange.Redis;
 
-namespace RedisVlDotNet.Indexes;
+namespace RedisVl.Indexes;
 
 public sealed class SearchIndexInfo
 {

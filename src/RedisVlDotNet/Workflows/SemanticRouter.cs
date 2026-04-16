@@ -1,13 +1,13 @@
 using System.Security.Cryptography;
 using System.Text;
-using RedisVlDotNet.Caches;
-using RedisVlDotNet.Indexes;
-using RedisVlDotNet.Queries;
-using RedisVlDotNet.Schema;
-using RedisVlDotNet.Vectorizers;
+using RedisVl.Caches;
+using RedisVl.Indexes;
+using RedisVl.Queries;
+using RedisVl.Schema;
+using RedisVl.Vectorizers;
 using StackExchange.Redis;
 
-namespace RedisVlDotNet.Workflows;
+namespace RedisVl.Workflows;
 
 public sealed class SemanticRouter
 {

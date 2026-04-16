@@ -1,8 +1,8 @@
 using System.Text.Json;
-using RedisVlDotNet.Indexes;
+using RedisVl.Indexes;
 using StackExchange.Redis;
 
-namespace RedisVlDotNet.Tests.Indexes;
+namespace RedisVl.Tests.Indexes;
 
 public sealed class HashDocumentMapperTests
 {

@@ -1,4 +1,4 @@
-namespace RedisVlDotNet.Rerankers;
+namespace RedisVl.Rerankers;
 
 public sealed class RerankResult
 {

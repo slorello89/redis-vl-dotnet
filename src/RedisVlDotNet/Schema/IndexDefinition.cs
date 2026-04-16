@@ -1,6 +1,6 @@
 using System.Collections.ObjectModel;
 
-namespace RedisVlDotNet.Schema;
+namespace RedisVl.Schema;
 
 public sealed record IndexDefinition
 {
