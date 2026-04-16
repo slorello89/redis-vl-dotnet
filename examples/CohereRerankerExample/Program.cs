@@ -45,7 +45,7 @@ var articles =
 try
 {
     await index.CreateAsync(new CreateIndexOptions(skipIfExists: true));
-    await index.LoadJsonAsync(articles);
+    await Task.WhenAll(articles.Select(article => index.LoadJsonAsync(article)));
 
     var initialResults = await index.SearchAsync<Article>(
         new TextQuery("password | token", ["title", "body"], limit: 3));
