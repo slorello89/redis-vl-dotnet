@@ -58,7 +58,7 @@ When `REDIS_VL_REDIS_CLUSTER_NODES` is set without Sentinel settings, the exampl
 
 ## Related Docs
 
-- [Examples index](/Users/steve.lorello/projects/redis/redis-vl-dotnet/examples/README.md)
-- [Core Features](/Users/steve.lorello/projects/redis/redis-vl-dotnet/docs-site/modules/ROOT/pages/core-features/index.adoc)
-- [Getting Started](/Users/steve.lorello/projects/redis/redis-vl-dotnet/docs-site/modules/ROOT/pages/getting-started/index.adoc)
-- [Testing](/Users/steve.lorello/projects/redis/redis-vl-dotnet/docs-site/modules/ROOT/pages/testing/index.adoc)
+- [Examples index](../README.md)
+- [Core Features](../../docs-site/modules/ROOT/pages/core-features/index.adoc)
+- [Getting Started](../../docs-site/modules/ROOT/pages/getting-started/index.adoc)
+- [Testing](../../docs-site/modules/ROOT/pages/testing/index.adoc)

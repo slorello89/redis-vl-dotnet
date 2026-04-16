@@ -18,6 +18,6 @@ dotnet run --project examples/HuggingFaceVectorizerExample/HuggingFaceVectorizer
 
 ## Related Docs
 
-- [Hugging Face Vectorizer](/Users/steve.lorello/projects/redis/redis-vl-dotnet/docs-site/modules/ROOT/pages/extensions/huggingface-vectorizer.adoc)
-- [SemanticCache](/Users/steve.lorello/projects/redis/redis-vl-dotnet/docs-site/modules/ROOT/pages/core-features/semantic-cache.adoc)
-- [Examples index](/Users/steve.lorello/projects/redis/redis-vl-dotnet/examples/README.md)
+- [Hugging Face Vectorizer](../../docs-site/modules/ROOT/pages/extensions/huggingface-vectorizer.adoc)
+- [SemanticCache](../../docs-site/modules/ROOT/pages/core-features/semantic-cache.adoc)
+- [Examples index](../README.md)

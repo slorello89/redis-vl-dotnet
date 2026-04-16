@@ -18,6 +18,6 @@ dotnet run --project examples/CohereRerankerExample/CohereRerankerExample.csproj
 
 ## Related Docs
 
-- [Cohere Reranker](/Users/steve.lorello/projects/redis/redis-vl-dotnet/docs-site/modules/ROOT/pages/extensions/cohere-reranker.adoc)
-- [TextQuery](/Users/steve.lorello/projects/redis/redis-vl-dotnet/docs-site/modules/ROOT/pages/core-features/text-query.adoc)
-- [Examples index](/Users/steve.lorello/projects/redis/redis-vl-dotnet/examples/README.md)
+- [Cohere Reranker](../../docs-site/modules/ROOT/pages/extensions/cohere-reranker.adoc)
+- [TextQuery](../../docs-site/modules/ROOT/pages/core-features/text-query.adoc)
+- [Examples index](../README.md)

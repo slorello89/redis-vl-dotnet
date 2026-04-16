@@ -41,7 +41,7 @@ The example uses `REDIS_VL_REDIS_URL` when it is set, and otherwise falls back t
 
 ## Related Docs
 
-- [Examples index](/Users/steve.lorello/projects/redis/redis-vl-dotnet/examples/README.md)
-- [Core Features](/Users/steve.lorello/projects/redis/redis-vl-dotnet/docs-site/modules/ROOT/pages/core-features/index.adoc)
-- [Getting Started](/Users/steve.lorello/projects/redis/redis-vl-dotnet/docs-site/modules/ROOT/pages/getting-started/index.adoc)
-- [Testing](/Users/steve.lorello/projects/redis/redis-vl-dotnet/docs-site/modules/ROOT/pages/testing/index.adoc)
+- [Examples index](../README.md)
+- [Core Features](../../docs-site/modules/ROOT/pages/core-features/index.adoc)
+- [Getting Started](../../docs-site/modules/ROOT/pages/getting-started/index.adoc)
+- [Testing](../../docs-site/modules/ROOT/pages/testing/index.adoc)

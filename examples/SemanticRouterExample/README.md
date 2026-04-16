@@ -36,7 +36,7 @@ dotnet run --project examples/SemanticRouterExample/SemanticRouterExample.csproj
 
 ## Related Docs
 
-- [Examples index](/Users/steve.lorello/projects/redis/redis-vl-dotnet/examples/README.md)
-- [SemanticRouter](/Users/steve.lorello/projects/redis/redis-vl-dotnet/docs-site/modules/ROOT/pages/core-features/semantic-router.adoc)
-- [Getting Started](/Users/steve.lorello/projects/redis/redis-vl-dotnet/docs-site/modules/ROOT/pages/getting-started/index.adoc)
-- [Testing](/Users/steve.lorello/projects/redis/redis-vl-dotnet/docs-site/modules/ROOT/pages/testing/index.adoc)
+- [Examples index](../README.md)
+- [SemanticRouter](../../docs-site/modules/ROOT/pages/core-features/semantic-router.adoc)
+- [Getting Started](../../docs-site/modules/ROOT/pages/getting-started/index.adoc)
+- [Testing](../../docs-site/modules/ROOT/pages/testing/index.adoc)

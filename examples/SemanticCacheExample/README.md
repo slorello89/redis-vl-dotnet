@@ -35,6 +35,6 @@ dotnet run --project examples/SemanticCacheExample/SemanticCacheExample.csproj
 
 ## Related Docs
 
-- [Examples index](/Users/steve.lorello/projects/redis/redis-vl-dotnet/examples/README.md)
-- [SemanticCache](/Users/steve.lorello/projects/redis/redis-vl-dotnet/docs-site/modules/ROOT/pages/core-features/semantic-cache.adoc)
-- [Testing](/Users/steve.lorello/projects/redis/redis-vl-dotnet/docs-site/modules/ROOT/pages/testing/index.adoc)
+- [Examples index](../README.md)
+- [SemanticCache](../../docs-site/modules/ROOT/pages/core-features/semantic-cache.adoc)
+- [Testing](../../docs-site/modules/ROOT/pages/testing/index.adoc)

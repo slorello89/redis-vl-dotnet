@@ -35,6 +35,6 @@ dotnet run --project examples/EmbeddingsCacheExample/EmbeddingsCacheExample.cspr
 
 ## Related Docs
 
-- [Examples index](/Users/steve.lorello/projects/redis/redis-vl-dotnet/examples/README.md)
-- [EmbeddingsCache](/Users/steve.lorello/projects/redis/redis-vl-dotnet/docs-site/modules/ROOT/pages/core-features/embeddings-cache.adoc)
-- [Getting Started](/Users/steve.lorello/projects/redis/redis-vl-dotnet/docs-site/modules/ROOT/pages/getting-started/index.adoc)
+- [Examples index](../README.md)
+- [EmbeddingsCache](../../docs-site/modules/ROOT/pages/core-features/embeddings-cache.adoc)
+- [Getting Started](../../docs-site/modules/ROOT/pages/getting-started/index.adoc)
