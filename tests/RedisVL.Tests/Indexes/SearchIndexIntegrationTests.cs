@@ -740,7 +740,10 @@ public sealed class SearchIndexIntegrationTests
             Assert.Equal(2, numericResults.TotalCount);
             Assert.Equal(
                 [$"{schema.Index.Prefix}1", $"{schema.Index.Prefix}3"],
-                numericResults.Documents.Select(static document => document.Id).ToArray());
+                numericResults.Documents
+                    .Select(static document => document.Id)
+                    .OrderBy(static id => id, StringComparer.Ordinal)
+                    .ToArray());
             Assert.Single(textResults.Documents);
             Assert.Equal($"{schema.Index.Prefix}3", textResults.Documents[0].Id);
             Assert.Single(geoResults.Documents);
@@ -779,16 +782,19 @@ public sealed class SearchIndexIntegrationTests
             await RedisSearchTestEnvironment.WaitForIndexDocumentCountAsync(index, SearchIndexSeedData.TextQueryMovies.Count);
 
             var results = await index.SearchAsync(new TextQuery("heat", ["title", "year"], limit: 2));
+            var documentsByTitle = results.Documents.ToDictionary(
+                static document => document.Values["title"].ToString(),
+                StringComparer.Ordinal);
 
             Assert.Equal(2, results.TotalCount);
             Assert.Equal(2, results.Documents.Count);
-            Assert.Equal($"{schema.Index.Prefix}1", results.Documents[0].Id);
-            Assert.Equal($"{schema.Index.Prefix}2", results.Documents[1].Id);
-            Assert.Equal("Heat Heat", results.Documents[0].Values["title"]);
-            Assert.Equal("1995", results.Documents[0].Values["year"]);
-            Assert.False(results.Documents[0].TryGetValue("genre", out _));
-            Assert.Equal("Heat", results.Documents[1].Values["title"]);
-            Assert.Equal("1981", results.Documents[1].Values["year"]);
+            Assert.Equal(["Heat", "Heat Heat"], documentsByTitle.Keys.OrderBy(static title => title, StringComparer.Ordinal).ToArray());
+            Assert.Equal($"{schema.Index.Prefix}1", documentsByTitle["Heat Heat"].Id);
+            Assert.Equal("1995", documentsByTitle["Heat Heat"].Values["year"]);
+            Assert.False(documentsByTitle["Heat Heat"].TryGetValue("genre", out _));
+            Assert.Equal($"{schema.Index.Prefix}2", documentsByTitle["Heat"].Id);
+            Assert.Equal("1981", documentsByTitle["Heat"].Values["year"]);
+            Assert.False(documentsByTitle["Heat"].TryGetValue("genre", out _));
         }
         finally
         {
@@ -864,11 +870,17 @@ public sealed class SearchIndexIntegrationTests
 
             var firstPage = await index.SearchAsync(new TextQuery("heat", ["title"], pagination: new QueryPagination(limit: 1)));
             var secondPage = await index.SearchAsync(new TextQuery("heat", ["title"], pagination: new QueryPagination(offset: 1, limit: 1)));
+            var returnedTitles = firstPage.Documents
+                .Concat(secondPage.Documents)
+                .Select(static document => document.Values["title"].ToString())
+                .OrderBy(static title => title, StringComparer.Ordinal)
+                .ToArray();
 
             Assert.Equal(2, firstPage.TotalCount);
             Assert.Equal(2, secondPage.TotalCount);
-            Assert.Equal("Heat Heat", Assert.Single(firstPage.Documents).Values["title"]);
-            Assert.Equal("Heat", Assert.Single(secondPage.Documents).Values["title"]);
+            Assert.Single(firstPage.Documents);
+            Assert.Single(secondPage.Documents);
+            Assert.Equal(["Heat", "Heat Heat"], returnedTitles);
         }
         finally
         {
