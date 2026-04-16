@@ -1,6 +1,7 @@
 .codex-iteration-prompt.md
 .codex-last-message.txt
 .last-branch
+.idea/
 
 bin/
 obj/
