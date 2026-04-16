@@ -3,20 +3,110 @@
   <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{site.title}}</title>
+    <title>{{#if page.title}}{{page.title}} :: {{/if}}{{site.title}}</title>
+    {{#if page.description}}<meta name="description" content="{{page.description}}">{{/if}}
     <link rel="stylesheet" href="{{{uiRootPath}}}/css/site.css">
+    <script defer src="{{{uiRootPath}}}/js/site.js"></script>
   </head>
-  <body>
-    <header class="site-header">
-      <div class="site-shell">
-        <a class="site-title" href="{{{siteRootPath}}}">{{site.title}}</a>
-        <p class="site-tagline">Antora scaffold for redis-vl-dotnet documentation.</p>
+  <body class="page-shell{{#if page.home}} is-home{{/if}}">
+    <header class="topbar">
+      <div class="topbar-inner">
+        <div class="brand-cluster">
+          <a class="redis-home" href="https://redis.io" aria-label="Redis">
+            <img src="{{{uiRootPath}}}/img/redis-logo.svg" alt="Redis">
+          </a>
+          <div class="brand-copy">
+            <a class="product-link" href="{{{siteRootPath}}}">{{site.title}}</a>
+            <span class="product-version">{{page.componentVersion.title}}</span>
+          </div>
+        </div>
+        <nav class="top-links" aria-label="Global">
+          <a href="https://redis.io/docs" target="_blank" rel="noreferrer">Redis Docs</a>
+          <a href="https://discord.gg/redis" target="_blank" rel="noreferrer">Community</a>
+          <a href="https://github.com/slorello89/redis-vl-dotnet" target="_blank" rel="noreferrer">GitHub</a>
+        </nav>
+        <button class="nav-toggle" type="button" data-nav-toggle aria-label="Toggle navigation">
+          <span></span>
+          <span></span>
+          <span></span>
+        </button>
       </div>
     </header>
-    <main class="site-shell">
-      <article class="doc-content">
-        {{{page.contents}}}
-      </article>
-    </main>
+
+    <div class="page-frame">
+      <aside class="sidebar-nav" aria-label="Documentation">
+        <div class="sidebar-nav__header">
+          <span class="sidebar-nav__product">{{page.componentVersion.title}}</span>
+          <span class="sidebar-nav__badge">{{#if page.version}}{{page.displayVersion}}{{else}}stable{{/if}}</span>
+        </div>
+        <nav class="sidebar-nav__body">
+          {{> nav-tree items=page.navigation wrapped=true}}
+        </nav>
+        <div class="sidebar-nav__footer">
+          <a href="https://github.com/slorello89/redis-vl-dotnet" target="_blank" rel="noreferrer">GitHub Project</a>
+        </div>
+      </aside>
+
+      <main class="page-main">
+        {{#if page.breadcrumbs}}
+        <nav class="breadcrumbs" aria-label="Breadcrumbs">
+          <ol>
+            {{#each page.breadcrumbs}}
+            <li>
+              {{#if url}}
+              <a href="{{{relativize url}}}">{{content}}</a>
+              {{else}}
+              <span>{{content}}</span>
+              {{/if}}
+            </li>
+            {{/each}}
+          </ol>
+        </nav>
+        {{/if}}
+
+        <article class="doc-content">
+          <header class="doc-header">
+            <p class="doc-header__eyebrow">{{page.componentVersion.title}}</p>
+            <h1>{{page.title}}</h1>
+            {{#if page.description}}<p class="doc-header__description">{{page.description}}</p>{{/if}}
+          </header>
+          {{{page.contents}}}
+        </article>
+
+        {{#if page.previous}}
+        <nav class="page-pagination" aria-label="Pagination">
+          <a class="page-pagination__prev" href="{{{relativize page.previous.url}}}">
+            <span class="page-pagination__label">Previous</span>
+            <strong>{{page.previous.content}}</strong>
+          </a>
+          {{#if page.next}}
+          <a class="page-pagination__next" href="{{{relativize page.next.url}}}">
+            <span class="page-pagination__label">Next</span>
+            <strong>{{page.next.content}}</strong>
+          </a>
+          {{/if}}
+        </nav>
+        {{else if page.next}}
+        <nav class="page-pagination" aria-label="Pagination">
+          <span></span>
+          <a class="page-pagination__next" href="{{{relativize page.next.url}}}">
+            <span class="page-pagination__label">Next</span>
+            <strong>{{page.next.content}}</strong>
+          </a>
+        </nav>
+        {{/if}}
+      </main>
+
+      <aside class="sidebar-toc" aria-label="On this page">
+        <div class="sidebar-toc__header">On this page</div>
+        <nav id="page-toc" class="sidebar-toc__body"></nav>
+      </aside>
+    </div>
+
+    <footer class="site-footer">
+      <div class="site-footer__inner">
+        <p>Copyright &copy; 2024 - 2026 Redis Inc.</p>
+      </div>
+    </footer>
   </body>
 </html>

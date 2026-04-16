@@ -1,0 +1,22 @@
+{{#if items}}
+{{#if wrapped}}
+<ul class="nav-tree">
+{{/if}}
+  {{#each items}}
+  {{#if content}}
+  <li class="nav-tree__item{{#if items}} has-children{{/if}}">
+    {{#if url}}
+    <a class="nav-tree__link" href="{{{relativize url}}}" data-nav-url="{{url}}">{{content}}</a>
+    {{else}}
+    <span class="nav-tree__text">{{content}}</span>
+    {{/if}}
+    {{> nav-tree items=items wrapped=true}}
+  </li>
+  {{else}}
+  {{> nav-tree items=items wrapped=false}}
+  {{/if}}
+  {{/each}}
+{{#if wrapped}}
+</ul>
+{{/if}}
+{{/if}}
