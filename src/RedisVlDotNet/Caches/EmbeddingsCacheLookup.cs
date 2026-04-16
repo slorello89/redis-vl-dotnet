@@ -1,4 +1,4 @@
-namespace RedisVlDotNet.Caches;
+namespace RedisVl.Caches;
 
 public readonly record struct EmbeddingsCacheLookup
 {

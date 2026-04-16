@@ -1,8 +1,8 @@
 using System.Reflection;
-using RedisVlDotNet.Caches;
+using RedisVl.Caches;
 using StackExchange.Redis;
 
-namespace RedisVlDotNet.Tests.Caches;
+namespace RedisVl.Tests.Caches;
 
 public sealed class EmbeddingsCacheTests
 {

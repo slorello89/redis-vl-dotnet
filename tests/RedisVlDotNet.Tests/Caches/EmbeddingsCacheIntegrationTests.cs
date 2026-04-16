@@ -1,8 +1,8 @@
-using RedisVlDotNet.Caches;
-using RedisVlDotNet.Tests.Indexes;
+using RedisVl.Caches;
+using RedisVl.Tests.Indexes;
 using StackExchange.Redis;
 
-namespace RedisVlDotNet.Tests.Caches;
+namespace RedisVl.Tests.Caches;
 
 public sealed class EmbeddingsCacheIntegrationTests
 {
