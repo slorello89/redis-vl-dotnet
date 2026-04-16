@@ -3,7 +3,7 @@ using System.Text;
 using System.Text.Json;
 using StackExchange.Redis;
 
-namespace RedisVl.Caches;
+namespace RedisVlDotNet.Caches;
 
 public sealed class EmbeddingsCache
 {

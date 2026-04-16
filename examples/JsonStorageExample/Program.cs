@@ -66,7 +66,7 @@ var scienceFictionQuery = new FilterQuery(
         Filter.Numeric("year").GreaterThan(1980)),
     returnFields: ["title", "year", "genre"]);
 
-var searchResults = await rediscoveredIndex.SearchAsync<Movie>(scienceFictionQuery);
+var searchResults = await rediscoveredIndex.SearchAsync<MovieListing>(scienceFictionQuery);
 var projectedTextResults = await rediscoveredIndex.SearchAsync(
     new TextQuery("Alien|Arrival", ["title", "year"], limit: 2));
 var typedTextResults = await rediscoveredIndex.SearchAsync<Movie>(
@@ -201,5 +201,6 @@ static async Task<IConnectionMultiplexer> ConnectAsync(
 }
 
 public sealed record Movie(string Id, string Title, int Year, string Genre, string Summary);
+public sealed record MovieListing(string Title, int Year, string Genre);
 
 public sealed record GenreSummary(string Genre, int MovieCount, double AverageYear);

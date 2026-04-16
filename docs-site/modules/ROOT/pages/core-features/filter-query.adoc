@@ -25,7 +25,7 @@ var scienceFictionQuery = new FilterQuery(
     returnFields: ["title", "year", "genre"],
     pagination: new QueryPagination(offset: 0, limit: 10));
 
-var results = await index.SearchAsync<Movie>(scienceFictionQuery);
+var results = await index.SearchAsync<MovieListing>(scienceFictionQuery);
 ----
 
 The canonical runnable reference is `/examples/JsonStorageExample`.
