@@ -22,23 +22,6 @@ npm run docs:validate
 
 GitHub Pages publishing runs from `.github/workflows/docs-pages.yml` on pushes to `main`. Configure the repository Pages source to `GitHub Actions` before expecting deployments.
 
-## NuGet Releases
-
-The publishable packages are:
-
-- `RedisVL`
-- `RedisVL.Vectorizers.Abstractions`
-- `RedisVL.Vectorizers.OpenAI`
-- `RedisVL.Vectorizers.HuggingFace`
-- `RedisVL.Rerankers.Abstractions`
-- `RedisVL.Rerankers.Cohere`
-
-The CLI at `src/RedisVL.Cli` is intentionally excluded from NuGet packaging.
-
-Manual NuGet publishing runs from `.github/workflows/nuget-release.yml` via `workflow_dispatch`. A single run restores, builds, tests, packs all publishable library projects, uploads the `.nupkg` and `.snupkg` artifacts, and then pushes all packages to NuGet using the `NUGET_API_KEY` repository secret.
-
-Package versions live in the individual library `.csproj` files. Update the version in the project you intend to release before triggering the workflow.
-
 ## Repository Pointers
 
 - Active parity roadmap: [docs/parity-roadmap.md](docs/parity-roadmap.md)
