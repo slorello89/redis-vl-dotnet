@@ -4,6 +4,8 @@
     <TargetFramework>net9.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <Version>0.0.1</Version>
+    <Description>Abstractions for text vectorizers used by redis-vl-dotnet packages.</Description>
   </PropertyGroup>
 
 </Project>

@@ -1,6 +1,6 @@
 services:
   redis-stack:
-    image: redis/redis-stack-server:7.4.0-v8
+    image: redis:latest
     ports:
       - "6379:6379"
     healthcheck:

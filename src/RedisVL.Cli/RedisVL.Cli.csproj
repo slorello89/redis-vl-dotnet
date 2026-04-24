@@ -6,6 +6,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <UseAppHost>false</UseAppHost>
+    <IsPackable>false</IsPackable>
   </PropertyGroup>
 
   <ItemGroup>

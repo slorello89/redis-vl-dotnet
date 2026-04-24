@@ -1,0 +1,38 @@
+<Project>
+  <PropertyGroup>
+    <RepositoryUrl>https://github.com/slorello89/redis-vl-dotnet</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <PackageProjectUrl>https://github.com/slorello89/redis-vl-dotnet</PackageProjectUrl>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
+    <Authors>Steve Lorello</Authors>
+    <Company>Redis Inc</Company>
+    <PackageTags>redis;redis-search;vector-search;semantic-search;dotnet</PackageTags>
+    <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    <PackageOutputPath>$(MSBuildThisFileDirectory)artifacts/packages</PackageOutputPath>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(MSBuildProjectName)' == 'RedisVL' Or
+                            '$(MSBuildProjectName)' == 'RedisVL.Vectorizers.Abstractions' Or
+                            '$(MSBuildProjectName)' == 'RedisVL.Vectorizers.OpenAI' Or
+                            '$(MSBuildProjectName)' == 'RedisVL.Vectorizers.HuggingFace' Or
+                            '$(MSBuildProjectName)' == 'RedisVL.Rerankers.Abstractions' Or
+                            '$(MSBuildProjectName)' == 'RedisVL.Rerankers.Cohere'">
+    <IsPackable>true</IsPackable>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(IsPackable)' == ''">
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup Condition="'$(IsPackable)' == 'true'">
+    <None Include="$(MSBuildThisFileDirectory)README.md"
+          Pack="true"
+          PackagePath="\" 
+          Link="README.md"
+          Visible="false" />
+  </ItemGroup>
+</Project>

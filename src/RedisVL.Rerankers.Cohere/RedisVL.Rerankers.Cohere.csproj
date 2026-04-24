@@ -4,6 +4,8 @@
     <TargetFramework>net9.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <Version>0.0.1</Version>
+    <Description>Cohere-backed text rerankers for redis-vl-dotnet.</Description>
   </PropertyGroup>
 
   <ItemGroup>
