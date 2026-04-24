@@ -2,24 +2,12 @@ name: nuget-release
 
 on:
   workflow_dispatch:
-    inputs:
-      package:
-        description: Package to publish to NuGet
-        required: true
-        type: choice
-        options:
-          - RedisVL
-          - RedisVL.Vectorizers.Abstractions
-          - RedisVL.Vectorizers.OpenAI
-          - RedisVL.Vectorizers.HuggingFace
-          - RedisVL.Rerankers.Abstractions
-          - RedisVL.Rerankers.Cohere
 
 permissions:
   contents: read
 
 concurrency:
-  group: nuget-release-${{ inputs.package }}
+  group: nuget-release
   cancel-in-progress: false
 
 jobs:
@@ -49,35 +37,6 @@ jobs:
         with:
           dotnet-version: 9.0.x
 
-      - name: Resolve selected project
-        id: selection
-        shell: bash
-        run: |
-          case "${{ inputs.package }}" in
-            RedisVL)
-              echo "project_path=src/RedisVL/RedisVL.csproj" >> "$GITHUB_OUTPUT"
-              ;;
-            RedisVL.Vectorizers.Abstractions)
-              echo "project_path=src/RedisVL.Vectorizers.Abstractions/RedisVL.Vectorizers.Abstractions.csproj" >> "$GITHUB_OUTPUT"
-              ;;
-            RedisVL.Vectorizers.OpenAI)
-              echo "project_path=src/RedisVL.Vectorizers.OpenAI/RedisVL.Vectorizers.OpenAI.csproj" >> "$GITHUB_OUTPUT"
-              ;;
-            RedisVL.Vectorizers.HuggingFace)
-              echo "project_path=src/RedisVL.Vectorizers.HuggingFace/RedisVL.Vectorizers.HuggingFace.csproj" >> "$GITHUB_OUTPUT"
-              ;;
-            RedisVL.Rerankers.Abstractions)
-              echo "project_path=src/RedisVL.Rerankers.Abstractions/RedisVL.Rerankers.Abstractions.csproj" >> "$GITHUB_OUTPUT"
-              ;;
-            RedisVL.Rerankers.Cohere)
-              echo "project_path=src/RedisVL.Rerankers.Cohere/RedisVL.Rerankers.Cohere.csproj" >> "$GITHUB_OUTPUT"
-              ;;
-            *)
-              echo "Unsupported package: ${{ inputs.package }}" >&2
-              exit 1
-              ;;
-          esac
-
       - name: Restore solution
         run: dotnet restore redis-vl-dotnet.sln
 
@@ -87,25 +46,31 @@ jobs:
       - name: Test solution
         run: dotnet test redis-vl-dotnet.sln --configuration Release --no-build --verbosity normal
 
-      - name: Pack selected project
-        run: dotnet pack ${{ steps.selection.outputs.project_path }} --configuration Release --no-build --output ${{ runner.temp }}/packages
-
-      - name: Read package metadata
-        id: package_metadata
+      - name: Pack publishable projects
         shell: bash
         run: |
-          package_id=$(dotnet msbuild "${{ steps.selection.outputs.project_path }}" -getProperty:PackageId | tail -n 1)
-          package_version=$(dotnet msbuild "${{ steps.selection.outputs.project_path }}" -getProperty:Version | tail -n 1)
-          echo "package_id=$package_id" >> "$GITHUB_OUTPUT"
-          echo "package_version=$package_version" >> "$GITHUB_OUTPUT"
+          projects=(
+            "src/RedisVL/RedisVL.csproj"
+            "src/RedisVL.Vectorizers.Abstractions/RedisVL.Vectorizers.Abstractions.csproj"
+            "src/RedisVL.Vectorizers.OpenAI/RedisVL.Vectorizers.OpenAI.csproj"
+            "src/RedisVL.Vectorizers.HuggingFace/RedisVL.Vectorizers.HuggingFace.csproj"
+            "src/RedisVL.Rerankers.Abstractions/RedisVL.Rerankers.Abstractions.csproj"
+            "src/RedisVL.Rerankers.Cohere/RedisVL.Rerankers.Cohere.csproj"
+          )
+
+          mkdir -p "${{ runner.temp }}/packages"
+
+          for project in "${projects[@]}"; do
+            dotnet pack "$project" --configuration Release --no-build --output "${{ runner.temp }}/packages"
+          done
 
       - name: Upload package artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ steps.package_metadata.outputs.package_id }}-${{ steps.package_metadata.outputs.package_version }}
+          name: nuget-packages
           path: |
             ${{ runner.temp }}/packages/*.nupkg
             ${{ runner.temp }}/packages/*.snupkg
 
-      - name: Publish package to NuGet
+      - name: Publish packages to NuGet
         run: dotnet nuget push "${{ runner.temp }}/packages/*.nupkg" --api-key "${{ secrets.NUGET_API_KEY }}" --source https://api.nuget.org/v3/index.json --skip-duplicate

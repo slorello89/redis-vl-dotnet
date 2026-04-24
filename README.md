@@ -35,7 +35,7 @@ The publishable packages are:
 
 The CLI at `src/RedisVL.Cli` is intentionally excluded from NuGet packaging.
 
-Manual NuGet publishing runs from `.github/workflows/nuget-release.yml` via `workflow_dispatch`. Each package is released independently by selecting the target package in the action UI. The workflow restores, builds, tests, packs only the selected project, uploads the `.nupkg` and `.snupkg` artifacts, and then pushes the package to NuGet using the `NUGET_API_KEY` repository secret.
+Manual NuGet publishing runs from `.github/workflows/nuget-release.yml` via `workflow_dispatch`. A single run restores, builds, tests, packs all publishable library projects, uploads the `.nupkg` and `.snupkg` artifacts, and then pushes all packages to NuGet using the `NUGET_API_KEY` repository secret.
 
 Package versions live in the individual library `.csproj` files. Update the version in the project you intend to release before triggering the workflow.
 
