@@ -28,6 +28,7 @@
 ** xref:extensions/openai-vectorizer.adoc[OpenAI Vectorizer]
 ** xref:extensions/huggingface-vectorizer.adoc[Hugging Face Vectorizer]
 ** xref:extensions/cohere-reranker.adoc[Cohere Reranker]
+** xref:extensions/onnx-reranker.adoc[ONNX Reranker]
 * xref:examples/index.adoc[Examples]
 * xref:cli/index.adoc[CLI]
 * xref:testing/index.adoc[Testing]

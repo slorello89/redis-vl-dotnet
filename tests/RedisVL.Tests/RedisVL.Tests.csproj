@@ -24,6 +24,7 @@
     <ProjectReference Include="..\..\src\RedisVL\RedisVL.csproj" />
     <ProjectReference Include="..\..\src\RedisVL.Rerankers.Abstractions\RedisVL.Rerankers.Abstractions.csproj" />
     <ProjectReference Include="..\..\src\RedisVL.Rerankers.Cohere\RedisVL.Rerankers.Cohere.csproj" />
+    <ProjectReference Include="..\..\src\RedisVL.Rerankers.Onnx\RedisVL.Rerankers.Onnx.csproj" />
     <ProjectReference Include="..\..\src\RedisVL.Vectorizers.Abstractions\RedisVL.Vectorizers.Abstractions.csproj" />
     <ProjectReference Include="..\..\src\RedisVL.Vectorizers.HuggingFace\RedisVL.Vectorizers.HuggingFace.csproj" />
     <ProjectReference Include="..\..\src\RedisVL.Vectorizers.OpenAI\RedisVL.Vectorizers.OpenAI.csproj" />
