@@ -4,7 +4,7 @@
     <TargetFramework>net9.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <Version>0.0.1</Version>
+    <Version>0.0.2</Version>
     <Description>Local ONNX-backed text rerankers for redis-vl-dotnet.</Description>
   </PropertyGroup>
 
