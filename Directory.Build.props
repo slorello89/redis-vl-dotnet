@@ -20,7 +20,8 @@
                             '$(MSBuildProjectName)' == 'RedisVL.Vectorizers.OpenAI' Or
                             '$(MSBuildProjectName)' == 'RedisVL.Vectorizers.HuggingFace' Or
                             '$(MSBuildProjectName)' == 'RedisVL.Rerankers.Abstractions' Or
-                            '$(MSBuildProjectName)' == 'RedisVL.Rerankers.Cohere'">
+                            '$(MSBuildProjectName)' == 'RedisVL.Rerankers.Cohere' Or
+                            '$(MSBuildProjectName)' == 'RedisVL.Rerankers.Onnx'">
     <IsPackable>true</IsPackable>
   </PropertyGroup>
 

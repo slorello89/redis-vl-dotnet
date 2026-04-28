@@ -1,0 +1,59 @@
+= ONNX Reranker
+
+`RedisVL.Rerankers.Onnx` provides `OnnxTextReranker`, an `ITextReranker` implementation that scores query-plus-document pairs locally with ONNX Runtime.
+
+== Package contents
+
+* `OnnxTextReranker` for local cross-encoder reranking
+* `OnnxRerankerOptions` for model asset and runtime configuration
+* `OnnxRuntimeSessionOptions` for ONNX Runtime session tuning
+* `OnnxRerankerPackage` as the package marker type
+
+== Local model assets
+
+This package does not bundle model files. Applications must provide:
+
+* a local `model.onnx` file
+* a local Hugging Face `tokenizer.json` file
+
+The reference workflow assumes a BERT-style cross-encoder tokenizer shape:
+
+* `[CLS] query [SEP] document [SEP]`
+* `input_ids`
+* `attention_mask`
+* `token_type_ids` when the model expects them
+
+== Request options
+
+`OnnxRerankerOptions` currently supports:
+
+* `ModelPath` for the local ONNX model file
+* `TokenizerPath` for the local tokenizer definition
+* `MaxSequenceLength` with a default of `512`
+* `ScoreThreshold` when the application wants to drop low-scoring matches after inference
+* `SessionOptions` for local ONNX Runtime tuning such as graph optimization, execution mode, and thread counts
+
+`ScoreThreshold` is optional because score calibration can vary across exported cross-encoder models.
+
+== Example workflow
+
+`/examples/OnnxRerankerExample` shows the expected integration pattern:
+
+* load an initial candidate set
+* print the original candidate order
+* rerank those candidates with `OnnxTextReranker`
+* print the local ONNX-adjusted order
+
+Run it from the repository root after setting local asset paths:
+
+[source,bash]
+----
+export ONNX_RERANKER_MODEL_PATH=/path/to/model.onnx
+export ONNX_RERANKER_TOKENIZER_PATH=/path/to/tokenizer.json
+dotnet run --project examples/OnnxRerankerExample/OnnxRerankerExample.csproj
+----
+
+== Validation references
+
+* `tests/RedisVL.Tests/Rerankers/OnnxTextRerankerTests.cs` covers validation, ordering, `TopN`, and threshold behavior
+* `tests/RedisVL.Tests/Rerankers/OnnxTextRerankerSmokeTests.cs` is the local-asset smoke test gate

@@ -37,6 +37,7 @@ Use this map when you want the fastest path to a parity feature area:
 | OpenAI vectorizer package | [OpenAI Vectorizer](../docs-site/modules/ROOT/pages/extensions/openai-vectorizer.adoc) | [OpenAiVectorizerExample](./OpenAiVectorizerExample/README.md) | RediSearch with vector similarity support, `OPENAI_API_KEY`, and optional `OPENAI_EMBEDDING_MODEL`, `OPENAI_EMBEDDING_DIMENSIONS`, `REDIS_VL_REDIS_URL` |
 | Hugging Face vectorizer package | [Hugging Face Vectorizer](../docs-site/modules/ROOT/pages/extensions/huggingface-vectorizer.adoc) | [HuggingFaceVectorizerExample](./HuggingFaceVectorizerExample/README.md) | RediSearch with vector similarity support, `HF_TOKEN`, and optional `HF_EMBEDDING_MODEL`, `REDIS_VL_REDIS_URL` |
 | Cohere reranker package | [Cohere Reranker](../docs-site/modules/ROOT/pages/extensions/cohere-reranker.adoc) | [CohereRerankerExample](./CohereRerankerExample/README.md) | RediSearch + RedisJSON, `COHERE_API_KEY`, and optional `COHERE_RERANK_MODEL`, `REDIS_VL_REDIS_URL` |
+| ONNX reranker package | [ONNX Reranker](../docs-site/modules/ROOT/pages/extensions/onnx-reranker.adoc) | [OnnxRerankerExample](./OnnxRerankerExample/README.md) | Local `model.onnx` and `tokenizer.json` assets exposed through `ONNX_RERANKER_MODEL_PATH` and `ONNX_RERANKER_TOKENIZER_PATH` |
 | CLI index and schema commands | [CLI](../docs-site/modules/ROOT/pages/cli/index.adoc) | `dotnet run --project src/RedisVL.Cli -- ...` | Index commands require RediSearch plus `--redis` or `REDIS_VL_REDIS_URL`; JSON-backed index creation also requires RedisJSON |
 
 ### [JsonStorageExample](./JsonStorageExample/README.md)
@@ -228,6 +229,26 @@ Run it from the repository root:
 
 ```bash
 dotnet run --project examples/CohereRerankerExample/CohereRerankerExample.csproj
+```
+
+### [OnnxRerankerExample](./OnnxRerankerExample/README.md)
+
+Demonstrates local reranking with `RedisVL.Rerankers.Onnx`:
+
+- create an in-memory candidate set
+- build `RerankDocument` values from those candidates
+- rerank the candidates locally with `OnnxTextReranker`
+- print the original order alongside the ONNX-adjusted order
+
+Additional prerequisites:
+
+- `ONNX_RERANKER_MODEL_PATH`
+- `ONNX_RERANKER_TOKENIZER_PATH`
+
+Run it from the repository root:
+
+```bash
+dotnet run --project examples/OnnxRerankerExample/OnnxRerankerExample.csproj
 ```
 
 ## Related Docs

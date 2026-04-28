@@ -11,6 +11,7 @@ The repository keeps provider contracts and implementations outside the core pac
 * `src/RedisVL.Vectorizers.OpenAI` for OpenAI embeddings
 * `src/RedisVL.Vectorizers.HuggingFace` for Hugging Face `hf-inference` embeddings
 * `src/RedisVL.Rerankers.Cohere` for Cohere reranking
+* `src/RedisVL.Rerankers.Onnx` for local ONNX cross-encoder reranking
 
 == Shared contracts
 
@@ -36,6 +37,7 @@ Use these package pages when you need constructor, environment, and example guid
 * xref:extensions/openai-vectorizer.adoc[OpenAI vectorizer]
 * xref:extensions/huggingface-vectorizer.adoc[Hugging Face vectorizer]
 * xref:extensions/cohere-reranker.adoc[Cohere reranker]
+* xref:extensions/onnx-reranker.adoc[ONNX reranker]
 
 == Provider-backed examples
 
@@ -44,10 +46,11 @@ Use these examples when you want runnable package coverage:
 * `/examples/OpenAiVectorizerExample` requires `OPENAI_API_KEY`
 * `/examples/HuggingFaceVectorizerExample` requires `HF_TOKEN`
 * `/examples/CohereRerankerExample` requires `COHERE_API_KEY`
+* `/examples/OnnxRerankerExample` requires local `model.onnx` and `tokenizer.json` assets
 
-These examples show how the provider packages plug into higher-level workflows such as `SemanticCache`.
+These examples show how the extension packages plug into higher-level workflows and reranking pipelines.
 
-All three examples read credentials from environment variables and fail fast with an explicit message when the required provider credential is missing.
+The remote-provider examples read credentials from environment variables and fail fast with an explicit message when the required provider credential is missing. The ONNX example follows the same fail-fast pattern for local asset paths.
 
 == Related sections
 
