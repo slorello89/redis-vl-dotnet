@@ -1,54 +1,40 @@
 using Microsoft.Extensions.AI;
+using OpenAI.Embeddings;
 using RedisVL.Vectorizers.ExtensionsAI;
 
-using var generator = new KeywordEmbeddingGenerator();
-var vectorizer = new ExtensionsAiTextVectorizer(generator);
+var apiKey = Environment.GetEnvironmentVariable("OPENAI_API_KEY");
+if (string.IsNullOrWhiteSpace(apiKey))
+{
+    throw new InvalidOperationException(
+        "Set OPENAI_API_KEY before running the Microsoft.Extensions.AI vectorizer example.");
+}
 
-var singleEmbedding = await vectorizer.VectorizeAsync("redis vector search");
-var batchEmbeddings = await vectorizer.VectorizeAsync(
-    [
-        "redis vector search",
-        "semantic cache"
-    ]);
+var model = Environment.GetEnvironmentVariable("OPENAI_EMBEDDING_MODEL") ?? "text-embedding-3-small";
+var dimensionsValue = Environment.GetEnvironmentVariable("OPENAI_EMBEDDING_DIMENSIONS");
+int? dimensions = string.IsNullOrWhiteSpace(dimensionsValue) ? null : int.Parse(dimensionsValue);
 
-Console.WriteLine("Single embedding:");
-Console.WriteLine($"- [{string.Join(", ", singleEmbedding.Select(static value => value.ToString("F2")))}]");
+var embeddingClient = new EmbeddingClient(model, apiKey);
+using var embeddingGenerator = embeddingClient.AsIEmbeddingGenerator(dimensions);
+var vectorizer = new ExtensionsAiTextVectorizer(embeddingGenerator);
+
+var singleInput = "redis vector search";
+var batchInputs = new[]
+{
+    "redis vector search",
+    "semantic cache"
+};
+
+var singleEmbedding = await vectorizer.VectorizeAsync(singleInput);
+var batchEmbeddings = await vectorizer.VectorizeAsync(batchInputs);
+
+Console.WriteLine("OpenAI-backed Microsoft.Extensions.AI adapter");
+Console.WriteLine($"- model: {model}");
+Console.WriteLine($"- single input dimension: {singleEmbedding.Length}");
 
 Console.WriteLine();
 Console.WriteLine("Batch embeddings:");
 for (var index = 0; index < batchEmbeddings.Count; index++)
 {
-    Console.WriteLine($"- {index}: [{string.Join(", ", batchEmbeddings[index].Select(static value => value.ToString("F2")))}]");
-}
-
-internal sealed class KeywordEmbeddingGenerator : IEmbeddingGenerator<string, Embedding<float>>
-{
-    public void Dispose()
-    {
-    }
-
-    public object? GetService(Type serviceType, object? serviceKey = null) => null;
-
-    public Task<GeneratedEmbeddings<Embedding<float>>> GenerateAsync(
-        IEnumerable<string> values,
-        EmbeddingGenerationOptions? options = null,
-        CancellationToken cancellationToken = default)
-    {
-        var embeddings = new GeneratedEmbeddings<Embedding<float>>();
-        foreach (var value in values)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-
-            var normalizedValue = value.ToLowerInvariant();
-            embeddings.Add(new Embedding<float>(
-                new float[]
-                {
-                    normalizedValue.Contains("redis", StringComparison.Ordinal) ? 1f : 0f,
-                    normalizedValue.Contains("vector", StringComparison.Ordinal) ? 1f : 0f,
-                    normalizedValue.Contains("cache", StringComparison.Ordinal) ? 1f : 0f
-                }));
-        }
-
-        return Task.FromResult(embeddings);
-    }
+    Console.WriteLine(
+        $"- {index}: input='{batchInputs[index]}' dimension={batchEmbeddings[index].Length} first3=[{string.Join(", ", batchEmbeddings[index].Take(3).Select(static value => value.ToString("F4")))}]");
 }

@@ -1,12 +1,15 @@
 # Microsoft.Extensions.AI Vectorizer Example
 
-This example shows how to wrap a `Microsoft.Extensions.AI` embedding generator with `RedisVL.Vectorizers.ExtensionsAI`.
+This example shows how to wrap an OpenAI-backed `Microsoft.Extensions.AI` embedding generator with `RedisVL.Vectorizers.ExtensionsAI`.
 
 ## Prerequisites
 
 - .NET 9 SDK
+- `OPENAI_API_KEY`
+- Optional: `OPENAI_EMBEDDING_MODEL` to override the default `text-embedding-3-small`
+- Optional: `OPENAI_EMBEDDING_DIMENSIONS` to request a reduced embedding size when the selected model supports it
 
-This example uses an in-memory sample `IEmbeddingGenerator<string, Embedding<float>>`, so it does not require provider credentials or Redis.
+This example does not require Redis. It creates an `OpenAI.Embeddings.EmbeddingClient`, converts it to `IEmbeddingGenerator<string, Embedding<float>>` with `AsIEmbeddingGenerator(...)`, and then adapts that generator to `RedisVL` with `ExtensionsAiTextVectorizer`.
 
 ## Run
 

@@ -31,9 +31,10 @@ Typical usage is:
 
 == Example workflow
 
-`/examples/ExtensionsAiVectorizerExample` shows the minimal adapter pattern:
+`/examples/ExtensionsAiVectorizerExample` shows the adapter pattern with OpenAI:
 
-* create an `IEmbeddingGenerator<string, Embedding<float>>`
+* create an `OpenAI.Embeddings.EmbeddingClient`
+* convert it to `IEmbeddingGenerator<string, Embedding<float>>` with `AsIEmbeddingGenerator(...)`
 * wrap it with `ExtensionsAiTextVectorizer`
 * vectorize one input and a batch of inputs through the RedisVL abstraction
 

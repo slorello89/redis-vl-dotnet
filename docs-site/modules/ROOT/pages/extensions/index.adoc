@@ -47,13 +47,13 @@ Use these examples when you want runnable package coverage:
 
 * `/examples/OpenAiVectorizerExample` requires `OPENAI_API_KEY`
 * `/examples/HuggingFaceVectorizerExample` requires `HF_TOKEN`
-* `/examples/ExtensionsAiVectorizerExample` uses an in-memory sample `IEmbeddingGenerator<string, Embedding<float>>`
+* `/examples/ExtensionsAiVectorizerExample` uses an OpenAI-backed `IEmbeddingGenerator<string, Embedding<float>>`
 * `/examples/CohereRerankerExample` requires `COHERE_API_KEY`
 * `/examples/OnnxRerankerExample` requires local `model.onnx` and `tokenizer.json` assets
 
 These examples show how the extension packages plug into higher-level workflows and reranking pipelines.
 
-The remote-provider examples read credentials from environment variables and fail fast with an explicit message when the required provider credential is missing. The ONNX example follows the same fail-fast pattern for local asset paths. The Microsoft.Extensions.AI adapter example is credential-free because it uses an in-memory sample generator.
+The remote-provider examples read credentials from environment variables and fail fast with an explicit message when the required provider credential is missing. The ONNX example follows the same fail-fast pattern for local asset paths.
 
 == Related sections
 
