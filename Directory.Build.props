@@ -17,6 +17,7 @@
 
   <PropertyGroup Condition="'$(MSBuildProjectName)' == 'RedisVL' Or
                             '$(MSBuildProjectName)' == 'RedisVL.Vectorizers.Abstractions' Or
+                            '$(MSBuildProjectName)' == 'RedisVL.Vectorizers.ExtensionsAI' Or
                             '$(MSBuildProjectName)' == 'RedisVL.Vectorizers.OpenAI' Or
                             '$(MSBuildProjectName)' == 'RedisVL.Vectorizers.HuggingFace' Or
                             '$(MSBuildProjectName)' == 'RedisVL.Rerankers.Abstractions' Or
