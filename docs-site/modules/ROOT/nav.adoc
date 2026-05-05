@@ -25,6 +25,7 @@
 * xref:extensions/index.adoc[Extensions]
 ** xref:extensions/vectorizer-abstractions.adoc[Vectorizer Abstractions]
 ** xref:extensions/reranker-abstractions.adoc[Reranker Abstractions]
+** xref:extensions/extensions-ai-vectorizer.adoc[Microsoft.Extensions.AI Vectorizer]
 ** xref:extensions/openai-vectorizer.adoc[OpenAI Vectorizer]
 ** xref:extensions/huggingface-vectorizer.adoc[Hugging Face Vectorizer]
 ** xref:extensions/cohere-reranker.adoc[Cohere Reranker]

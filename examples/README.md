@@ -36,6 +36,7 @@ Use this map when you want the fastest path to a parity feature area:
 | Semantic route registration and nearest-route matching | [SemanticRouter](../docs-site/modules/ROOT/pages/core-features/semantic-router.adoc) | [SemanticRouterExample](./SemanticRouterExample/README.md) | RediSearch with vector similarity support and optional `REDIS_VL_REDIS_URL`; no provider credentials required |
 | OpenAI vectorizer package | [OpenAI Vectorizer](../docs-site/modules/ROOT/pages/extensions/openai-vectorizer.adoc) | [OpenAiVectorizerExample](./OpenAiVectorizerExample/README.md) | RediSearch with vector similarity support, `OPENAI_API_KEY`, and optional `OPENAI_EMBEDDING_MODEL`, `OPENAI_EMBEDDING_DIMENSIONS`, `REDIS_VL_REDIS_URL` |
 | Hugging Face vectorizer package | [Hugging Face Vectorizer](../docs-site/modules/ROOT/pages/extensions/huggingface-vectorizer.adoc) | [HuggingFaceVectorizerExample](./HuggingFaceVectorizerExample/README.md) | RediSearch with vector similarity support, `HF_TOKEN`, and optional `HF_EMBEDDING_MODEL`, `REDIS_VL_REDIS_URL` |
+| Microsoft.Extensions.AI vectorizer adapter | [Microsoft.Extensions.AI Vectorizer](../docs-site/modules/ROOT/pages/extensions/extensions-ai-vectorizer.adoc) | [ExtensionsAiVectorizerExample](./ExtensionsAiVectorizerExample/README.md) | In-memory sample `IEmbeddingGenerator<string, Embedding<float>>`; no provider credentials required |
 | Cohere reranker package | [Cohere Reranker](../docs-site/modules/ROOT/pages/extensions/cohere-reranker.adoc) | [CohereRerankerExample](./CohereRerankerExample/README.md) | RediSearch + RedisJSON, `COHERE_API_KEY`, and optional `COHERE_RERANK_MODEL`, `REDIS_VL_REDIS_URL` |
 | ONNX reranker package | [ONNX Reranker](../docs-site/modules/ROOT/pages/extensions/onnx-reranker.adoc) | [OnnxRerankerExample](./OnnxRerankerExample/README.md) | Local `model.onnx` and `tokenizer.json` assets exposed through `ONNX_RERANKER_MODEL_PATH` and `ONNX_RERANKER_TOKENIZER_PATH` |
 | CLI index and schema commands | [CLI](../docs-site/modules/ROOT/pages/cli/index.adoc) | `dotnet run --project src/RedisVL.Cli -- ...` | Index commands require RediSearch plus `--redis` or `REDIS_VL_REDIS_URL`; JSON-backed index creation also requires RedisJSON |
@@ -204,6 +205,21 @@ Run it from the repository root:
 
 ```bash
 dotnet run --project examples/HuggingFaceVectorizerExample/HuggingFaceVectorizerExample.csproj
+```
+
+### [ExtensionsAiVectorizerExample](./ExtensionsAiVectorizerExample/README.md)
+
+Demonstrates `Microsoft.Extensions.AI` interop through `RedisVL.Vectorizers.ExtensionsAI`:
+
+- create a sample `IEmbeddingGenerator<string, Embedding<float>>`
+- wrap it with `ExtensionsAiTextVectorizer`
+- vectorize one input and a batch of inputs through the RedisVL abstraction
+- print the resulting vectors
+
+Run it from the repository root:
+
+```bash
+dotnet run --project examples/ExtensionsAiVectorizerExample/ExtensionsAiVectorizerExample.csproj
 ```
 
 ### [CohereRerankerExample](./CohereRerankerExample/README.md)

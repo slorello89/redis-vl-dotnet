@@ -1,0 +1,49 @@
+= Microsoft.Extensions.AI Vectorizer
+
+`RedisVL.Vectorizers.ExtensionsAI` provides `ExtensionsAiTextVectorizer`, an `IBatchTextVectorizer` adapter over `IEmbeddingGenerator<string, Embedding<float>>` from `Microsoft.Extensions.AI`.
+
+== Package contents
+
+* `ExtensionsAiTextVectorizer` for adapting a Microsoft.Extensions.AI embedding generator to RedisVL vectorizer contracts
+* `ExtensionsAiVectorizerOptions` for forwarding optional embedding-generation settings
+* `ExtensionsAiVectorizerPackage` as the package marker type
+
+== Constructor options
+
+Use this construction path:
+
+* `new ExtensionsAiTextVectorizer(IEmbeddingGenerator<string, Embedding<float>> generator, ExtensionsAiVectorizerOptions? options = null)`
+
+`ExtensionsAiVectorizerOptions` currently supports:
+
+* `GenerationOptions` to forward `EmbeddingGenerationOptions` to the wrapped generator
+* `DisposeGenerator` when the adapter should own and dispose the wrapped generator
+
+== Interop workflow
+
+This adapter keeps `Microsoft.Extensions.AI` outside the core `RedisVL` package while still letting applications reuse an existing embedding stack.
+
+Typical usage is:
+
+* resolve or construct an `IEmbeddingGenerator<string, Embedding<float>>`
+* wrap it with `ExtensionsAiTextVectorizer`
+* pass the adapter anywhere `RedisVL` expects an `ITextVectorizer` or `IBatchTextVectorizer`
+
+== Example workflow
+
+`/examples/ExtensionsAiVectorizerExample` shows the minimal adapter pattern:
+
+* create an `IEmbeddingGenerator<string, Embedding<float>>`
+* wrap it with `ExtensionsAiTextVectorizer`
+* vectorize one input and a batch of inputs through the RedisVL abstraction
+
+Run it from the repository root:
+
+[source,bash]
+----
+dotnet run --project examples/ExtensionsAiVectorizerExample/ExtensionsAiVectorizerExample.csproj
+----
+
+== Validation references
+
+* `tests/RedisVL.Tests/Vectorizers/ExtensionsAiTextVectorizerTests.cs` covers request forwarding, validation, and disposal behavior
