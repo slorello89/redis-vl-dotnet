@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <Version>0.0.2</Version>
+    <Description>Microsoft.Extensions.AI embedding-generator adapters for redis-vl-dotnet.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.AI.Abstractions" Version="10.5.1" />
+    <ProjectReference Include="..\RedisVL.Vectorizers.Abstractions\RedisVL.Vectorizers.Abstractions.csproj" />
+  </ItemGroup>
+
+</Project>
