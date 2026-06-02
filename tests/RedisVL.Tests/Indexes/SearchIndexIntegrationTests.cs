@@ -255,7 +255,6 @@ public sealed class SearchIndexIntegrationTests
                 temporarySeconds: 300,
                 noOffsets: true,
                 noHighlight: true,
-                noFields: true,
                 noFrequencies: true,
                 skipInitialScan: true),
             [
@@ -305,7 +304,6 @@ public sealed class SearchIndexIntegrationTests
 
             Assert.Contains("NOOFFSETS", indexOptions);
             Assert.Contains("NOHL", indexOptions);
-            Assert.Contains("NOFIELDS", indexOptions);
             Assert.Contains("NOFREQS", indexOptions);
             Assert.Contains("MAXTEXTFIELDS", indexOptions);
 
@@ -316,6 +314,47 @@ public sealed class SearchIndexIntegrationTests
             Assert.Contains("UNF", flattenedAttributes);
             Assert.Contains("WEIGHT", flattenedAttributes);
             Assert.Contains("2.5", flattenedAttributes);
+        }
+        finally
+        {
+            if (await index.ExistsAsync())
+            {
+                await index.DropAsync(deleteDocuments: true);
+            }
+        }
+    }
+
+    [RedisSearchIntegrationFact]
+    public async Task CreatesIndexWithNoFieldsOption()
+    {
+        // NOFIELDS is validated in its own index because newer RediSearch rejects
+        // combining MAXTEXTFIELDS with NOFIELDS ("MAXTEXTFIELDS cannot be used with NOFIELDS").
+        await using var connection = await RedisSearchTestEnvironment.ConnectAsync();
+        var database = connection.GetDatabase();
+
+        var token = Guid.NewGuid().ToString("N");
+        var schema = new SearchSchema(
+            new IndexDefinition(
+                $"movies-nofields-idx-{token}",
+                $"movie:nofields:{token}:",
+                StorageType.Hash,
+                noFields: true),
+            [
+                new TextFieldDefinition("title")
+            ]);
+        var index = new SearchIndex(database, schema);
+
+        try
+        {
+            await index.CreateAsync();
+
+            var info = await index.InfoAsync();
+
+            Assert.True(info.TryGetValue("index_options", out var indexOptionsValue));
+
+            var indexOptions = FlattenRedisResult(indexOptionsValue).ToArray();
+
+            Assert.Contains("NOFIELDS", indexOptions);
         }
         finally
         {
