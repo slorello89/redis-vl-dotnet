@@ -1664,6 +1664,8 @@ public sealed class SearchIndexIntegrationTests
 
     private sealed record HybridAggregationRow(string Genre, int MatchCount, double AvgDistance);
 
+    private sealed record HybridSearchRow(string Id, string Title);
+
     private static IReadOnlyDictionary<string, string> ToFlatStringDictionary(RedisResult result)
     {
         var entries = (RedisResult[])result!;
@@ -1699,6 +1701,123 @@ public sealed class SearchIndexIntegrationTests
         }
 
         yield return result.ToString()!;
+    }
+
+    [RedisSearchIntegrationFact]
+    public async Task ExecutesNativeHybridSearchQueriesWithLinearFusion()
+    {
+        await using var connection = await RedisSearchTestEnvironment.ConnectAsync();
+        var database = connection.GetDatabase();
+
+        var token = Guid.NewGuid().ToString("N");
+        var schema = new SearchSchema(
+            new IndexDefinition($"native-hybrid-idx-{token}", $"native-hybrid:{token}:", StorageType.Hash),
+            [
+                new TextFieldDefinition("title"),
+                new TagFieldDefinition("genre"),
+                new VectorFieldDefinition(
+                    "embedding",
+                    new VectorFieldAttributes(
+                        VectorAlgorithm.Flat,
+                        VectorDataType.Float32,
+                        VectorDistanceMetric.Cosine,
+                        2))
+            ]);
+        var index = new SearchIndex(database, schema);
+
+        try
+        {
+            await index.CreateAsync();
+            await SeedHashDocumentsAsync(database, schema, SearchIndexSeedData.HybridMovies);
+            await RedisSearchTestEnvironment.WaitForIndexDocumentCountAsync(index, SearchIndexSeedData.HybridMovies.Count);
+
+            // "He*" matches "Heat" and "Heatwave"; [1,0] is an exact match for "Heat" on the vector branch.
+            var query = HybridSearchQuery.FromFloat32(
+                Filter.Text("title").Prefix("He"),
+                "embedding",
+                [1f, 0f],
+                3,
+                combination: new LinearHybridCombination(0.7, 0.3),
+                returnFields: ["title"]);
+
+            var results = await index.SearchAsync(query);
+            var typed = await index.SearchAsync<HybridSearchRow>(query);
+
+            Assert.True(results.Documents.Count >= 2);
+            Assert.Equal($"{schema.Index.Prefix}1", results.Documents[0].Id);
+            Assert.Equal("Heat", results.Documents[0].Values["title"]);
+            Assert.All(results.Documents, document =>
+            {
+                Assert.False(document.Values.ContainsKey(HybridSearchQuery.KeyField));
+                Assert.True(document.Values.ContainsKey(HybridSearchQuery.ScoreField));
+                Assert.True(double.TryParse(
+                    document.Values[HybridSearchQuery.ScoreField]!,
+                    System.Globalization.NumberStyles.Float,
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    out _));
+            });
+
+            Assert.Equal(results.Documents.Count, typed.Documents.Count);
+            Assert.Equal($"{schema.Index.Prefix}1", typed.Documents[0].Id);
+            Assert.Equal("Heat", typed.Documents[0].Title);
+        }
+        finally
+        {
+            if (await index.ExistsAsync())
+            {
+                await index.DropAsync(deleteDocuments: true);
+            }
+        }
+    }
+
+    [RedisSearchIntegrationFact]
+    public async Task ExecutesNativeHybridSearchQueriesWithVectorPreFilter()
+    {
+        await using var connection = await RedisSearchTestEnvironment.ConnectAsync();
+        var database = connection.GetDatabase();
+
+        var token = Guid.NewGuid().ToString("N");
+        var schema = new SearchSchema(
+            new IndexDefinition($"native-hybrid-filter-idx-{token}", $"native-hybrid-filter:{token}:", StorageType.Hash),
+            [
+                new TextFieldDefinition("title"),
+                new TagFieldDefinition("genre"),
+                new VectorFieldDefinition(
+                    "embedding",
+                    new VectorFieldAttributes(
+                        VectorAlgorithm.Flat,
+                        VectorDataType.Float32,
+                        VectorDistanceMetric.Cosine,
+                        2))
+            ]);
+        var index = new SearchIndex(database, schema);
+
+        try
+        {
+            await index.CreateAsync();
+            await SeedHashDocumentsAsync(database, schema, SearchIndexSeedData.HybridMovies);
+            await RedisSearchTestEnvironment.WaitForIndexDocumentCountAsync(index, SearchIndexSeedData.HybridMovies.Count);
+
+            var query = HybridSearchQuery.FromFloat32(
+                Filter.Text("title").Prefix("He"),
+                "embedding",
+                [0f, 1f],
+                3,
+                vectorFilter: Filter.Tag("genre").Eq("crime"),
+                returnFields: ["title", "genre"]);
+
+            var results = await index.SearchAsync(query);
+
+            Assert.NotEmpty(results.Documents);
+            Assert.All(results.Documents, document => Assert.Equal("crime", document.Values["genre"].ToString()));
+        }
+        finally
+        {
+            if (await index.ExistsAsync())
+            {
+                await index.DropAsync(deleteDocuments: true);
+            }
+        }
     }
 
     private static async Task SeedHashDocumentsAsync(

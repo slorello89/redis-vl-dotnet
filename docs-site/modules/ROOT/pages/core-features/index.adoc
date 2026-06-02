@@ -65,6 +65,9 @@ The core package centers on these feature groups:
 | xref:core-features/hybrid-query.adoc[`HybridQuery`]
 | Combined text-plus-vector search where a text predicate narrows semantic search candidates.
 
+| xref:core-features/hybrid-search-query.adoc[`HybridSearchQuery`]
+| Native `FT.HYBRID` search (Redis 8.4+) with server-side score fusion (linear weighting or reciprocal rank fusion).
+
 | xref:core-features/aggregate-hybrid-query.adoc[`AggregateHybridQuery`]
 | Vector + text filtering with aggregation pipelines, load fields, reducers, sort clauses, and runtime tuning.
 

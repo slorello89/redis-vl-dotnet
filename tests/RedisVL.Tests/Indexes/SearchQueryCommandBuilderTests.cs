@@ -824,6 +824,148 @@ public sealed class SearchQueryCommandBuilderTests
             });
     }
 
+    [Fact]
+    public void BuildsNativeHybridArgumentsWithServerDefaultCombination()
+    {
+        var schema = new SearchSchema(
+            new IndexDefinition("movies-idx", "movie:", StorageType.Hash),
+            [
+                new TextFieldDefinition("title"),
+                new VectorFieldDefinition(
+                    "embedding",
+                    new VectorFieldAttributes(
+                        VectorAlgorithm.Flat,
+                        VectorDataType.Float32,
+                        VectorDistanceMetric.Cosine,
+                        2))
+            ]);
+        var query = HybridSearchQuery.FromFloat32(
+            Filter.Text("title").Prefix("He"),
+            "embedding",
+            [1f, 0f],
+            3);
+
+        var rendered = SearchQueryCommandBuilder.BuildNativeHybridArguments(schema, query)
+            .Select(RenderArgument)
+            .ToArray();
+
+        Assert.Equal(
+            [
+                "movies-idx",
+                "SEARCH", "@title:He*",
+                "VSIM", "@embedding", "$vector",
+                "KNN", "2", "K", "3",
+                "LIMIT", "0", "3",
+                "LOAD", "2", "@__key", "@__score",
+                "PARAMS", "2", "vector", "<binary>"
+            ],
+            rendered);
+    }
+
+    [Fact]
+    public void BuildsNativeHybridArgumentsWithLinearCombinationFilterAndRuntimeOptions()
+    {
+        var schema = new SearchSchema(
+            new IndexDefinition("movies-idx", "movie:", StorageType.Hash),
+            [
+                new TextFieldDefinition("title"),
+                new TagFieldDefinition("genre"),
+                new VectorFieldDefinition(
+                    "embedding",
+                    new VectorFieldAttributes(
+                        VectorAlgorithm.Hnsw,
+                        VectorDataType.Float32,
+                        VectorDistanceMetric.Cosine,
+                        2,
+                        m: 16,
+                        efConstruction: 200))
+            ]);
+        var query = HybridSearchQuery.FromFloat32(
+            Filter.Text("title").Prefix("He"),
+            "embedding",
+            [1f, 0f],
+            5,
+            combination: new LinearHybridCombination(0.7, 0.3, window: 20),
+            vectorFilter: Filter.Tag("genre").Eq("crime"),
+            returnFields: ["title"],
+            runtimeOptions: new VectorKnnRuntimeOptions(efRuntime: 100),
+            pagination: new QueryPagination(limit: 5));
+
+        var rendered = SearchQueryCommandBuilder.BuildNativeHybridArguments(schema, query)
+            .Select(RenderArgument)
+            .ToArray();
+
+        Assert.Equal(
+            [
+                "movies-idx",
+                "SEARCH", "@title:He*",
+                "VSIM", "@embedding", "$vector",
+                "KNN", "4", "K", "5", "EF_RUNTIME", "100",
+                "FILTER", "@genre:{crime}",
+                "COMBINE", "LINEAR", "6", "ALPHA", "0.7", "BETA", "0.3", "WINDOW", "20",
+                "LIMIT", "0", "5",
+                "LOAD", "3", "@__key", "@__score", "@title",
+                "PARAMS", "2", "vector", "<binary>"
+            ],
+            rendered);
+    }
+
+    [Fact]
+    public void BuildsNativeHybridArgumentsWithReciprocalRankFusionCombination()
+    {
+        var schema = new SearchSchema(
+            new IndexDefinition("movies-idx", "movie:", StorageType.Hash),
+            [
+                new TextFieldDefinition("title"),
+                new VectorFieldDefinition(
+                    "embedding",
+                    new VectorFieldAttributes(
+                        VectorAlgorithm.Flat,
+                        VectorDataType.Float32,
+                        VectorDistanceMetric.Cosine,
+                        2))
+            ]);
+        var query = HybridSearchQuery.FromFloat32(
+            Filter.Text("title").Prefix("He"),
+            "embedding",
+            [1f, 0f],
+            4,
+            combination: new ReciprocalRankFusionHybridCombination(constant: 60, window: 50));
+
+        var rendered = SearchQueryCommandBuilder.BuildNativeHybridArguments(schema, query)
+            .Select(RenderArgument)
+            .ToArray();
+
+        Assert.Equal(
+            [
+                "movies-idx",
+                "SEARCH", "@title:He*",
+                "VSIM", "@embedding", "$vector",
+                "KNN", "2", "K", "4",
+                "COMBINE", "RRF", "4", "CONSTANT", "60", "WINDOW", "50",
+                "LIMIT", "0", "4",
+                "LOAD", "2", "@__key", "@__score",
+                "PARAMS", "2", "vector", "<binary>"
+            ],
+            rendered);
+    }
+
+    [Fact]
+    public void HybridSearchQueryRequiresTextPredicate()
+    {
+        Assert.Throws<ArgumentException>(() => HybridSearchQuery.FromFloat32(
+            Filter.Tag("genre").Eq("crime"),
+            "embedding",
+            [1f, 0f],
+            3));
+    }
+
+    [Fact]
+    public void ReciprocalRankFusionCombinationRequiresAtLeastOneArgument()
+    {
+        Assert.Throws<ArgumentException>(() => new ReciprocalRankFusionHybridCombination());
+    }
+
     private static string RenderArgument(object argument) =>
         argument is byte[] ? "<binary>" : argument.ToString()!;
 }
