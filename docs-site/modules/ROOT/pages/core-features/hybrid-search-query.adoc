@@ -1,0 +1,55 @@
+= HybridSearchQuery
+
+`HybridSearchQuery` runs a native xref:https://redis.io/docs/latest/commands/ft.hybrid/[`FT.HYBRID`] query (Redis 8.4+). The text branch (`SEARCH`) and the vector branch (`VSIM`) are scored independently and fused server-side, giving you tunable weighting between lexical and semantic relevance.
+
+[NOTE]
+====
+`FT.HYBRID` requires Redis 8.4 or newer. On older servers use xref:core-features/hybrid-query.adoc[`HybridQuery`] (a single `FT.SEARCH` expression) or xref:core-features/aggregate-hybrid-query.adoc[`AggregateHybridQuery`] (`FT.AGGREGATE`) instead.
+====
+
+== Basic shape
+
+[source,csharp]
+----
+var query = HybridSearchQuery.FromFloat32(
+    Filter.Text("title").Prefix("He"),   // SEARCH branch (must contain a text predicate)
+    "plot_embedding",                     // VSIM branch
+    queryVector,
+    topK: 3,
+    combination: new LinearHybridCombination(alpha: 0.7, beta: 0.3),
+    vectorFilter: Filter.Tag("genre").Eq("crime"),
+    returnFields: ["title"]);
+
+var results = await index.SearchAsync(query);
+var typed = await index.SearchAsync<Movie>(query);
+----
+
+Each returned document exposes the fused score under `HybridSearchQuery.ScoreField` (`__score`); the source document key becomes the result `Id`.
+
+== Fusion strategies
+
+The `combination` argument controls how the two branches are merged:
+
+* `LinearHybridCombination(alpha, beta, window?)` — weighted blend where `alpha` weights the text score and `beta` weights the vector score (`COMBINE LINEAR`).
+* `ReciprocalRankFusionHybridCombination(constant?, window?)` — reciprocal rank fusion (`COMBINE RRF`). At least one of `constant` or `window` must be supplied.
+* `null` (default) — use the server default, which is RRF with a window of 20 and a constant of 60.
+
+== Filtering
+
+* The `textQuery` (the first argument) drives the lexical `SEARCH` branch and must contain at least one text predicate, otherwise construction throws `ArgumentException`.
+* `vectorFilter` applies an optional pre-filter to the vector branch (`VSIM ... FILTER`), restricting the candidate set considered during nearest-neighbour search.
+
+== Paging and runtime behavior
+
+* `topK` (the `KNN K` count) must be greater than zero.
+* `pagination` maps to `LIMIT offset num` and defaults to the first `topK` results.
+* `VectorKnnRuntimeOptions.EfRuntime` emits `EF_RUNTIME` for HNSW vector fields.
+
+Return-field normalization and typed mapping behave the same way as xref:core-features/vector-query.adoc[`VectorQuery`].
+
+== Related pages
+
+* xref:core-features/hybrid-query.adoc[HybridQuery]
+* xref:core-features/aggregate-hybrid-query.adoc[AggregateHybridQuery]
+* xref:core-features/vector-query.adoc[VectorQuery]
+* xref:core-features/text-query.adoc[TextQuery]

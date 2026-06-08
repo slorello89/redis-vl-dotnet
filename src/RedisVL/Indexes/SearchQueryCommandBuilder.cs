@@ -282,6 +282,79 @@ internal static class SearchQueryCommandBuilder
         return arguments.ToArray();
     }
 
+    public static object[] BuildNativeHybridArguments(SearchSchema schema, HybridSearchQuery query)
+    {
+        ArgumentNullException.ThrowIfNull(schema);
+        ArgumentNullException.ThrowIfNull(query);
+
+        var vectorField = ResolveVectorField(schema, query.VectorFieldName);
+        ValidateVectorPayload(vectorField.Attributes, query.VectorFieldName, query.Vector);
+        ValidateRuntimeParameters(vectorField, query.VectorFieldName, query.RuntimeOptions);
+
+        var arguments = new List<object>
+        {
+            schema.Index.Name,
+            "SEARCH",
+            query.TextQuery.ToQueryString(),
+            "VSIM",
+            $"@{GetQueryFieldName(schema, vectorField)}",
+            "$vector"
+        };
+
+        AppendHybridKnnClause(arguments, query);
+
+        if (query.VectorFilter is not null)
+        {
+            arguments.Add("FILTER");
+            arguments.Add(query.VectorFilter.ToQueryString());
+        }
+
+        query.Combination?.AppendTo(arguments);
+
+        AppendLimit(arguments, query.Offset, query.Limit);
+        AppendHybridLoadClause(arguments, query);
+
+        arguments.Add("PARAMS");
+        arguments.Add("2");
+        arguments.Add("vector");
+        arguments.Add(query.Vector);
+
+        return arguments.ToArray();
+    }
+
+    private static void AppendHybridKnnClause(List<object> arguments, HybridSearchQuery query)
+    {
+        arguments.Add("KNN");
+        if (query.RuntimeOptions?.EfRuntime is int efRuntime)
+        {
+            arguments.Add("4");
+            arguments.Add("K");
+            arguments.Add(query.TopK.ToString(CultureInfo.InvariantCulture));
+            arguments.Add("EF_RUNTIME");
+            arguments.Add(efRuntime.ToString(CultureInfo.InvariantCulture));
+        }
+        else
+        {
+            arguments.Add("2");
+            arguments.Add("K");
+            arguments.Add(query.TopK.ToString(CultureInfo.InvariantCulture));
+        }
+    }
+
+    private static void AppendHybridLoadClause(List<object> arguments, HybridSearchQuery query)
+    {
+        var fields = new List<object>
+        {
+            $"@{HybridSearchQuery.KeyField}",
+            $"@{HybridSearchQuery.ScoreField}"
+        };
+        fields.AddRange(query.ReturnFields.Select(static field => (object)$"@{field}"));
+
+        arguments.Add("LOAD");
+        arguments.Add(fields.Count.ToString(CultureInfo.InvariantCulture));
+        arguments.AddRange(fields);
+    }
+
     public static object[] BuildVectorRangeArguments(SearchSchema schema, VectorRangeQuery query)
     {
         ArgumentNullException.ThrowIfNull(schema);

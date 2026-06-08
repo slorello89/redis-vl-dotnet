@@ -13,6 +13,7 @@ public sealed class SearchIndex
     private readonly JsonSerializerOptions _serializerOptions;
     private const string ListIndexesCommand = "FT._LIST";
     private const string InfoCommand = "FT.INFO";
+    private const string HybridCommand = "FT.HYBRID";
 
     public SearchIndex(IDatabase database, SearchSchema schema)
     {
@@ -479,6 +480,34 @@ public sealed class SearchIndex
 
     public async Task<SearchResults<TDocument>> SearchAsync<TDocument>(
         HybridQuery query,
+        JsonSerializerOptions? serializerOptions = null,
+        CancellationToken cancellationToken = default)
+    {
+        var results = await SearchAsync(query, cancellationToken).ConfigureAwait(false);
+        cancellationToken.ThrowIfCancellationRequested();
+        return results.Map<TDocument>(serializerOptions);
+    }
+
+    public SearchResults Search(HybridSearchQuery query) =>
+        SearchAsync(query).GetAwaiter().GetResult();
+
+    public SearchResults<TDocument> Search<TDocument>(HybridSearchQuery query, JsonSerializerOptions? serializerOptions = null) =>
+        SearchAsync<TDocument>(query, serializerOptions).GetAwaiter().GetResult();
+
+    public async Task<SearchResults> SearchAsync(HybridSearchQuery query, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(query);
+
+        var result = await ExecuteAsync(
+            HybridCommand,
+            SearchQueryCommandBuilder.BuildNativeHybridArguments(Schema, query),
+            cancellationToken).ConfigureAwait(false);
+
+        return HybridSearchResultsParser.Parse(result);
+    }
+
+    public async Task<SearchResults<TDocument>> SearchAsync<TDocument>(
+        HybridSearchQuery query,
         JsonSerializerOptions? serializerOptions = null,
         CancellationToken cancellationToken = default)
     {
