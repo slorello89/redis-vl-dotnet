@@ -1743,10 +1743,19 @@ public sealed class SearchIndexIntegrationTests
             var results = await index.SearchAsync(query);
             var typed = await index.SearchAsync<HybridSearchRow>(query);
 
+            // "He*" matches Heat (:1) and Heatwave (:2) on the text branch; the KNN branch can also
+            // surface Arrival (:3). FT.HYBRID does not guarantee a stable result order for close fused
+            // scores, so assert on the returned set and on score accuracy (looked up by id) rather than
+            // on a fixed position.
+            var heatId = $"{schema.Index.Prefix}1";
+            var heatwaveId = $"{schema.Index.Prefix}2";
+
             Assert.True(results.Documents.Count >= 2);
-            Assert.Equal($"{schema.Index.Prefix}1", results.Documents[0].Id);
-            Assert.Equal("Heat", results.Documents[0].Values["title"]);
-            Assert.All(results.Documents, document =>
+            Assert.Contains(results.Documents, document => document.Id == heatId);
+            Assert.Contains(results.Documents, document => document.Id == heatwaveId);
+
+            var scoresById = new Dictionary<string, double>();
+            foreach (var document in results.Documents)
             {
                 Assert.False(document.Values.ContainsKey(HybridSearchQuery.KeyField));
                 Assert.True(document.Values.ContainsKey(HybridSearchQuery.ScoreField));
@@ -1754,12 +1763,19 @@ public sealed class SearchIndexIntegrationTests
                     document.Values[HybridSearchQuery.ScoreField]!,
                     System.Globalization.NumberStyles.Float,
                     System.Globalization.CultureInfo.InvariantCulture,
-                    out _));
-            });
+                    out var score));
+                Assert.True(double.IsFinite(score) && score > 0);
+                scoresById[document.Id] = score;
+            }
+
+            // Heat is an exact vector match for [1,0] and also matches the text branch, so with linear
+            // fusion it must carry the highest fused score regardless of the order results come back in.
+            Assert.Equal(scoresById.Values.Max(), scoresById[heatId]);
+            Assert.True(scoresById[heatId] >= scoresById[heatwaveId]);
+            Assert.Equal("Heat", results.Documents.Single(document => document.Id == heatId).Values["title"]);
 
             Assert.Equal(results.Documents.Count, typed.Documents.Count);
-            Assert.Equal($"{schema.Index.Prefix}1", typed.Documents[0].Id);
-            Assert.Equal("Heat", typed.Documents[0].Title);
+            Assert.Contains(typed.Documents, document => document.Id == heatId && document.Title == "Heat");
         }
         finally
         {
