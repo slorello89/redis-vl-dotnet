@@ -16,6 +16,8 @@ public sealed class SemanticCache
     private readonly IDatabase _database;
     private readonly SearchIndex _index;
     private readonly JsonSerializerOptions _serializerOptions;
+    private long _hitCount;
+    private long _missCount;
 
     public SemanticCache(IDatabase database, SemanticCacheOptions options)
     {
@@ -37,6 +39,40 @@ public sealed class SemanticCache
     public TimeSpan? TimeToLive => Options.TimeToLive;
 
     public double DistanceThreshold => Options.DistanceThreshold;
+
+    /// <summary>
+    /// Gets the number of cache lookups that returned a hit. Only tracked when
+    /// <see cref="SemanticCacheOptions.TrackStatistics" /> is enabled; otherwise zero.
+    /// </summary>
+    public long HitCount => Interlocked.Read(ref _hitCount);
+
+    /// <summary>
+    /// Gets the number of cache lookups that returned a miss. Only tracked when
+    /// <see cref="SemanticCacheOptions.TrackStatistics" /> is enabled; otherwise zero.
+    /// </summary>
+    public long MissCount => Interlocked.Read(ref _missCount);
+
+    /// <summary>
+    /// Gets the fraction of cache lookups that returned a hit (<c>hits / (hits + misses)</c>),
+    /// or <c>0</c> when no lookups have been tracked.
+    /// </summary>
+    public double HitRate
+    {
+        get
+        {
+            var hits = Interlocked.Read(ref _hitCount);
+            var misses = Interlocked.Read(ref _missCount);
+            var total = hits + misses;
+            return total == 0 ? 0d : (double)hits / total;
+        }
+    }
+
+    /// <summary>Resets the tracked hit and miss counters to zero.</summary>
+    public void ResetStatistics()
+    {
+        Interlocked.Exchange(ref _hitCount, 0);
+        Interlocked.Exchange(ref _missCount, 0);
+    }
 
     public bool Create(CreateIndexOptions? options = null) =>
         CreateAsync(options).GetAwaiter().GetResult();
@@ -78,31 +114,8 @@ public sealed class SemanticCache
         CancellationToken cancellationToken = default)
     {
         NormalizePrompt(prompt);
-        ArgumentNullException.ThrowIfNull(embedding);
-        ValidateFilterUsage(filter);
-
-        cancellationToken.ThrowIfCancellationRequested();
-
-        var results = await _index.SearchAsync(
-            VectorRangeQuery.FromFloat32(
-                Options.EmbeddingFieldName,
-                embedding,
-                DistanceThreshold,
-                filter,
-                returnFields: [Options.PromptFieldName, Options.ResponseFieldName, Options.MetadataFieldName],
-                scoreAlias: "distance",
-                limit: 1),
-            cancellationToken: cancellationToken).ConfigureAwait(false);
-
-        foreach (var document in results.Documents)
-        {
-            if (TryMapSearchHit(document, out var hit))
-            {
-                return hit;
-            }
-        }
-
-        return null;
+        var hits = await SearchHitsAsync(embedding, 1, filter, cancellationToken).ConfigureAwait(false);
+        return hits.Count > 0 ? hits[0] : null;
     }
 
     public async Task<SemanticCacheHit?> CheckAsync(
@@ -116,6 +129,157 @@ public sealed class SemanticCache
         var embedding = await vectorizer.VectorizeAsync(NormalizePrompt(prompt), cancellationToken).ConfigureAwait(false);
         cancellationToken.ThrowIfCancellationRequested();
         return await CheckAsync(prompt, embedding, filter, cancellationToken).ConfigureAwait(false);
+    }
+
+    public IReadOnlyList<SemanticCacheHit> CheckTopK(string prompt, float[] embedding, int topK, FilterExpression? filter = null) =>
+        CheckTopKAsync(prompt, embedding, topK, filter).GetAwaiter().GetResult();
+
+    public IReadOnlyList<SemanticCacheHit> CheckTopK(string prompt, ITextVectorizer vectorizer, int topK, FilterExpression? filter = null) =>
+        CheckTopKAsync(prompt, vectorizer, topK, filter).GetAwaiter().GetResult();
+
+    /// <summary>
+    /// Returns up to <paramref name="topK" /> cached entries within the configured distance threshold,
+    /// ordered nearest-first. An empty list indicates a cache miss.
+    /// </summary>
+    public async Task<IReadOnlyList<SemanticCacheHit>> CheckTopKAsync(
+        string prompt,
+        float[] embedding,
+        int topK,
+        FilterExpression? filter = null,
+        CancellationToken cancellationToken = default)
+    {
+        NormalizePrompt(prompt);
+        if (topK <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(topK), topK, "Semantic cache topK must be greater than zero.");
+        }
+
+        return await SearchHitsAsync(embedding, topK, filter, cancellationToken).ConfigureAwait(false);
+    }
+
+    public async Task<IReadOnlyList<SemanticCacheHit>> CheckTopKAsync(
+        string prompt,
+        ITextVectorizer vectorizer,
+        int topK,
+        FilterExpression? filter = null,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(vectorizer);
+
+        var embedding = await vectorizer.VectorizeAsync(NormalizePrompt(prompt), cancellationToken).ConfigureAwait(false);
+        cancellationToken.ThrowIfCancellationRequested();
+        return await CheckTopKAsync(prompt, embedding, topK, filter, cancellationToken).ConfigureAwait(false);
+    }
+
+    public IReadOnlyList<SemanticCacheHit?> CheckMany(IEnumerable<SemanticCacheCheckRequest> requests) =>
+        CheckManyAsync(requests).GetAwaiter().GetResult();
+
+    public IReadOnlyList<SemanticCacheHit?> CheckMany(IEnumerable<SemanticCacheCheckRequest> requests, ITextVectorizer vectorizer) =>
+        CheckManyAsync(requests, vectorizer).GetAwaiter().GetResult();
+
+    /// <summary>
+    /// Runs a batch of cache lookups. The result list is aligned to the input order; a <see langword="null" />
+    /// element indicates a miss for the request at that position.
+    /// </summary>
+    public async Task<IReadOnlyList<SemanticCacheHit?>> CheckManyAsync(
+        IEnumerable<SemanticCacheCheckRequest> requests,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(requests);
+
+        var materialized = requests.ToList();
+        var hits = new List<SemanticCacheHit?>(materialized.Count);
+        foreach (var request in materialized)
+        {
+            ArgumentNullException.ThrowIfNull(request);
+            if (request.Embedding is null)
+            {
+                throw new ArgumentException("Each check request must provide an embedding when no vectorizer is supplied.", nameof(requests));
+            }
+
+            hits.Add(await CheckAsync(request.Prompt, request.Embedding, request.Filter, cancellationToken).ConfigureAwait(false));
+        }
+
+        return hits;
+    }
+
+    public async Task<IReadOnlyList<SemanticCacheHit?>> CheckManyAsync(
+        IEnumerable<SemanticCacheCheckRequest> requests,
+        ITextVectorizer vectorizer,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(requests);
+        ArgumentNullException.ThrowIfNull(vectorizer);
+
+        var materialized = requests.ToList();
+        var prompts = materialized.Select(request =>
+        {
+            ArgumentNullException.ThrowIfNull(request);
+            return NormalizePrompt(request.Prompt);
+        }).ToList();
+
+        var embeddings = await vectorizer.VectorizeManyAsync(prompts, cancellationToken).ConfigureAwait(false);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        var hits = new List<SemanticCacheHit?>(materialized.Count);
+        for (var index = 0; index < materialized.Count; index++)
+        {
+            hits.Add(await CheckAsync(materialized[index].Prompt, embeddings[index], materialized[index].Filter, cancellationToken).ConfigureAwait(false));
+        }
+
+        return hits;
+    }
+
+    private async Task<IReadOnlyList<SemanticCacheHit>> SearchHitsAsync(
+        float[] embedding,
+        int limit,
+        FilterExpression? filter,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(embedding);
+        ValidateFilterUsage(filter);
+
+        cancellationToken.ThrowIfCancellationRequested();
+
+        var results = await _index.SearchAsync(
+            VectorRangeQuery.FromFloat32(
+                Options.EmbeddingFieldName,
+                embedding,
+                DistanceThreshold,
+                filter,
+                returnFields: [Options.PromptFieldName, Options.ResponseFieldName, Options.MetadataFieldName],
+                scoreAlias: "distance",
+                limit: limit),
+            cancellationToken: cancellationToken).ConfigureAwait(false);
+
+        var hits = new List<SemanticCacheHit>(results.Documents.Count);
+        foreach (var document in results.Documents)
+        {
+            if (TryMapSearchHit(document, out var hit))
+            {
+                hits.Add(hit);
+            }
+        }
+
+        RecordLookup(hits.Count > 0);
+        return hits;
+    }
+
+    private void RecordLookup(bool hit)
+    {
+        if (!Options.TrackStatistics)
+        {
+            return;
+        }
+
+        if (hit)
+        {
+            Interlocked.Increment(ref _hitCount);
+        }
+        else
+        {
+            Interlocked.Increment(ref _missCount);
+        }
     }
 
     public string Store(
@@ -192,6 +356,119 @@ public sealed class SemanticCache
         var embedding = await vectorizer.VectorizeAsync(NormalizePrompt(prompt), cancellationToken).ConfigureAwait(false);
         cancellationToken.ThrowIfCancellationRequested();
         return await StoreAsync(prompt, response, embedding, metadata, filterValues, cancellationToken).ConfigureAwait(false);
+    }
+
+    public IReadOnlyList<string> StoreMany(IEnumerable<SemanticCacheStoreRequest> requests) =>
+        StoreManyAsync(requests).GetAwaiter().GetResult();
+
+    public IReadOnlyList<string> StoreMany(IEnumerable<SemanticCacheStoreRequest> requests, ITextVectorizer vectorizer) =>
+        StoreManyAsync(requests, vectorizer).GetAwaiter().GetResult();
+
+    /// <summary>
+    /// Stores multiple prompt/response pairs. Each request must carry its own embedding; the returned key
+    /// list is aligned to the input order.
+    /// </summary>
+    public async Task<IReadOnlyList<string>> StoreManyAsync(
+        IEnumerable<SemanticCacheStoreRequest> requests,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(requests);
+
+        var materialized = requests.ToList();
+        var keys = new List<string>(materialized.Count);
+        foreach (var request in materialized)
+        {
+            ArgumentNullException.ThrowIfNull(request);
+            if (request.Embedding is null)
+            {
+                throw new ArgumentException("Each store request must provide an embedding when no vectorizer is supplied.", nameof(requests));
+            }
+
+            keys.Add(await StoreAsync(request.Prompt, request.Response, request.Embedding, request.Metadata, request.FilterValues, cancellationToken).ConfigureAwait(false));
+        }
+
+        return keys;
+    }
+
+    /// <summary>
+    /// Stores multiple prompt/response pairs, vectorizing all prompts in a single batch via
+    /// <paramref name="vectorizer" />. Any embedding supplied on a request is ignored.
+    /// </summary>
+    public async Task<IReadOnlyList<string>> StoreManyAsync(
+        IEnumerable<SemanticCacheStoreRequest> requests,
+        ITextVectorizer vectorizer,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(requests);
+        ArgumentNullException.ThrowIfNull(vectorizer);
+
+        var materialized = requests.ToList();
+        var prompts = materialized.Select(request =>
+        {
+            ArgumentNullException.ThrowIfNull(request);
+            return NormalizePrompt(request.Prompt);
+        }).ToList();
+
+        var embeddings = await vectorizer.VectorizeManyAsync(prompts, cancellationToken).ConfigureAwait(false);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        var keys = new List<string>(materialized.Count);
+        for (var index = 0; index < materialized.Count; index++)
+        {
+            var request = materialized[index];
+            keys.Add(await StoreAsync(request.Prompt, request.Response, embeddings[index], request.Metadata, request.FilterValues, cancellationToken).ConfigureAwait(false));
+        }
+
+        return keys;
+    }
+
+    public bool Update(string key, string? response = null, object? metadata = null) =>
+        UpdateAsync(key, response, metadata).GetAwaiter().GetResult();
+
+    /// <summary>
+    /// Updates the response and/or metadata of an existing cached entry identified by <paramref name="key" />
+    /// (as returned by <c>Store</c>). Refreshes the TTL when one is configured. Returns <see langword="false" />
+    /// when the key does not exist; the embedding and filter values are left unchanged.
+    /// </summary>
+    public async Task<bool> UpdateAsync(
+        string key,
+        string? response = null,
+        object? metadata = null,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(key);
+        if (response is null && metadata is null)
+        {
+            throw new ArgumentException("Specify a response and/or metadata to update.", nameof(response));
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+
+        if (!await _database.KeyExistsAsync(key).WaitAsync(cancellationToken).ConfigureAwait(false))
+        {
+            return false;
+        }
+
+        var entries = new List<HashEntry>(2);
+        if (response is not null)
+        {
+            entries.Add(new HashEntry(Options.ResponseFieldName, NormalizeResponse(response)));
+        }
+
+        if (metadata is not null)
+        {
+            entries.Add(new HashEntry(Options.MetadataFieldName, SerializeMetadata(metadata)));
+        }
+
+        await _database.HashSetAsync((RedisKey)key, entries.ToArray()).WaitAsync(cancellationToken).ConfigureAwait(false);
+
+        if (TimeToLive.HasValue)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            await _database.KeyExpireAsync((RedisKey)key, TimeToLive).WaitAsync(cancellationToken).ConfigureAwait(false);
+        }
+
+        return true;
     }
 
     internal RedisKey CreateKey(string prompt, IReadOnlyDictionary<string, RedisValue>? filterValues = null)
@@ -447,3 +724,25 @@ public sealed class SemanticCache
 }
 
 public sealed record SemanticCacheHit(string Prompt, string Response, double Distance, string? Metadata = null);
+
+/// <summary>A single entry for a batch <c>StoreMany</c> call.</summary>
+/// <remarks>
+/// <see cref="Embedding" /> is required for the precomputed-vector <c>StoreMany</c> overload and ignored by
+/// the overload that accepts an <see cref="ITextVectorizer" />.
+/// </remarks>
+public sealed record SemanticCacheStoreRequest(
+    string Prompt,
+    string Response,
+    float[]? Embedding = null,
+    object? Metadata = null,
+    IReadOnlyDictionary<string, object?>? FilterValues = null);
+
+/// <summary>A single lookup for a batch <c>CheckMany</c> call.</summary>
+/// <remarks>
+/// <see cref="Embedding" /> is required for the precomputed-vector <c>CheckMany</c> overload and ignored by
+/// the overload that accepts an <see cref="ITextVectorizer" />.
+/// </remarks>
+public sealed record SemanticCacheCheckRequest(
+    string Prompt,
+    float[]? Embedding = null,
+    FilterExpression? Filter = null);

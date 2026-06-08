@@ -186,18 +186,228 @@ public sealed class SemanticCacheTests
                 filterableFields: [new TagFieldDefinition("tenant", alias: "tenantAlias")]));
     }
 
-    private static SemanticCacheOptions CreateOptions() =>
+    [Fact]
+    public async Task CheckTopKAsync_ReturnsHitsOrderedNearestFirst()
+    {
+        var (database, recorder) = RecordingDatabaseProxy.CreatePair();
+        recorder.ExecuteAsyncHandler = (command, _) => command switch
+        {
+            "FT.SEARCH" => Task.FromResult(
+                RedisResult.Create(
+                [
+                    RedisResult.Create(2),
+                    RedisResult.Create((RedisValue)"semantic:unit-cache:tests:k1"),
+                    RedisResult.Create(
+                    [
+                        RedisResult.Create((RedisValue)"prompt"),
+                        RedisResult.Create((RedisValue)"first"),
+                        RedisResult.Create((RedisValue)"response"),
+                        RedisResult.Create((RedisValue)"resp-1"),
+                        RedisResult.Create((RedisValue)"distance"),
+                        RedisResult.Create((RedisValue)"0.05")
+                    ]),
+                    RedisResult.Create((RedisValue)"semantic:unit-cache:tests:k2"),
+                    RedisResult.Create(
+                    [
+                        RedisResult.Create((RedisValue)"prompt"),
+                        RedisResult.Create((RedisValue)"second"),
+                        RedisResult.Create((RedisValue)"response"),
+                        RedisResult.Create((RedisValue)"resp-2"),
+                        RedisResult.Create((RedisValue)"distance"),
+                        RedisResult.Create((RedisValue)"0.2")
+                    ])
+                ])),
+            _ => Task.FromResult(RedisResult.Create((RedisValue)"OK"))
+        };
+        var cache = new SemanticCache(database, CreateOptions());
+
+        var hits = await cache.CheckTopKAsync("prompt", [1f, 0f], topK: 5);
+
+        Assert.Equal(2, hits.Count);
+        Assert.Equal("resp-1", hits[0].Response);
+        Assert.Equal("resp-2", hits[1].Response);
+        Assert.True(hits[0].Distance < hits[1].Distance);
+    }
+
+    [Fact]
+    public async Task CheckTopKAsync_WithNonPositiveTopK_Throws()
+    {
+        var (database, _) = RecordingDatabaseProxy.CreatePair();
+        var cache = new SemanticCache(database, CreateOptions());
+
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => cache.CheckTopKAsync("prompt", [1f, 0f], 0));
+    }
+
+    [Fact]
+    public async Task Statistics_TrackHitsMissesAndRate_WhenEnabled()
+    {
+        var (database, recorder) = RecordingDatabaseProxy.CreatePair();
+        var hitNext = true;
+        recorder.ExecuteAsyncHandler = (command, _) =>
+            command == "FT.SEARCH"
+                ? Task.FromResult(hitNext ? SingleHitResult() : MissResult())
+                : Task.FromResult(RedisResult.Create((RedisValue)"OK"));
+        var cache = new SemanticCache(database, CreateOptions(trackStatistics: true));
+
+        hitNext = true;
+        await cache.CheckAsync("p", [1f, 0f]);
+        await cache.CheckAsync("p", [1f, 0f]);
+        hitNext = false;
+        await cache.CheckAsync("p", [0f, 1f]);
+
+        Assert.Equal(2, cache.HitCount);
+        Assert.Equal(1, cache.MissCount);
+        Assert.Equal(2d / 3d, cache.HitRate, 5);
+
+        cache.ResetStatistics();
+        Assert.Equal(0, cache.HitCount);
+        Assert.Equal(0, cache.MissCount);
+        Assert.Equal(0d, cache.HitRate);
+    }
+
+    [Fact]
+    public async Task Statistics_StayZero_WhenDisabled()
+    {
+        var (database, recorder) = RecordingDatabaseProxy.CreatePair();
+        recorder.ExecuteAsyncHandler = (_, _) => Task.FromResult(SingleHitResult());
+        var cache = new SemanticCache(database, CreateOptions());
+
+        await cache.CheckAsync("p", [1f, 0f]);
+
+        Assert.Equal(0, cache.HitCount);
+        Assert.Equal(0, cache.MissCount);
+        Assert.Equal(0d, cache.HitRate);
+    }
+
+    [Fact]
+    public async Task StoreManyAsync_WritesEachEntryAndReturnsAlignedKeys()
+    {
+        var (database, recorder) = RecordingDatabaseProxy.CreatePair();
+        var cache = new SemanticCache(database, CreateOptions());
+
+        var keys = await cache.StoreManyAsync(
+        [
+            new SemanticCacheStoreRequest("p1", "r1", [1f, 0f]),
+            new SemanticCacheStoreRequest("p2", "r2", [0f, 1f])
+        ]);
+
+        Assert.Equal(2, keys.Count);
+        Assert.Equal(2, recorder.HashSetAsyncCallCount);
+        Assert.All(keys, key => Assert.StartsWith("semantic:unit-cache:tests:", key, StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task StoreManyAsync_WithoutEmbedding_Throws()
+    {
+        var (database, recorder) = RecordingDatabaseProxy.CreatePair();
+        var cache = new SemanticCache(database, CreateOptions());
+
+        await Assert.ThrowsAsync<ArgumentException>(() =>
+            cache.StoreManyAsync([new SemanticCacheStoreRequest("p", "r")]));
+        Assert.Equal(0, recorder.HashSetAsyncCallCount);
+    }
+
+    [Fact]
+    public async Task CheckManyAsync_ReturnsAlignedHitsAndMisses()
+    {
+        var (database, recorder) = RecordingDatabaseProxy.CreatePair();
+        var calls = 0;
+        recorder.ExecuteAsyncHandler = (command, _) =>
+        {
+            if (command != "FT.SEARCH")
+            {
+                return Task.FromResult(RedisResult.Create((RedisValue)"OK"));
+            }
+
+            calls++;
+            return Task.FromResult(calls == 1 ? SingleHitResult() : MissResult());
+        };
+        var cache = new SemanticCache(database, CreateOptions());
+
+        var results = await cache.CheckManyAsync(
+        [
+            new SemanticCacheCheckRequest("p1", [1f, 0f]),
+            new SemanticCacheCheckRequest("p2", [0f, 1f])
+        ]);
+
+        Assert.Equal(2, results.Count);
+        Assert.NotNull(results[0]);
+        Assert.Null(results[1]);
+    }
+
+    [Fact]
+    public async Task UpdateAsync_ExistingKey_WritesProvidedFieldsAndRefreshesTtl()
+    {
+        var (database, recorder) = RecordingDatabaseProxy.CreatePair();
+        recorder.KeyExistsResult = true;
+        var cache = new SemanticCache(database, CreateOptions(timeToLive: TimeSpan.FromMinutes(5)));
+
+        var updated = await cache.UpdateAsync(
+            "semantic:unit-cache:tests:key",
+            response: "new response",
+            metadata: new { v = 2 });
+
+        Assert.True(updated);
+        Assert.Equal(1, recorder.HashSetAsyncCallCount);
+        Assert.Contains(recorder.LastHashEntries!, entry => entry.Name == "response" && entry.Value == "new response");
+        Assert.Contains(recorder.LastHashEntries!, entry => entry.Name == "metadata" && entry.Value == "{\"v\":2}");
+        Assert.Equal(1, recorder.KeyExpireAsyncCallCount);
+    }
+
+    [Fact]
+    public async Task UpdateAsync_MissingKey_ReturnsFalseWithoutWriting()
+    {
+        var (database, recorder) = RecordingDatabaseProxy.CreatePair();
+        recorder.KeyExistsResult = false;
+        var cache = new SemanticCache(database, CreateOptions());
+
+        var updated = await cache.UpdateAsync("semantic:unit-cache:tests:missing", response: "x");
+
+        Assert.False(updated);
+        Assert.Equal(0, recorder.HashSetAsyncCallCount);
+    }
+
+    [Fact]
+    public async Task UpdateAsync_WithNothingToUpdate_Throws()
+    {
+        var (database, _) = RecordingDatabaseProxy.CreatePair();
+        var cache = new SemanticCache(database, CreateOptions());
+
+        await Assert.ThrowsAsync<ArgumentException>(() => cache.UpdateAsync("key"));
+    }
+
+    private static SemanticCacheOptions CreateOptions(bool trackStatistics = false, TimeSpan? timeToLive = null) =>
         new(
             "unit-cache",
             CreateVectorAttributes(),
             0.3d,
             "tests",
+            timeToLive,
             filterableFields:
             [
                 new TagFieldDefinition("tenant"),
                 new NumericFieldDefinition("temperature"),
                 new TextFieldDefinition("promptTemplate")
-            ]);
+            ],
+            trackStatistics: trackStatistics);
+
+    private static RedisResult SingleHitResult(string prompt = "stored", string response = "cached", string distance = "0.1") =>
+        RedisResult.Create(
+        [
+            RedisResult.Create(1),
+            RedisResult.Create((RedisValue)"semantic:unit-cache:tests:key"),
+            RedisResult.Create(
+            [
+                RedisResult.Create((RedisValue)"prompt"),
+                RedisResult.Create((RedisValue)prompt),
+                RedisResult.Create((RedisValue)"response"),
+                RedisResult.Create((RedisValue)response),
+                RedisResult.Create((RedisValue)"distance"),
+                RedisResult.Create((RedisValue)distance)
+            ])
+        ]);
+
+    private static RedisResult MissResult() => RedisResult.Create([RedisResult.Create(0)]);
 
     private static VectorFieldAttributes CreateVectorAttributes() =>
         new(
@@ -229,6 +439,10 @@ public sealed class SemanticCacheTests
 
         public int KeyExpireAsyncCallCount { get; private set; }
 
+        public int KeyExistsAsyncCallCount { get; private set; }
+
+        public bool KeyExistsResult { get; set; } = true;
+
         public HashEntry[]? LastHashEntries { get; private set; }
 
         public TimeSpan? LastExpiry { get; private set; }
@@ -249,6 +463,7 @@ public sealed class SemanticCacheTests
                 nameof(IDatabase.ExecuteAsync) => HandleExecuteAsync(args),
                 nameof(IDatabase.HashSetAsync) => HandleHashSetAsync(args),
                 nameof(IDatabase.KeyExpireAsync) => HandleKeyExpireAsync(args),
+                nameof(IDatabase.KeyExistsAsync) => HandleKeyExistsAsync(),
                 nameof(IDatabase.Multiplexer) => throw new NotSupportedException(),
                 nameof(IDatabase.Database) => 0,
                 _ => throw new NotSupportedException($"Method '{targetMethod.Name}' is not configured for this test proxy.")
@@ -276,6 +491,12 @@ public sealed class SemanticCacheTests
             KeyExpireAsyncCallCount++;
             LastExpiry = (TimeSpan?)args![1]!;
             return Task.FromResult(true);
+        }
+
+        private Task<bool> HandleKeyExistsAsync()
+        {
+            KeyExistsAsyncCallCount++;
+            return Task.FromResult(KeyExistsResult);
         }
     }
 }

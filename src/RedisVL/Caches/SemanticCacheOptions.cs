@@ -15,7 +15,8 @@ public sealed class SemanticCacheOptions
         string responseFieldName = "response",
         string metadataFieldName = "metadata",
         string embeddingFieldName = "embedding",
-        IEnumerable<FieldDefinition>? filterableFields = null)
+        IEnumerable<FieldDefinition>? filterableFields = null,
+        bool trackStatistics = false)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         ArgumentNullException.ThrowIfNull(embeddingFieldAttributes);
@@ -49,6 +50,7 @@ public sealed class SemanticCacheOptions
         MetadataFieldName = metadataFieldName.Trim();
         EmbeddingFieldName = embeddingFieldName.Trim();
         FilterableFields = NormalizeFilterableFields(filterableFields);
+        TrackStatistics = trackStatistics;
     }
 
     public string Name { get; }
@@ -70,6 +72,13 @@ public sealed class SemanticCacheOptions
     public string EmbeddingFieldName { get; }
 
     public IReadOnlyList<FieldDefinition> FilterableFields { get; }
+
+    /// <summary>
+    /// Gets a value indicating whether the cache tracks hit/miss statistics. When <see langword="false" />
+    /// (the default), <see cref="SemanticCache.HitCount" />, <see cref="SemanticCache.MissCount" />, and
+    /// <see cref="SemanticCache.HitRate" /> stay at zero.
+    /// </summary>
+    public bool TrackStatistics { get; }
 
     private ReadOnlyCollection<FieldDefinition> NormalizeFilterableFields(IEnumerable<FieldDefinition>? filterableFields)
     {
