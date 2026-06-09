@@ -58,11 +58,33 @@ The cache supports both raw embeddings and `ITextVectorizer` overloads. Prefer `
 
 | `CheckAsync(..., vectorizer, ...)`
 | Vectorizes the incoming prompt before lookup.
+
+| `CheckTopKAsync(prompt, embedding, topK, filter)`
+| Returns up to `topK` cached entries within the threshold, ordered nearest-first. An empty list means a miss.
+
+| `StoreManyAsync(requests)` / `StoreManyAsync(requests, vectorizer)`
+| Stores a batch of `SemanticCacheStoreRequest` entries; the returned key list is aligned to input order. The vectorizer overload embeds all prompts in a single batch (using `IBatchTextVectorizer` when available).
+
+| `CheckManyAsync(requests)` / `CheckManyAsync(requests, vectorizer)`
+| Runs a batch of `SemanticCacheCheckRequest` lookups; the result list is aligned to input order, with `null` for each miss.
+
+| `UpdateAsync(key, response, metadata)`
+| Updates the response and/or metadata of an existing entry (by the key returned from `Store`), refreshing the TTL when one is configured. Returns `false` if the key does not exist; the embedding and filter values are left unchanged.
 |===
 
 Filter values are part of the cache identity. That means the same prompt can produce separate cached entries for different tenants, models, or numeric settings.
 
 `CheckAsync` does not do text matching on the prompt field. The prompt text is useful for traceability and response inspection, but cache hits are driven by vector distance plus any optional filter expression.
+
+== Hit/miss statistics
+
+Set `trackStatistics: true` on `SemanticCacheOptions` to record lookup outcomes. The cache then exposes:
+
+* `HitCount` and `MissCount` — counts of lookups that found / did not find a match (each `CheckAsync` / `CheckTopKAsync` call counts once)
+* `HitRate` — `hits / (hits + misses)`, or `0` when nothing has been tracked
+* `ResetStatistics()` — clears both counters
+
+Statistics are thread-safe. When `trackStatistics` is left at its default (`false`), all three stay at zero.
 
 == Example
 

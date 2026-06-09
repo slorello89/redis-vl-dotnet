@@ -222,7 +222,129 @@ public sealed class SemanticCacheIntegrationTests
         }
     }
 
-    private static SemanticCacheOptions CreateOptions(string token, double distanceThreshold, TimeSpan? timeToLive = null) =>
+    [RedisSearchIntegrationFact]
+    public async Task StoreManyAndCheckTopKReturnNearestEntriesOrdered()
+    {
+        await using var connection = await RedisSearchTestEnvironment.ConnectAsync();
+        var database = connection.GetDatabase();
+
+        var token = Guid.NewGuid().ToString("N");
+        var cache = new SemanticCache(database, CreateOptions(token, 0.25d));
+
+        try
+        {
+            await cache.CreateAsync();
+            await cache.StoreManyAsync(
+            [
+                new SemanticCacheStoreRequest("prompt-exact", "resp-exact", [1f, 0f]),
+                new SemanticCacheStoreRequest("prompt-near", "resp-near", [0.95f, 0f])
+            ]);
+            await RedisSearchTestEnvironment.WaitForIndexDocumentCountAsync(
+                SearchIndex.FromExisting(database, $"semantic-cache:integration-semantic-cache:{token}"),
+                2);
+
+            var hits = await cache.CheckTopKAsync("query", [1f, 0f], topK: 5);
+
+            Assert.True(hits.Count >= 2);
+            Assert.Equal("resp-exact", hits[0].Response);
+            Assert.Equal("resp-near", hits[1].Response);
+            Assert.True(hits[0].Distance <= hits[1].Distance);
+        }
+        finally
+        {
+            if (await cache.ExistsAsync())
+            {
+                await cache.DropAsync(deleteDocuments: true);
+            }
+        }
+    }
+
+    [RedisSearchIntegrationFact]
+    public async Task UpdateRewritesResponseAndMetadataForExistingEntry()
+    {
+        await using var connection = await RedisSearchTestEnvironment.ConnectAsync();
+        var database = connection.GetDatabase();
+
+        var token = Guid.NewGuid().ToString("N");
+        var cache = new SemanticCache(database, CreateOptions(token, 0.25d));
+
+        try
+        {
+            await cache.CreateAsync();
+            var key = await cache.StoreAsync(
+                "prompt-a",
+                "old response",
+                [1f, 0f],
+                metadata: new { edited = false },
+                filterValues: TeamAFilterValues);
+            await RedisSearchTestEnvironment.WaitForAsync(
+                async () => await cache.CheckAsync("prompt-a", [1f, 0f], Filter.Tag("tenant").Eq("team-a")) is not null);
+
+            var updated = await cache.UpdateAsync(key, response: "new response", metadata: new { edited = true });
+            var missing = await cache.UpdateAsync($"{key}-absent", response: "ignored");
+
+            Assert.True(updated);
+            Assert.False(missing);
+            await RedisSearchTestEnvironment.WaitForAsync(
+                async () =>
+                {
+                    var hit = await cache.CheckAsync("prompt-a", [1f, 0f], Filter.Tag("tenant").Eq("team-a"));
+                    return hit?.Response == "new response";
+                });
+
+            var refreshed = await cache.CheckAsync("prompt-a", [1f, 0f], Filter.Tag("tenant").Eq("team-a"));
+            Assert.Equal("new response", refreshed!.Response);
+            Assert.Equal("{\"edited\":true}", refreshed.Metadata);
+        }
+        finally
+        {
+            if (await cache.ExistsAsync())
+            {
+                await cache.DropAsync(deleteDocuments: true);
+            }
+        }
+    }
+
+    [RedisSearchIntegrationFact]
+    public async Task TracksHitAndMissStatisticsWhenEnabled()
+    {
+        await using var connection = await RedisSearchTestEnvironment.ConnectAsync();
+        var database = connection.GetDatabase();
+
+        var token = Guid.NewGuid().ToString("N");
+        var cache = new SemanticCache(database, CreateOptions(token, 0.25d, trackStatistics: true));
+
+        try
+        {
+            await cache.CreateAsync();
+            await cache.StoreAsync("prompt-a", "cached-a", [1f, 0f], filterValues: TeamAFilterValues);
+            await RedisSearchTestEnvironment.WaitForAsync(
+                async () => await cache.CheckAsync("prompt-a", [1f, 0f], Filter.Tag("tenant").Eq("team-a")) is not null);
+
+            // The warm-up loop above counts toward statistics; reset before the asserted lookups.
+            cache.ResetStatistics();
+
+            await cache.CheckAsync("prompt-a", [1f, 0f], Filter.Tag("tenant").Eq("team-a"));
+            await cache.CheckAsync("prompt-z", [0f, 1f], Filter.Tag("tenant").Eq("team-a"));
+
+            Assert.Equal(1, cache.HitCount);
+            Assert.Equal(1, cache.MissCount);
+            Assert.Equal(0.5d, cache.HitRate, 5);
+        }
+        finally
+        {
+            if (await cache.ExistsAsync())
+            {
+                await cache.DropAsync(deleteDocuments: true);
+            }
+        }
+    }
+
+    private static SemanticCacheOptions CreateOptions(
+        string token,
+        double distanceThreshold,
+        TimeSpan? timeToLive = null,
+        bool trackStatistics = false) =>
         new(
             "integration-semantic-cache",
             CreateVectorAttributes(),
@@ -233,7 +355,8 @@ public sealed class SemanticCacheIntegrationTests
             [
                 new TagFieldDefinition("tenant"),
                 new NumericFieldDefinition("temperature")
-            ]);
+            ],
+            trackStatistics: trackStatistics);
 
     private static VectorFieldAttributes CreateVectorAttributes() =>
         new(
