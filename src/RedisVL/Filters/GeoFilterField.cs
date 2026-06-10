@@ -18,4 +18,19 @@ public sealed class GeoFilterField
 
         return new GeoFilterExpression(_fieldName, longitude, latitude, radius, unit);
     }
+
+    public FilterExpression WithinBox(double minLongitude, double minLatitude, double maxLongitude, double maxLatitude)
+    {
+        if (minLongitude > maxLongitude)
+        {
+            throw new ArgumentException("Geo box minimum longitude cannot be greater than maximum longitude.");
+        }
+
+        if (minLatitude > maxLatitude)
+        {
+            throw new ArgumentException("Geo box minimum latitude cannot be greater than maximum latitude.");
+        }
+
+        return new GeoBoxFilterExpression(_fieldName, minLongitude, minLatitude, maxLongitude, maxLatitude);
+    }
 }

@@ -54,6 +54,26 @@ await foreach (var batch in index.SearchBatchesAsync(
 
 This exact pattern is used in `/examples/JsonStorageExample`.
 
+== Per-field weights
+
+Pass `fieldWeights` to spread the query terms across multiple text fields and boost individual fields. When `fieldWeights` is supplied, the `Text` is treated as whitespace-separated terms (OR'd together) instead of a raw query string:
+
+[source,csharp]
+----
+var weighted = new TextQuery(
+    "redis search",
+    fieldWeights: new Dictionary<string, double>
+    {
+        ["title"] = 5.0,
+        ["body"] = 1.0,
+    });
+
+// weighted.QueryString =>
+// (@title:(redis | search) => { $weight: 5 } | @body:(redis | search))
+----
+
+A field with weight `1.0` is emitted without a `$weight` modifier, and a single weighted field is not wrapped in parentheses. Weights must be greater than zero. When `fieldWeights` is omitted the `QueryString` is the raw `Text`, preserving the existing behavior.
+
 == Related pages
 
 * xref:core-features/filter-query.adoc[FilterQuery]

@@ -22,4 +22,16 @@ public sealed class TagFilterField
 
         return new TagFilterExpression(_fieldName, values);
     }
+
+    public FilterExpression Like(params string[] patterns)
+    {
+        ArgumentNullException.ThrowIfNull(patterns);
+
+        if (patterns.Length == 0)
+        {
+            throw new ArgumentException("At least one tag pattern is required.", nameof(patterns));
+        }
+
+        return new TagFilterExpression(_fieldName, patterns, preserveWildcards: true);
+    }
 }

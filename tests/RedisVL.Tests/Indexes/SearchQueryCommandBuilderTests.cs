@@ -696,6 +696,70 @@ public sealed class SearchQueryCommandBuilderTests
     }
 
     [Fact]
+    public void TextQueryWithoutWeightsUsesRawText()
+    {
+        var query = new TextQuery("@title:redis");
+
+        Assert.Empty(query.FieldWeights);
+        Assert.Equal("@title:redis", query.QueryString);
+    }
+
+    [Fact]
+    public void TextQuerySingleFieldWeightWrapsTermsAndAppendsWeight()
+    {
+        var defaultWeight = new TextQuery("redis search", fieldWeights: new Dictionary<string, double> { ["title"] = 1.0 });
+        Assert.Equal("@title:(redis | search)", defaultWeight.QueryString);
+
+        var weighted = new TextQuery("redis search", fieldWeights: new Dictionary<string, double> { ["title"] = 5.0 });
+        Assert.Equal("@title:(redis | search) => { $weight: 5 }", weighted.QueryString);
+    }
+
+    [Fact]
+    public void TextQueryMultipleFieldWeightsAreOrGroupedInDeclarationOrder()
+    {
+        var query = new TextQuery(
+            "redis",
+            fieldWeights: new Dictionary<string, double>
+            {
+                ["@title"] = 5.0,
+                ["content"] = 2.0,
+                ["tags"] = 1.0,
+            });
+
+        Assert.Equal(
+            "(@title:(redis) => { $weight: 5 } | @content:(redis) => { $weight: 2 } | @tags:(redis))",
+            query.QueryString);
+    }
+
+    [Fact]
+    public void TextQueryFieldWeightsFlowIntoCommandArguments()
+    {
+        var schema = new SearchSchema(
+            new IndexDefinition("articles-idx", "article:", StorageType.Hash),
+            [
+                new TextFieldDefinition("title"),
+                new TextFieldDefinition("body")
+            ]);
+        var query = new TextQuery(
+            "redis",
+            fieldWeights: new Dictionary<string, double> { ["title"] = 5.0, ["body"] = 1.0 });
+
+        var rendered = SearchQueryCommandBuilder.BuildTextSearchArguments(schema, query)
+            .Select(RenderArgument)
+            .ToArray();
+
+        Assert.Equal("articles-idx", rendered[0]);
+        Assert.Equal("(@title:(redis) => { $weight: 5 } | @body:(redis))", rendered[1]);
+    }
+
+    [Fact]
+    public void TextQueryRejectsNonPositiveWeights()
+    {
+        Assert.Throws<ArgumentException>(
+            () => new TextQuery("redis", fieldWeights: new Dictionary<string, double> { ["title"] = 0 }));
+    }
+
+    [Fact]
     public void AggregationQueryRejectsBlankQueryString()
     {
         Assert.Throws<ArgumentException>(() => new AggregationQuery(" "));

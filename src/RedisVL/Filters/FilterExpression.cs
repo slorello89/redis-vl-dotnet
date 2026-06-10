@@ -89,16 +89,50 @@ public abstract class FilterExpression
             .Replace("\\", "\\\\", StringComparison.Ordinal)
             .Replace("\"", "\\\"", StringComparison.Ordinal);
     }
+
+    internal static string EscapeWildcardPattern(string value)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(value);
+
+        // Inside a w'...' wildcard pattern only the backslash and the quote
+        // delimiter are control characters; * and ? stay as wildcards.
+        return value.Trim()
+            .Replace("\\", "\\\\", StringComparison.Ordinal)
+            .Replace("'", "\\'", StringComparison.Ordinal);
+    }
+
+    internal static string EscapeTagPattern(string value)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(value);
+
+        // Like EscapeTagValue, but preserve * and ? so they act as wildcards.
+        var builder = new StringBuilder(value.Length);
+        foreach (var character in value.Trim())
+        {
+            if (char.IsLetterOrDigit(character) || character is '_' or '*' or '?')
+            {
+                builder.Append(character);
+                continue;
+            }
+
+            builder.Append('\\');
+            builder.Append(character);
+        }
+
+        return builder.ToString();
+    }
 }
 
-internal sealed class TagFilterExpression(string fieldName, IReadOnlyList<string> values) : FilterExpression
+internal sealed class TagFilterExpression(string fieldName, IReadOnlyList<string> values, bool preserveWildcards = false) : FilterExpression
 {
     private readonly string _fieldName = NormalizeFieldName(fieldName);
     private readonly IReadOnlyList<string> _values = values;
+    private readonly bool _preserveWildcards = preserveWildcards;
 
     internal override string Render(bool grouped)
     {
-        var valueExpression = string.Join("|", _values.Select(EscapeTagValue));
+        Func<string, string> escape = _preserveWildcards ? EscapeTagPattern : EscapeTagValue;
+        var valueExpression = string.Join("|", _values.Select(escape));
         return $"@{_fieldName}:{{{valueExpression}}}";
     }
 }
@@ -159,6 +193,25 @@ internal sealed class GeoFilterExpression(
             GeoUnit.Miles => "mi",
             _ => throw new ArgumentOutOfRangeException(nameof(unit), unit, "Unsupported geo distance unit.")
         };
+}
+
+internal sealed class GeoBoxFilterExpression(
+    string fieldName,
+    double minLongitude,
+    double minLatitude,
+    double maxLongitude,
+    double maxLatitude) : FilterExpression
+{
+    private readonly string _fieldName = NormalizeFieldName(fieldName);
+    private readonly double _minLongitude = minLongitude;
+    private readonly double _minLatitude = minLatitude;
+    private readonly double _maxLongitude = maxLongitude;
+    private readonly double _maxLatitude = maxLatitude;
+
+    internal override string Render(bool grouped)
+    {
+        return $"@{_fieldName}:[{FormatNumber(_minLongitude)} {FormatNumber(_minLatitude)} {FormatNumber(_maxLongitude)} {FormatNumber(_maxLatitude)}]";
+    }
 }
 
 internal enum LogicalOperator
