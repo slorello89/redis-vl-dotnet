@@ -14,7 +14,7 @@ internal static class SearchQueryCommandBuilder
         var arguments = new List<object>
         {
             schema.Index.Name,
-            query.Text
+            query.QueryString
         };
 
         if (query.ReturnFields.Count > 0)

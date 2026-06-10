@@ -10,6 +10,8 @@ public static class Filter
 
     public static GeoFilterField Geo(string fieldName) => new(fieldName);
 
+    public static TimestampFilterField Timestamp(string fieldName) => new(fieldName);
+
     public static FilterExpression And(params FilterExpression[] expressions) =>
         Combine(LogicalOperator.And, expressions);
 

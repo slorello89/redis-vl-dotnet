@@ -17,4 +17,21 @@ public sealed class TextFilterField
 
     public FilterExpression Prefix(string prefix) =>
         new TextFilterExpression(_fieldName, $"{FilterExpression.EscapeTextTerm(prefix)}*");
+
+    public FilterExpression Fuzzy(string term, int maxEditDistance = 1)
+    {
+        if (maxEditDistance is < 1 or > 3)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(maxEditDistance),
+                maxEditDistance,
+                "Fuzzy match edit distance must be between 1 and 3.");
+        }
+
+        var delimiter = new string('%', maxEditDistance);
+        return new TextFilterExpression(_fieldName, $"{delimiter}{FilterExpression.EscapeTextTerm(term)}{delimiter}");
+    }
+
+    public FilterExpression Wildcard(string pattern) =>
+        new TextFilterExpression(_fieldName, $"w'{FilterExpression.EscapeWildcardPattern(pattern)}'");
 }

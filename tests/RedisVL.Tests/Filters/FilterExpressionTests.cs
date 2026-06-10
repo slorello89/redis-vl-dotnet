@@ -37,6 +37,49 @@ public sealed class FilterExpressionTests
     }
 
     [Fact]
+    public void BuildsGeoBoxFilters()
+    {
+        var filter = Filter.Geo("location").WithinBox(-74.05, 40.6, -73.85, 40.9);
+
+        Assert.Equal("@location:[-74.05 40.6 -73.85 40.9]", filter.ToQueryString());
+    }
+
+    [Fact]
+    public void BuildsFuzzyTextFilters()
+    {
+        Assert.Equal("@title:%redis%", Filter.Text("title").Fuzzy("redis").ToQueryString());
+        Assert.Equal("@title:%%redis%%", Filter.Text("title").Fuzzy("redis", 2).ToQueryString());
+        Assert.Equal("@title:%%%redis%%%", Filter.Text("title").Fuzzy("redis", 3).ToQueryString());
+    }
+
+    [Fact]
+    public void BuildsWildcardTextFilters()
+    {
+        Assert.Equal("@title:w'f?o*bar'", Filter.Text("title").Wildcard("f?o*bar").ToQueryString());
+        Assert.Equal("@title:w'it\\'s*'", Filter.Text("title").Wildcard("it's*").ToQueryString());
+    }
+
+    [Fact]
+    public void BuildsTagLikeFiltersPreservingWildcards()
+    {
+        Assert.Equal("@category:{tech*}", Filter.Tag("category").Like("tech*").ToQueryString());
+        Assert.Equal("@category:{tech*|*soft}", Filter.Tag("category").Like("tech*", "*soft").ToQueryString());
+        Assert.Equal("@category:{open\\ source*}", Filter.Tag("category").Like("open source*").ToQueryString());
+    }
+
+    [Fact]
+    public void BuildsTimestampFilters()
+    {
+        var after = DateTimeOffset.FromUnixTimeSeconds(1_700_000_000);
+        var before = DateTimeOffset.FromUnixTimeSeconds(1_800_000_000);
+
+        Assert.Equal("@created:[(1700000000 +inf]", Filter.Timestamp("created").After(after).ToQueryString());
+        Assert.Equal("@created:[-inf (1800000000]", Filter.Timestamp("created").Before(before).ToQueryString());
+        Assert.Equal("@created:[1700000000 1800000000]", Filter.Timestamp("created").Between(after, before).ToQueryString());
+        Assert.Equal("@created:[1700000000 1700000000]", Filter.Timestamp("created").Eq(1_700_000_000).ToQueryString());
+    }
+
+    [Fact]
     public void SupportsLogicalCompositionOperators()
     {
         var filter =
@@ -56,5 +99,10 @@ public sealed class FilterExpressionTests
         Assert.Throws<ArgumentException>(() => Filter.Numeric("rating").Between(10, 5));
         Assert.Throws<ArgumentOutOfRangeException>(() => Filter.Geo("location").WithinRadius(1, 2, 0, GeoUnit.Meters));
         Assert.Throws<ArgumentException>(() => Filter.And(Filter.Tag("genre").Eq("science fiction")));
+        Assert.Throws<ArgumentException>(() => Filter.Tag("genre").Like());
+        Assert.Throws<ArgumentOutOfRangeException>(() => Filter.Text("title").Fuzzy("redis", 0));
+        Assert.Throws<ArgumentOutOfRangeException>(() => Filter.Text("title").Fuzzy("redis", 4));
+        Assert.Throws<ArgumentException>(() => Filter.Geo("location").WithinBox(2, 0, 1, 5));
+        Assert.Throws<ArgumentException>(() => Filter.Timestamp("created").Between(20, 10));
     }
 }
