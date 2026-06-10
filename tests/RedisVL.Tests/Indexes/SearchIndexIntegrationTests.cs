@@ -1744,9 +1744,14 @@ public sealed class SearchIndexIntegrationTests
             var typed = await index.SearchAsync<HybridSearchRow>(query);
 
             // "He*" matches Heat (:1) and Heatwave (:2) on the text branch; the KNN branch can also
-            // surface Arrival (:3). FT.HYBRID does not guarantee a stable result order for close fused
-            // scores, so assert on the returned set and on score accuracy (looked up by id) rather than
-            // on a fixed position.
+            // surface Arrival (:3). FT.HYBRID min-max normalizes each branch independently before
+            // fusing, so the text branch maps the Heat/Heatwave BM25 scores onto {0, 1} no matter how
+            // close they are. With text weighted 0.7 that makes the *fused ranking* depend on Redis's
+            // internal BM25 tie-breaking rather than on anything this client controls, and it is not
+            // stable across Redis builds. We therefore treat the fused ordering (and which document
+            // carries the highest score) as don't-care, and assert only the contract this client owns:
+            // the expected documents come back, each with a valid positive fused score, the internal
+            // key field is not leaked, and typed mapping matches the untyped results.
             var heatId = $"{schema.Index.Prefix}1";
             var heatwaveId = $"{schema.Index.Prefix}2";
 
@@ -1754,7 +1759,6 @@ public sealed class SearchIndexIntegrationTests
             Assert.Contains(results.Documents, document => document.Id == heatId);
             Assert.Contains(results.Documents, document => document.Id == heatwaveId);
 
-            var scoresById = new Dictionary<string, double>();
             foreach (var document in results.Documents)
             {
                 Assert.False(document.Values.ContainsKey(HybridSearchQuery.KeyField));
@@ -1765,13 +1769,8 @@ public sealed class SearchIndexIntegrationTests
                     System.Globalization.CultureInfo.InvariantCulture,
                     out var score));
                 Assert.True(double.IsFinite(score) && score > 0);
-                scoresById[document.Id] = score;
             }
 
-            // Heat is an exact vector match for [1,0] and also matches the text branch, so with linear
-            // fusion it must carry the highest fused score regardless of the order results come back in.
-            Assert.Equal(scoresById.Values.Max(), scoresById[heatId]);
-            Assert.True(scoresById[heatId] >= scoresById[heatwaveId]);
             Assert.Equal("Heat", results.Documents.Single(document => document.Id == heatId).Values["title"]);
 
             Assert.Equal(results.Documents.Count, typed.Documents.Count);
