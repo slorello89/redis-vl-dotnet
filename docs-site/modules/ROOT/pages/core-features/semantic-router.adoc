@@ -1,18 +1,51 @@
 = SemanticRouter
 
-`SemanticRouter` maps an input embedding to the nearest stored route reference. It is useful when one incoming request needs to be classified into a workflow, intent, or tool category before the application continues.
+`SemanticRouter` classifies an input embedding against stored route references. A route can hold many reference phrases, and the router can return either the single nearest reference or a ranked set of matching routes. It is useful when one incoming request needs to be classified into a workflow, intent, or tool category before the application continues.
 
 == Schema and options
 
 Each router instance builds a HASH-backed index with:
 
-* `routeName`
+* `routeName` (a tag field, so routes can be selected exactly)
 * `reference`
 * one vector field for the route embedding
 
-`SemanticRouterOptions` configures the router name, vector field attributes, distance threshold, optional namespace, and optional field names.
+A route's optional metadata and per-route distance threshold are persisted as additional fields on each reference document.
 
-`DistanceThreshold` is the key routing control. When the nearest route falls outside the threshold, `RouteAsync` returns `null`.
+`SemanticRouterOptions` configures the router name, vector field attributes, distance threshold, optional namespace, optional field names, and an optional `RoutingConfig`.
+
+`DistanceThreshold` is the maximum routing radius. A route only matches when its (aggregated) distance is within this threshold; a per-route threshold may restrict matching further but cannot exceed it. When the nearest route falls outside the threshold, `RouteAsync` returns `null` and `RouteManyAsync` returns an empty list.
+
+== Routes, references, and routing config
+
+A `Route` bundles a name, one or more reference phrases, optional metadata, and an optional per-route `DistanceThreshold`:
+
+[source,csharp]
+----
+var billing = new Route(
+    "billing",
+    ["refund status", "billing question", "payment failed"],
+    new Dictionary<string, object?> { ["team"] = "finance" },
+    distanceThreshold: 0.6d);
+
+await router.AddRouteAsync(billing, vectorizer);
+----
+
+`RoutingConfig` controls multi-match behavior:
+
+* `MaxResults` — the maximum number of routes `RouteManyAsync` returns (default `1`).
+* `AggregationMethod` — how a route's multiple reference distances are combined: `Average` (default), `Minimum`, or `Sum`.
+* `MaxReferenceCandidates` — the cap on nearest reference documents considered before aggregation (default `1000`).
+
+== Distance aggregation
+
+When a route has several references, `RouteManyAsync` collapses those reference distances into one route distance using `DistanceAggregationMethod`:
+
+* `Minimum` favors the single closest reference.
+* `Average` balances across all matched references.
+* `Sum` accumulates, so routes with many near references rank higher but can exceed the threshold.
+
+`RouteManyAsync` accepts optional per-call `maxResults` and `aggregationMethod` arguments that override the router's `RoutingConfig` for a single classification.
 
 == Add and route flows
 
@@ -20,17 +53,26 @@ Each router instance builds a HASH-backed index with:
 |===
 | API | Behavior
 
-| `AddRouteAsync(routeName, reference, embedding)`
+| `AddRouteAsync(routeName, reference, embedding \| vectorizer)`
 | Stores one route document keyed from the route name plus reference text.
 
-| `AddRouteAsync(routeName, reference, vectorizer)`
-| Vectorizes the reference text before storing the route.
+| `AddRouteAsync(route, embeddings \| vectorizer)`
+| Stores every reference of a `Route`, persisting its metadata and per-route threshold.
 
-| `RouteAsync(input, embedding)`
-| Returns the nearest `SemanticRouteMatch` inside the configured threshold.
+| `AddRouteReferencesAsync(routeName, references, embeddings \| vectorizer)`
+| Adds reference phrases to an existing route.
 
-| `RouteAsync(input, vectorizer)`
-| Vectorizes the incoming input before matching.
+| `GetRouteReferencesAsync(routeName)` / `GetRouteAsync(routeName)`
+| Reads back the stored references, or reconstructs the full `Route` (references, metadata, threshold).
+
+| `DeleteRouteReferencesAsync(routeName, references)` / `DeleteRouteAsync(routeName)`
+| Removes specific references, or every reference of a route.
+
+| `RouteAsync(input, embedding \| vectorizer)`
+| Returns the nearest single `SemanticRouteMatch` inside the configured threshold.
+
+| `RouteManyAsync(input, embedding \| vectorizer)`
+| Returns a ranked list of `SemanticRouterMatch`, one per matching route, ordered nearest-first.
 |===
 
 As with the other higher-level vector workflows, prefer `ITextVectorizer` rather than the obsolete `ITextEmbeddingGenerator` shim.
@@ -52,9 +94,11 @@ The runnable example for this API is `/examples/SemanticRouterExample`.
 
 It demonstrates:
 
-* creating a router with a local sample vectorizer
-* adding routes for multiple intents
-* routing a new utterance to the nearest stored reference
+* creating a router with a `RoutingConfig` and a local sample vectorizer
+* adding routes with multiple references, metadata, and per-route thresholds
+* routing a new utterance to the nearest stored reference (`RouteAsync`)
+* returning a ranked set of routes with distance aggregation (`RouteManyAsync`)
+* inspecting, adding, and removing route references
 * cleaning up the router index and documents
 
 The contract details are also covered in `tests/RedisVL.Tests/Workflows/SemanticRouterTests.cs` and `tests/RedisVL.Tests/Workflows/SemanticRouterIntegrationTests.cs`.
