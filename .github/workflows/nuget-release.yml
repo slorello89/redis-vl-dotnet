@@ -54,6 +54,7 @@ jobs:
             "src/RedisVL.Vectorizers.Abstractions/RedisVL.Vectorizers.Abstractions.csproj"
             "src/RedisVL.Vectorizers.OpenAI/RedisVL.Vectorizers.OpenAI.csproj"
             "src/RedisVL.Vectorizers.HuggingFace/RedisVL.Vectorizers.HuggingFace.csproj"
+            "src/RedisVL.Vectorizers.Onnx/RedisVL.Vectorizers.Onnx.csproj"
             "src/RedisVL.Rerankers.Abstractions/RedisVL.Rerankers.Abstractions.csproj"
             "src/RedisVL.Rerankers.Cohere/RedisVL.Rerankers.Cohere.csproj"
           )

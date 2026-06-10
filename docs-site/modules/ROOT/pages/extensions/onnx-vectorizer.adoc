@@ -1,0 +1,64 @@
+= ONNX Vectorizer
+
+`RedisVL.Vectorizers.Onnx` provides `OnnxTextVectorizer`, an `IBatchTextVectorizer` implementation that generates sentence embeddings locally with ONNX Runtime. It lets applications embed text entirely offline, without an API key or network call, mirroring the SentenceTransformers workflow.
+
+== Package contents
+
+* `OnnxTextVectorizer` for local sentence embedding generation
+* `OnnxVectorizerOptions` for model asset and runtime configuration
+* `OnnxPoolingStrategy` for selecting mean or `[CLS]` pooling
+* `OnnxRuntimeSessionOptions` for ONNX Runtime session tuning
+* `OnnxVectorizerPackage` as the package marker type
+
+== Local model assets
+
+This package does not bundle model files. Applications must provide:
+
+* a local `model.onnx` file
+* a local Hugging Face `tokenizer.json` file
+
+A typical source is a SentenceTransformers model such as `sentence-transformers/all-MiniLM-L6-v2` exported to ONNX (for example with Hugging Face Optimum), which produces both a `model.onnx` and a `tokenizer.json`.
+
+The reference workflow assumes a BERT-style tokenizer and embedding shape:
+
+* `[CLS] text [SEP]`
+* `input_ids`
+* `attention_mask`
+* `token_type_ids` when the model expects them
+* a `last_hidden_state` (or `token_embeddings`) output of shape `[batch, sequence, hidden]`
+
+== Request options
+
+`OnnxVectorizerOptions` supports:
+
+* `ModelPath` for the local ONNX model file
+* `TokenizerPath` for the local tokenizer definition
+* `MaxSequenceLength` with a default of `512`
+* `Pooling` with a default of `OnnxPoolingStrategy.Mean`; choose `OnnxPoolingStrategy.Cls` for models that expose a `[CLS]`-pooled representation
+* `Normalize` with a default of `true`, which L2-normalizes each embedding so cosine similarity equals the dot product
+* `SessionOptions` for local ONNX Runtime tuning such as graph optimization, execution mode, and thread counts
+
+Mean pooling averages the per-token outputs using the attention mask, matching the most common SentenceTransformers configuration.
+
+== Example workflow
+
+`/examples/OnnxVectorizerExample` shows the expected integration pattern:
+
+* embed a batch of prompts in a single call
+* print the embedding count and dimensionality
+* compare cosine similarity between a paraphrase and an unrelated prompt
+
+Run it from the repository root after setting local asset paths:
+
+[source,bash]
+----
+export ONNX_VECTORIZER_MODEL_PATH=/path/to/model.onnx
+export ONNX_VECTORIZER_TOKENIZER_PATH=/path/to/tokenizer.json
+dotnet run --project examples/OnnxVectorizerExample/OnnxVectorizerExample.csproj
+----
+
+== Validation references
+
+* `tests/RedisVL.Tests/Vectorizers/OnnxTextVectorizerTests.cs` covers validation, pooling, normalization, and batch behavior with stubbed inference
+* `tests/RedisVL.Tests/Vectorizers/OnnxTextTokenizerTests.cs` covers tokenizer `[CLS]`/`[SEP]` wrapping and truncation
+* `tests/RedisVL.Tests/Vectorizers/OnnxTextVectorizerSmokeTests.cs` is the local-asset smoke test gate

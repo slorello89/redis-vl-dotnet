@@ -62,6 +62,11 @@ Examples that use JSON storage also require RedisJSON. Provider-backed examples 
 | `/examples/HuggingFaceVectorizerExample`
 | RediSearch with vector similarity support. Requires `HF_TOKEN`. Optional `HF_EMBEDDING_MODEL` and `REDIS_VL_REDIS_URL`.
 
+| Local/offline ONNX vectorization
+| xref:../extensions/onnx-vectorizer.adoc[ONNX Vectorizer]
+| `/examples/OnnxVectorizerExample`
+| Local `model.onnx` and `tokenizer.json` assets exposed through `ONNX_VECTORIZER_MODEL_PATH` and `ONNX_VECTORIZER_TOKENIZER_PATH`. No Redis or provider credentials required.
+
 | Cohere reranking
 | xref:../extensions/cohere-reranker.adoc[Cohere Reranker]
 | `/examples/CohereRerankerExample`
