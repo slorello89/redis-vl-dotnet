@@ -77,6 +77,131 @@ public sealed class SemanticRouterIntegrationTests
         }
     }
 
+    [RedisSearchIntegrationFact]
+    public async Task RouteManyAggregatesReferencesAndRanksRoutes()
+    {
+        await using var connection = await RedisSearchTestEnvironment.ConnectAsync();
+        var database = connection.GetDatabase();
+
+        var token = Guid.NewGuid().ToString("N");
+        var router = new SemanticRouter(database, CreateOptions(token, 0.5d));
+
+        try
+        {
+            await router.CreateAsync();
+            await router.AddRouteAsync(
+                new Route("billing", ["refund", "payment"]),
+                new[] { new[] { 1f, 0f }, new[] { 0.9f, 0.1f } });
+            await router.AddRouteAsync(
+                new Route("shipping", ["delivery"]),
+                new[] { new[] { 0.8f, 0.2f } });
+            await RedisSearchTestEnvironment.WaitForAsync(
+                async () =>
+                {
+                    var ready = await router.RouteManyAsync("query", [1f, 0f], maxResults: 2);
+                    return ready.Count == 2;
+                });
+
+            var matches = await router.RouteManyAsync("query", [1f, 0f], maxResults: 2);
+
+            Assert.Equal(2, matches.Count);
+            Assert.Equal("billing", matches[0].RouteName);
+            Assert.Equal("shipping", matches[1].RouteName);
+            Assert.True(matches[0].Distance <= matches[1].Distance);
+        }
+        finally
+        {
+            if (await router.ExistsAsync())
+            {
+                await router.DropAsync(deleteDocuments: true);
+            }
+        }
+    }
+
+    [RedisSearchIntegrationFact]
+    public async Task AddsGetsAndDeletesRouteReferences()
+    {
+        await using var connection = await RedisSearchTestEnvironment.ConnectAsync();
+        var database = connection.GetDatabase();
+
+        var token = Guid.NewGuid().ToString("N");
+        var router = new SemanticRouter(database, CreateOptions(token, 0.5d));
+
+        try
+        {
+            await router.CreateAsync();
+            await router.AddRouteAsync(
+                new Route("billing", ["refund", "payment"]),
+                new[] { new[] { 1f, 0f }, new[] { 0.9f, 0.1f } });
+            await router.AddRouteReferencesAsync("billing", ["chargeback"], new[] { new[] { 0.95f, 0.05f } });
+            await RedisSearchTestEnvironment.WaitForAsync(
+                async () =>
+                {
+                    var references = await router.GetRouteReferencesAsync("billing");
+                    return references.Count == 3;
+                });
+
+            var references = await router.GetRouteReferencesAsync("billing");
+            Assert.Equal(3, references.Count);
+            Assert.All(references, reference => Assert.Equal("billing", reference.RouteName));
+
+            var removed = await router.DeleteRouteReferencesAsync("billing", ["chargeback"]);
+            Assert.Equal(1, removed);
+            await RedisSearchTestEnvironment.WaitForAsync(
+                async () => (await router.GetRouteReferencesAsync("billing")).Count == 2);
+
+            var deletedRoute = await router.DeleteRouteAsync("billing");
+            Assert.Equal(2, deletedRoute);
+            await RedisSearchTestEnvironment.WaitForAsync(
+                async () => (await router.GetRouteReferencesAsync("billing")).Count == 0);
+        }
+        finally
+        {
+            if (await router.ExistsAsync())
+            {
+                await router.DropAsync(deleteDocuments: true);
+            }
+        }
+    }
+
+    [RedisSearchIntegrationFact]
+    public async Task GetRoutePreservesMetadataAndPerRouteThreshold()
+    {
+        await using var connection = await RedisSearchTestEnvironment.ConnectAsync();
+        var database = connection.GetDatabase();
+
+        var token = Guid.NewGuid().ToString("N");
+        var router = new SemanticRouter(database, CreateOptions(token, 0.5d));
+
+        try
+        {
+            await router.CreateAsync();
+            await router.AddRouteAsync(
+                new Route(
+                    "billing",
+                    ["refund"],
+                    new Dictionary<string, object?> { ["team"] = "finance" },
+                    distanceThreshold: 0.2d),
+                new[] { new[] { 1f, 0f } });
+            await RedisSearchTestEnvironment.WaitForAsync(
+                async () => await router.GetRouteAsync("billing") is not null);
+
+            var route = await router.GetRouteAsync("billing");
+
+            Assert.NotNull(route);
+            Assert.Equal(0.2d, route!.DistanceThreshold);
+            Assert.NotNull(route.Metadata);
+            Assert.True(route.Metadata!.ContainsKey("team"));
+        }
+        finally
+        {
+            if (await router.ExistsAsync())
+            {
+                await router.DropAsync(deleteDocuments: true);
+            }
+        }
+    }
+
     private static SemanticRouterOptions CreateOptions(string token, double distanceThreshold) =>
         new(
             "integration-semantic-router",
