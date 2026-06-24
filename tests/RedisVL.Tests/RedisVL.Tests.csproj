@@ -22,6 +22,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\RedisVL.Cli\RedisVL.Cli.csproj" />
     <ProjectReference Include="..\..\src\RedisVL\RedisVL.csproj" />
+    <ProjectReference Include="..\..\src\RedisVL.Connectors.VectorData\RedisVL.Connectors.VectorData.csproj" />
     <ProjectReference Include="..\..\src\RedisVL.Rerankers.Abstractions\RedisVL.Rerankers.Abstractions.csproj" />
     <ProjectReference Include="..\..\src\RedisVL.Rerankers.Cohere\RedisVL.Rerankers.Cohere.csproj" />
     <ProjectReference Include="..\..\src\RedisVL.Rerankers.Onnx\RedisVL.Rerankers.Onnx.csproj" />

@@ -40,6 +40,8 @@ Use this map when you want the fastest path to a parity feature area:
 | Local/offline ONNX vectorizer package | [ONNX Vectorizer](../docs-site/modules/ROOT/pages/extensions/onnx-vectorizer.adoc) | [OnnxVectorizerExample](./OnnxVectorizerExample/README.md) | Local `model.onnx` and `tokenizer.json` assets exposed through `ONNX_VECTORIZER_MODEL_PATH` and `ONNX_VECTORIZER_TOKENIZER_PATH`; no Redis or provider credentials required |
 | Cohere reranker package | [Cohere Reranker](../docs-site/modules/ROOT/pages/extensions/cohere-reranker.adoc) | [CohereRerankerExample](./CohereRerankerExample/README.md) | RediSearch + RedisJSON, `COHERE_API_KEY`, and optional `COHERE_RERANK_MODEL`, `REDIS_VL_REDIS_URL` |
 | ONNX reranker package | [ONNX Reranker](../docs-site/modules/ROOT/pages/extensions/onnx-reranker.adoc) | [OnnxRerankerExample](./OnnxRerankerExample/README.md) | Local `model.onnx` and `tokenizer.json` assets exposed through `ONNX_RERANKER_MODEL_PATH` and `ONNX_RERANKER_TOKENIZER_PATH` |
+| Microsoft.Extensions.VectorData / Semantic Kernel vector-store connector and chat-memory store | [Vector Data Connector](../docs-site/modules/ROOT/pages/extensions/vector-data-connector.adoc) | [VectorDataConnectorExample](./VectorDataConnectorExample/README.md) | RediSearch + RedisJSON, `OPENAI_API_KEY`, and optional `OPENAI_EMBEDDING_MODEL`, `REDIS_VL_REDIS_URL` |
+| Semantic Kernel consuming the RedisVL MEVD connector (`VectorStoreTextSearch`) | [Vector Data Connector](../docs-site/modules/ROOT/pages/extensions/vector-data-connector.adoc) | [SemanticKernelConnectorExample](./SemanticKernelConnectorExample/README.md) | RediSearch + RedisJSON, `OPENAI_API_KEY`, and optional `OPENAI_EMBEDDING_MODEL`, `REDIS_VL_REDIS_URL` |
 | CLI index and schema commands | [CLI](../docs-site/modules/ROOT/pages/cli/index.adoc) | `dotnet run --project src/RedisVL.Cli -- ...` | Index commands require RediSearch plus `--redis` or `REDIS_VL_REDIS_URL`; JSON-backed index creation also requires RedisJSON |
 
 ### [JsonStorageExample](./JsonStorageExample/README.md)
@@ -291,6 +293,59 @@ Run it from the repository root:
 
 ```bash
 dotnet run --project examples/OnnxVectorizerExample/OnnxVectorizerExample.csproj
+```
+
+### [VectorDataConnectorExample](./VectorDataConnectorExample/README.md)
+
+Demonstrates the `RedisVL.Connectors.VectorData` package — a Microsoft.Extensions.VectorData (MEVD) /
+Semantic Kernel-compatible vector-store connector backed by RedisVL:
+
+- create a `RedisVLVectorStore` and a strongly-typed `VectorStoreCollection<string, Movie>`
+- map a POCO with `[VectorStoreKey]`, `[VectorStoreData]`, and `[VectorStoreVector]` attributes
+- embed summaries and the query with OpenAI through a Microsoft.Extensions.AI `IEmbeddingGenerator`
+- upsert records and fetch one by key
+- run a vector search with a LINQ metadata pre-filter
+- run a filtered (non-vector) retrieval
+- persist and replay chat history with `RedisVLChatMessageStore`
+
+Redis prerequisites:
+
+- RediSearch with vector similarity support
+- RedisJSON
+
+Additional prerequisites:
+
+- `OPENAI_API_KEY`
+
+Run it from the repository root:
+
+```bash
+dotnet run --project examples/VectorDataConnectorExample/VectorDataConnectorExample.csproj
+```
+
+### [SemanticKernelConnectorExample](./SemanticKernelConnectorExample/README.md)
+
+Demonstrates Semantic Kernel consuming the RedisVL MEVD connector — the same `RedisVLVectorStore`
+plugged into SK's `VectorStoreTextSearch<T>`:
+
+- wrap a `RedisVLCollection<string, Movie>` in `VectorStoreTextSearch<Movie>`
+- embed records and queries with OpenAI through a Microsoft.Extensions.AI `IEmbeddingGenerator`
+- run `GetTextSearchResultsAsync(...)` for RAG retrieval over RedisVL
+- expose the search to a `Kernel` as a plugin
+
+Redis prerequisites:
+
+- RediSearch with vector similarity support
+- RedisJSON
+
+Additional prerequisites:
+
+- `OPENAI_API_KEY`
+
+Run it from the repository root:
+
+```bash
+dotnet run --project examples/SemanticKernelConnectorExample/SemanticKernelConnectorExample.csproj
 ```
 
 ## Related Docs

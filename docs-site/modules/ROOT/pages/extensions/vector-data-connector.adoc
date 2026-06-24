@@ -1,0 +1,107 @@
+= Microsoft.Extensions.VectorData Connector
+
+`RedisVL.Connectors.VectorData` exposes a RedisVL `SearchIndex` as a
+https://learn.microsoft.com/dotnet/api/microsoft.extensions.vectordata[Microsoft.Extensions.VectorData]
+(MEVD) `VectorStore` / `VectorStoreCollection<TKey, TRecord>`. Because Semantic Kernel's memory and
+vector-store connectors are built on MEVD, this single package is consumable from Semantic Kernel and
+the broader Microsoft.Extensions.AI ecosystem.
+
+This is the .NET analog of the Java library's LangChain4J adapters
+(`RedisVLEmbeddingStore`, `RedisVLContentRetriever`, `RedisVLChatMemoryStore`, and the filter mapper).
+
+== Package contents
+
+* `RedisVLVectorStore` — a MEVD `VectorStore` over a StackExchange.Redis `IDatabase`
+* `RedisVLCollection<TKey, TRecord>` — a MEVD `VectorStoreCollection` backed by a JSON-storage `SearchIndex`
+* `RedisVLCollectionOptions` — index name, key prefix, and an explicit `VectorStoreCollectionDefinition`
+* `RedisVLChatMessageStore` (namespace `RedisVL.Connectors.VectorData.ChatMemory`) — a chat-history store that bridges Microsoft.Extensions.AI `ChatMessage` to the `MessageHistory` workflow
+
+== Record model
+
+The connector maps a record type onto a JSON-backed search index using the standard MEVD attributes,
+or an explicit `VectorStoreCollectionDefinition` passed through `RedisVLCollectionOptions.Definition`:
+
+* `[VectorStoreKey]` — the document key. Only `string` keys are supported.
+* `[VectorStoreData(IsIndexed = true)]` — indexed as a `TAG` field (strings, enums, booleans, string collections) or a sortable `NUMERIC` field (numeric types).
+* `[VectorStoreData(IsFullTextIndexed = true)]` — indexed as a `TEXT` field (strings only).
+* `[VectorStoreData]` without indexing flags — stored in JSON but not added to the index.
+* `[VectorStoreVector(dims, DistanceFunction = ..., IndexKind = ...)]` — a `VECTOR` field. `ReadOnlyMemory<float>`/`float[]`/`Embedding<float>` map to `FLOAT32`; `ReadOnlyMemory<double>`/`double[]` map to `FLOAT64`.
+
+Field (and JSON) names follow `System.Text.Json` web defaults — camel-cased property names, or a
+`[JsonPropertyName]` override.
+
+Distance functions map to RedisVL metrics: cosine -> `Cosine`, dot-product -> `InnerProduct`,
+Euclidean -> `L2`. Index kinds map `Flat` -> `Flat` and `Hnsw`/`Dynamic` -> `Hnsw`.
+
+== Usage
+
+[source,csharp]
+----
+var store = new RedisVLVectorStore(database);
+var movies = store.GetCollection<string, Movie>("movies");
+
+await movies.EnsureCollectionExistsAsync();
+await movies.UpsertAsync(catalog);
+
+// Vector search with a LINQ metadata pre-filter (translated to a RedisVL FilterExpression).
+await foreach (var result in movies.SearchAsync(
+    queryVector,
+    top: 5,
+    new VectorSearchOptions<Movie> { Filter = m => m.Genre == "scifi" && m.Year >= 1990 }))
+{
+    Console.WriteLine($"{result.Record.Title} ({result.Score})");
+}
+----
+
+== Filter translation
+
+LINQ predicates on `VectorSearchOptions.Filter` and `GetAsync(filter, top)` are translated to RedisVL
+`FilterExpression` values. Supported forms include `==`, `!=`, `<`, `<=`, `>`, `>=`, `&&`, `||`, `!`,
+collection `Contains` (tag membership and `IN`), and captured-variable evaluation.
+
+== Limitations
+
+* Search input must be a raw vector (`ReadOnlyMemory<float>`, `float[]`, `Embedding<float>`, or the `double` equivalents). Passing a string for server-side or generator-based embedding is not yet supported.
+* Only `string` keys are supported.
+* Dynamic (dictionary-based) collections are not supported; use `GetCollection<TKey, TRecord>`.
+* Records are always materialized in full, so `IncludeVectors = false` is treated as best-effort.
+
+== Semantic Kernel interop
+
+Because Semantic Kernel's vector-store and text-search abstractions are built on MEVD, the connector
+plugs directly into SK's `VectorStoreTextSearch<TRecord>` for retrieval-augmented generation:
+
+[source,csharp]
+----
+var collection = new RedisVLVectorStore(database).GetCollection<string, Movie>("movies");
+var textSearch = new VectorStoreTextSearch<Movie>(collection, embeddingGenerator, stringMapper, resultMapper);
+var results = await textSearch.GetTextSearchResultsAsync("a natural-language question");
+var plugin = textSearch.CreateWithGetTextSearchResults("RedisVLSearch"); // expose to a Kernel
+----
+
+The package targets `Microsoft.Extensions.VectorData.Abstractions` 10.1.0 as its floor to stay
+binary-compatible with the Semantic Kernel 1.x line (a newer MEVD added a `class` constraint to
+`VectorSearchResult<T>` that SK 1.77 cannot load). NuGet unifies upward when a consumer brings a newer
+compatible MEVD.
+
+== Example workflows
+
+* `/examples/VectorDataConnectorExample` — the full MEVD flow: store creation, OpenAI-embedded upsert, fetch-by-key, filtered vector search, filtered retrieval, and the chat-memory store.
+* `/examples/SemanticKernelConnectorExample` — Semantic Kernel consuming the connector through `VectorStoreTextSearch<TRecord>`, with OpenAI embeddings.
+
+Both examples require `OPENAI_API_KEY` and embed with OpenAI (`text-embedding-3-small` by default) through a Microsoft.Extensions.AI `IEmbeddingGenerator`.
+
+Run them from the repository root:
+
+[source,bash]
+----
+dotnet run --project examples/VectorDataConnectorExample/VectorDataConnectorExample.csproj
+dotnet run --project examples/SemanticKernelConnectorExample/SemanticKernelConnectorExample.csproj
+----
+
+== Validation references
+
+* `tests/RedisVL.Tests/Connectors/VectorData/RedisVLRecordModelTests.cs` covers schema mapping
+* `tests/RedisVL.Tests/Connectors/VectorData/RedisVLFilterTranslatorTests.cs` covers LINQ filter translation
+* `tests/RedisVL.Tests/Connectors/VectorData/RedisVLVectorStoreIntegrationTests.cs` covers the collection round-trip
+* `tests/RedisVL.Tests/Connectors/VectorData/RedisVLChatMessageStoreIntegrationTests.cs` covers the chat-memory store
