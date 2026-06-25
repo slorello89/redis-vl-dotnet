@@ -77,6 +77,42 @@ public sealed class SearchIndexCommandBuilderTests
     }
 
     [Fact]
+    public void BuildsSvsVamanaCreateArgumentsWithCompressionAndRuntimeKnobs()
+    {
+        var schema = new SearchSchema(
+            new IndexDefinition("docs-idx", "docs:", StorageType.Hash),
+            [
+                new VectorFieldDefinition(
+                    "embedding",
+                    new VectorFieldAttributes(
+                        VectorAlgorithm.SvsVamana,
+                        VectorDataType.Float16,
+                        VectorDistanceMetric.Cosine,
+                        1536,
+                        compression: VectorCompression.Lvq8,
+                        constructionWindowSize: 250,
+                        graphMaxDegree: 40,
+                        searchWindowSize: 20,
+                        epsilon: 0.05,
+                        trainingThreshold: 20480,
+                        reduce: 768))
+            ]);
+
+        var arguments = SearchIndexCommandBuilder.BuildCreateArguments(schema);
+
+        Assert.Equal(
+            [
+                "docs-idx", "ON", "HASH", "PREFIX", "1", "docs:", "SCHEMA",
+                "embedding", "VECTOR", "SVS-VAMANA", "20",
+                "TYPE", "FLOAT16", "DIM", "1536", "DISTANCE_METRIC", "COSINE",
+                "COMPRESSION", "LVQ8",
+                "CONSTRUCTION_WINDOW_SIZE", "250", "GRAPH_MAX_DEGREE", "40", "SEARCH_WINDOW_SIZE", "20",
+                "EPSILON", "0.05", "TRAINING_THRESHOLD", "20480", "REDUCE", "768"
+            ],
+            arguments.Select(static argument => argument.ToString()!).ToArray());
+    }
+
+    [Fact]
     public void BuildsCreateArgumentsWithMultiplePrefixes()
     {
         var schema = new SearchSchema(

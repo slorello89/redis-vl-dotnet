@@ -61,6 +61,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "VectorDataConnectorExample"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SemanticKernelConnectorExample", "examples\SemanticKernelConnectorExample\SemanticKernelConnectorExample.csproj", "{C7993158-2845-49C6-B73B-A37B5D5A1C9A}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SvsVamanaExample", "examples\SvsVamanaExample\SvsVamanaExample.csproj", "{576BA181-E406-4E75-922A-CCD7FB91B2C3}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -383,6 +385,18 @@ Global
 		{C7993158-2845-49C6-B73B-A37B5D5A1C9A}.Release|x64.Build.0 = Release|Any CPU
 		{C7993158-2845-49C6-B73B-A37B5D5A1C9A}.Release|x86.ActiveCfg = Release|Any CPU
 		{C7993158-2845-49C6-B73B-A37B5D5A1C9A}.Release|x86.Build.0 = Release|Any CPU
+		{576BA181-E406-4E75-922A-CCD7FB91B2C3}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{576BA181-E406-4E75-922A-CCD7FB91B2C3}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{576BA181-E406-4E75-922A-CCD7FB91B2C3}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{576BA181-E406-4E75-922A-CCD7FB91B2C3}.Debug|x64.Build.0 = Debug|Any CPU
+		{576BA181-E406-4E75-922A-CCD7FB91B2C3}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{576BA181-E406-4E75-922A-CCD7FB91B2C3}.Debug|x86.Build.0 = Debug|Any CPU
+		{576BA181-E406-4E75-922A-CCD7FB91B2C3}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{576BA181-E406-4E75-922A-CCD7FB91B2C3}.Release|Any CPU.Build.0 = Release|Any CPU
+		{576BA181-E406-4E75-922A-CCD7FB91B2C3}.Release|x64.ActiveCfg = Release|Any CPU
+		{576BA181-E406-4E75-922A-CCD7FB91B2C3}.Release|x64.Build.0 = Release|Any CPU
+		{576BA181-E406-4E75-922A-CCD7FB91B2C3}.Release|x86.ActiveCfg = Release|Any CPU
+		{576BA181-E406-4E75-922A-CCD7FB91B2C3}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -414,5 +428,6 @@ Global
 		{76D30BFF-4161-4E90-8008-908B0D31D404} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 		{4D24FD19-A733-4920-AFDF-6EB6A32FD35B} = {B36A84DF-456D-A817-6EDD-3EC3E7F6E11F}
 		{C7993158-2845-49C6-B73B-A37B5D5A1C9A} = {B36A84DF-456D-A817-6EDD-3EC3E7F6E11F}
+		{576BA181-E406-4E75-922A-CCD7FB91B2C3} = {B36A84DF-456D-A817-6EDD-3EC3E7F6E11F}
 	EndGlobalSection
 EndGlobal

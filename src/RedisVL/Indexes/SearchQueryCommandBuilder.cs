@@ -115,7 +115,7 @@ internal static class SearchQueryCommandBuilder
             schema.Index.Name,
             BuildHybridAggregateQuery(schema, vectorField, query)
         };
-        arguments.AddRange(BuildVectorParams(query.Vector, ("ef_runtime", query.RuntimeOptions?.EfRuntime)));
+        arguments.AddRange(BuildVectorParams(query.Vector, CollectKnnRuntimeParams(query.RuntimeOptions)));
 
         AppendAggregationPipeline(
             arguments,
@@ -204,7 +204,7 @@ internal static class SearchQueryCommandBuilder
             schema.Index.Name,
             BuildVectorSearchQuery(schema, vectorField, query)
         };
-        arguments.AddRange(BuildVectorParams(query.Vector, ("ef_runtime", query.RuntimeOptions?.EfRuntime)));
+        arguments.AddRange(BuildVectorParams(query.Vector, CollectKnnRuntimeParams(query.RuntimeOptions)));
         arguments.AddRange(
         [
             "SORTBY",
@@ -264,7 +264,7 @@ internal static class SearchQueryCommandBuilder
             schema.Index.Name,
             BuildHybridSearchQuery(schema, vectorField, query)
         };
-        arguments.AddRange(BuildVectorParams(query.Vector, ("ef_runtime", query.RuntimeOptions?.EfRuntime)));
+        arguments.AddRange(BuildVectorParams(query.Vector, CollectKnnRuntimeParams(query.RuntimeOptions)));
         arguments.AddRange(
         [
             "SORTBY",
@@ -324,20 +324,15 @@ internal static class SearchQueryCommandBuilder
 
     private static void AppendHybridKnnClause(List<object> arguments, HybridSearchQuery query)
     {
+        var runtimeParams = CollectKnnRuntimeParams(query.RuntimeOptions);
         arguments.Add("KNN");
-        if (query.RuntimeOptions?.EfRuntime is int efRuntime)
+        arguments.Add((2 + runtimeParams.Count * 2).ToString(CultureInfo.InvariantCulture));
+        arguments.Add("K");
+        arguments.Add(query.TopK.ToString(CultureInfo.InvariantCulture));
+        foreach (var (_, keyword, value) in runtimeParams)
         {
-            arguments.Add("4");
-            arguments.Add("K");
-            arguments.Add(query.TopK.ToString(CultureInfo.InvariantCulture));
-            arguments.Add("EF_RUNTIME");
-            arguments.Add(efRuntime.ToString(CultureInfo.InvariantCulture));
-        }
-        else
-        {
-            arguments.Add("2");
-            arguments.Add("K");
-            arguments.Add(query.TopK.ToString(CultureInfo.InvariantCulture));
+            arguments.Add(keyword);
+            arguments.Add(value);
         }
     }
 
@@ -390,21 +385,21 @@ internal static class SearchQueryCommandBuilder
     private static string BuildVectorSearchQuery(SearchSchema schema, VectorFieldDefinition field, VectorQuery query)
     {
         var filter = query.Filter?.ToQueryString() ?? "*";
-        var runtimeClause = query.RuntimeOptions?.EfRuntime is int ? " EF_RUNTIME $ef_runtime" : string.Empty;
+        var runtimeClause = BuildKnnRuntimeClause(query.RuntimeOptions);
         return $"{filter}=>[KNN {query.TopK.ToString(CultureInfo.InvariantCulture)} @{GetQueryFieldName(schema, field)} $vector{runtimeClause} AS {query.ScoreAlias}]";
     }
 
     private static string BuildHybridSearchQuery(SearchSchema schema, VectorFieldDefinition field, HybridQuery query)
     {
         var filter = query.CombinedFilter.ToQueryString();
-        var runtimeClause = query.RuntimeOptions?.EfRuntime is int ? " EF_RUNTIME $ef_runtime" : string.Empty;
+        var runtimeClause = BuildKnnRuntimeClause(query.RuntimeOptions);
         return $"({filter})=>[KNN {query.TopK.ToString(CultureInfo.InvariantCulture)} @{GetQueryFieldName(schema, field)} $vector{runtimeClause} AS {query.ScoreAlias}]";
     }
 
     private static string BuildHybridAggregateQuery(SearchSchema schema, VectorFieldDefinition field, AggregateHybridQuery query)
     {
         var filter = query.CombinedFilter.ToQueryString();
-        var runtimeClause = query.RuntimeOptions?.EfRuntime is int ? " EF_RUNTIME $ef_runtime" : string.Empty;
+        var runtimeClause = BuildKnnRuntimeClause(query.RuntimeOptions);
         return $"({filter})=>[KNN {query.TopK.ToString(CultureInfo.InvariantCulture)} @{GetQueryFieldName(schema, field)} $vector{runtimeClause} AS {query.ScoreAlias}]";
     }
 
@@ -502,15 +497,26 @@ internal static class SearchQueryCommandBuilder
         string fieldName,
         VectorKnnRuntimeOptions? runtimeOptions)
     {
-        if (runtimeOptions?.EfRuntime is null)
+        if (runtimeOptions is null)
         {
             return;
         }
 
-        if (field.Attributes.Algorithm != VectorAlgorithm.Hnsw)
+        var algorithm = field.Attributes.Algorithm;
+
+        if (runtimeOptions.EfRuntime is not null && algorithm != VectorAlgorithm.Hnsw)
         {
             throw new InvalidOperationException(
-                $"Field '{fieldName}' uses '{field.Attributes.Algorithm}' and does not support runtime parameter 'EF_RUNTIME'.");
+                $"Field '{fieldName}' uses '{algorithm}' and does not support runtime parameter 'EF_RUNTIME'.");
+        }
+
+        if ((runtimeOptions.SearchWindowSize is not null
+                || runtimeOptions.UseSearchHistory is not null
+                || runtimeOptions.SearchBufferCapacity is not null)
+            && algorithm != VectorAlgorithm.SvsVamana)
+        {
+            throw new InvalidOperationException(
+                $"Field '{fieldName}' uses '{algorithm}' and does not support SVS-VAMANA runtime parameters such as 'SEARCH_WINDOW_SIZE'.");
         }
     }
 
@@ -524,7 +530,7 @@ internal static class SearchQueryCommandBuilder
             return;
         }
 
-        if (field.Attributes.Algorithm != VectorAlgorithm.Hnsw)
+        if (field.Attributes.Algorithm != VectorAlgorithm.Hnsw && field.Attributes.Algorithm != VectorAlgorithm.SvsVamana)
         {
             throw new InvalidOperationException(
                 $"Field '{fieldName}' uses '{field.Attributes.Algorithm}' and does not support runtime parameter 'EPSILON'.");
@@ -546,6 +552,10 @@ internal static class SearchQueryCommandBuilder
         {
             VectorDataType.Float32 => sizeof(float),
             VectorDataType.Float64 => sizeof(double),
+            VectorDataType.Float16 => 2,
+            VectorDataType.BFloat16 => 2,
+            VectorDataType.UInt8 => 1,
+            VectorDataType.Int8 => 1,
             _ => throw new ArgumentOutOfRangeException(nameof(attributes), attributes.DataType, "Unsupported vector data type.")
         };
 
@@ -557,6 +567,52 @@ internal static class SearchQueryCommandBuilder
                 nameof(vector));
         }
     }
+
+    private static List<(string ParamName, string Keyword, string Value)> CollectKnnRuntimeParams(VectorKnnRuntimeOptions? options)
+    {
+        var collected = new List<(string ParamName, string Keyword, string Value)>();
+        if (options is null)
+        {
+            return collected;
+        }
+
+        if (options.EfRuntime is int efRuntime)
+        {
+            collected.Add(("ef_runtime", "EF_RUNTIME", efRuntime.ToString(CultureInfo.InvariantCulture)));
+        }
+
+        if (options.SearchWindowSize is int searchWindowSize)
+        {
+            collected.Add(("search_window_size", "SEARCH_WINDOW_SIZE", searchWindowSize.ToString(CultureInfo.InvariantCulture)));
+        }
+
+        if (options.UseSearchHistory is SvsSearchHistory useSearchHistory)
+        {
+            collected.Add(("use_search_history", "USE_SEARCH_HISTORY", ToRedisKeyword(useSearchHistory)));
+        }
+
+        if (options.SearchBufferCapacity is int searchBufferCapacity)
+        {
+            collected.Add(("search_buffer_capacity", "SEARCH_BUFFER_CAPACITY", searchBufferCapacity.ToString(CultureInfo.InvariantCulture)));
+        }
+
+        return collected;
+    }
+
+    private static string BuildKnnRuntimeClause(VectorKnnRuntimeOptions? options) =>
+        string.Concat(CollectKnnRuntimeParams(options).Select(static parameter => $" {parameter.Keyword} ${parameter.ParamName}"));
+
+    private static string ToRedisKeyword(SvsSearchHistory value) =>
+        value switch
+        {
+            SvsSearchHistory.Auto => "AUTO",
+            SvsSearchHistory.On => "ON",
+            SvsSearchHistory.Off => "OFF",
+            _ => throw new ArgumentOutOfRangeException(nameof(value), value, "Unsupported search history value.")
+        };
+
+    private static object[] BuildVectorParams(byte[] vector, IReadOnlyList<(string ParamName, string Keyword, string Value)> runtimeParams) =>
+        BuildVectorParams(vector, runtimeParams.Select(static parameter => (parameter.ParamName, (object?)parameter.Value)).ToArray());
 
     private static object[] BuildVectorParams(byte[] vector, params (string Name, object? Value)[] additionalParameters)
     {

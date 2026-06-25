@@ -50,12 +50,14 @@ var typedResults = await index.SearchAsync<MovieVectorHit>(
 
 == Runtime vector options
 
-Use `VectorKnnRuntimeOptions` to pass runtime HNSW tuning:
+Use `VectorKnnRuntimeOptions` to pass runtime tuning for the field's algorithm:
 
-* `efRuntime` must be greater than zero
-* the option is translated into `EF_RUNTIME` query params
+* HNSW fields: `efRuntime` (must be greater than zero) is translated into `EF_RUNTIME` query params
+* SVS-VAMANA fields: `searchWindowSize`, `useSearchHistory` (`SvsSearchHistory.Auto`/`On`/`Off`), and `searchBufferCapacity` are translated into `SEARCH_WINDOW_SIZE`, `USE_SEARCH_HISTORY`, and `SEARCH_BUFFER_CAPACITY` query params
 
-This is a runtime search knob, not schema metadata. Schema construction choices such as `m` and `efConstruction` still live on the vector field definition.
+Runtime knobs are validated against the field's algorithm: `EF_RUNTIME` is rejected on non-HNSW fields, and the SVS-VAMANA knobs are rejected on non-SVS-VAMANA fields.
+
+These are runtime search knobs, not schema metadata. Schema construction choices such as `m`, `efConstruction`, `graphMaxDegree`, and `constructionWindowSize` still live on the vector field definition.
 
 == Batch helpers
 

@@ -172,6 +172,18 @@ internal static class SearchIndexCommandBuilder
         AddOptionalAttribute(attributeArguments, "M", field.Attributes.M);
         AddOptionalAttribute(attributeArguments, "EF_CONSTRUCTION", field.Attributes.EfConstruction);
         AddOptionalAttribute(attributeArguments, "EF_RUNTIME", field.Attributes.EfRuntime);
+        if (field.Attributes.Compression != VectorCompression.None)
+        {
+            attributeArguments.Add("COMPRESSION");
+            attributeArguments.Add(ToRedisKeyword(field.Attributes.Compression));
+        }
+
+        AddOptionalAttribute(attributeArguments, "CONSTRUCTION_WINDOW_SIZE", field.Attributes.ConstructionWindowSize);
+        AddOptionalAttribute(attributeArguments, "GRAPH_MAX_DEGREE", field.Attributes.GraphMaxDegree);
+        AddOptionalAttribute(attributeArguments, "SEARCH_WINDOW_SIZE", field.Attributes.SearchWindowSize);
+        AddOptionalAttribute(attributeArguments, "EPSILON", field.Attributes.Epsilon);
+        AddOptionalAttribute(attributeArguments, "TRAINING_THRESHOLD", field.Attributes.TrainingThreshold);
+        AddOptionalAttribute(attributeArguments, "REDUCE", field.Attributes.Reduce);
         arguments.Add("VECTOR");
         arguments.Add(ToRedisKeyword(field.Attributes.Algorithm));
         arguments.Add(attributeArguments.Count.ToString(CultureInfo.InvariantCulture));
@@ -187,6 +199,17 @@ internal static class SearchIndexCommandBuilder
 
         arguments.Add(keyword);
         arguments.Add(value.ToString(CultureInfo.InvariantCulture));
+    }
+
+    private static void AddOptionalAttribute(List<object> arguments, string keyword, double value)
+    {
+        if (value <= 0d)
+        {
+            return;
+        }
+
+        arguments.Add(keyword);
+        arguments.Add(value.ToString("G", CultureInfo.InvariantCulture));
     }
 
     private static void AddIndexOption(List<object> arguments, string keyword, bool enabled)
@@ -231,6 +254,7 @@ internal static class SearchIndexCommandBuilder
         {
             VectorAlgorithm.Flat => "FLAT",
             VectorAlgorithm.Hnsw => "HNSW",
+            VectorAlgorithm.SvsVamana => "SVS-VAMANA",
             _ => throw new ArgumentOutOfRangeException(nameof(algorithm), algorithm, "Unsupported vector algorithm.")
         };
 
@@ -239,7 +263,23 @@ internal static class SearchIndexCommandBuilder
         {
             VectorDataType.Float32 => "FLOAT32",
             VectorDataType.Float64 => "FLOAT64",
+            VectorDataType.Float16 => "FLOAT16",
+            VectorDataType.BFloat16 => "BFLOAT16",
+            VectorDataType.UInt8 => "UINT8",
+            VectorDataType.Int8 => "INT8",
             _ => throw new ArgumentOutOfRangeException(nameof(dataType), dataType, "Unsupported vector data type.")
+        };
+
+    private static string ToRedisKeyword(VectorCompression compression) =>
+        compression switch
+        {
+            VectorCompression.Lvq8 => "LVQ8",
+            VectorCompression.Lvq4 => "LVQ4",
+            VectorCompression.Lvq4x4 => "LVQ4x4",
+            VectorCompression.Lvq4x8 => "LVQ4x8",
+            VectorCompression.LeanVec4x8 => "LeanVec4x8",
+            VectorCompression.LeanVec8x8 => "LeanVec8x8",
+            _ => throw new ArgumentOutOfRangeException(nameof(compression), compression, "Unsupported vector compression.")
         };
 
     private static string ToRedisKeyword(VectorDistanceMetric distanceMetric) =>

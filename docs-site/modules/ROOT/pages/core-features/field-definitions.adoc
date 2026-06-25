@@ -21,7 +21,7 @@ RedisVL supports text, tag, numeric, geo, and vector field definitions. Each fie
 | Geographic coordinates for geo filters.
 
 | `VectorFieldDefinition`
-| Dense vector fields with FLAT or HNSW indexing attributes.
+| Dense vector fields with FLAT, HNSW, or SVS-VAMANA indexing attributes.
 |===
 
 == Text, tag, numeric, and geo options
@@ -67,16 +67,52 @@ new VectorFieldDefinition(
 
 Supported vector attributes:
 
-* `algorithm`: `Flat` or `Hnsw`
+* `algorithm`: `Flat`, `Hnsw`, or `SvsVamana`
 * `dataType`: `Float32`, `Float64`, `Float16`, `BFloat16`, `UInt8`, or `Int8`
 * `distanceMetric`: `Cosine`, `L2`, or `InnerProduct`
 * `dimensions`: required and must be greater than zero
-* `initialCapacity`, `blockSize`, `m`, `efConstruction`, `efRuntime`: optional tuning knobs
+* `initialCapacity`, `blockSize`: optional tuning knobs for any algorithm
+* HNSW-only: `m`, `efConstruction`, `efRuntime`
+* SVS-VAMANA-only: `compression`, `constructionWindowSize`, `graphMaxDegree`, `searchWindowSize`, `epsilon`, `trainingThreshold`, `reduce`
+
+=== SVS-VAMANA with vector compression
+
+SVS-VAMANA is a graph-based index that supports vector compression (LVQ and LeanVec) to reduce memory usage:
+
+[source,csharp]
+----
+new VectorFieldDefinition(
+    "embedding",
+    new VectorFieldAttributes(
+        VectorAlgorithm.SvsVamana,
+        VectorDataType.Float16,
+        VectorDistanceMetric.Cosine,
+        dimensions: 1536,
+        compression: VectorCompression.Lvq8,
+        constructionWindowSize: 250,
+        graphMaxDegree: 40,
+        searchWindowSize: 20))
+----
+
+`VectorCompression` values: `None` (default), `Lvq8`, `Lvq4`, `Lvq4x4`, `Lvq4x8`, `LeanVec4x8`, `LeanVec8x8`. The `reduce` attribute sets the reduced dimension count for LeanVec compression.
+
+At query time, SVS-VAMANA KNN queries accept their own runtime knobs through `VectorKnnRuntimeOptions`:
+
+[source,csharp]
+----
+var runtimeOptions = new VectorKnnRuntimeOptions(
+    searchWindowSize: 30,
+    useSearchHistory: SvsSearchHistory.On,
+    searchBufferCapacity: 60);
+----
 
 Validation rules:
 
 * all numeric tuning values must be zero or greater
-* `Flat` does not allow HNSW-only settings such as `m`, `efConstruction`, or `efRuntime`
+* `Flat` does not allow HNSW-only or SVS-VAMANA-only settings
+* HNSW-only settings (`m`, `efConstruction`, `efRuntime`) are rejected on non-HNSW fields
+* SVS-VAMANA-only settings (compression, graph/window knobs) are rejected on non-SVS-VAMANA fields
+* `EF_RUNTIME` is only valid on HNSW fields; `SEARCH_WINDOW_SIZE` / `USE_SEARCH_HISTORY` / `SEARCH_BUFFER_CAPACITY` only on SVS-VAMANA fields
 
 == JSON and HASH document mapping
 
