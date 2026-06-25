@@ -1,3 +1,4 @@
+using System.Linq.Expressions;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.VectorData;
 using OpenAI.Embeddings;
@@ -42,6 +43,7 @@ var catalog = new[]
     new Movie { Id = "heat", Title = "Heat", Genre = "crime", Year = 1995, Summary = "A detective hunts a disciplined crew of bank robbers across Los Angeles." },
     new Movie { Id = "arrival", Title = "Arrival", Genre = "scifi", Year = 2016, Summary = "A linguist decodes the language of aliens who arrive on Earth in towering ships." },
     new Movie { Id = "se7en", Title = "Se7en", Genre = "crime", Year = 1995, Summary = "Two detectives track a serial killer who stages murders around the seven deadly sins." },
+    new Movie { Id = "interstellar", Title = "Interstellar", Genre = "scifi", Year = 2014, Summary = "Astronauts travel through a wormhole near Saturn seeking a new home for humanity." },
 };
 
 var summaryEmbeddings = await embeddingGenerator.GenerateAsync(catalog.Select(movie => movie.Summary));
@@ -56,9 +58,9 @@ await movies.UpsertAsync(catalog);
 var fetched = await movies.GetAsync("arrival");
 Console.WriteLine($"\nFetched by key: {fetched?.Title} ({fetched?.Year})");
 
-// 4. Vector search with a metadata pre-filter (LINQ -> RedisVL FilterExpression).
+// 4. Vector search with a LINQ metadata pre-filter (translated to a RedisVL FilterExpression).
 var query = (await embeddingGenerator.GenerateAsync(["aliens making first contact with humanity"]))[0].Vector;
-Console.WriteLine("\nTop sci-fi matches for the query:");
+Console.WriteLine("\nTop sci-fi matches for the query (vector search + LINQ filter m => m.Genre == \"scifi\"):");
 await foreach (var result in movies.SearchAsync(
                    query,
                    top: 3,
@@ -67,11 +69,29 @@ await foreach (var result in movies.SearchAsync(
     Console.WriteLine($"  {result.Record.Title,-12} score={result.Score:F4}");
 }
 
-// 5. Filtered (non-vector) retrieval.
-Console.WriteLine("\nCrime movies from 1995:");
-await foreach (var movie in movies.GetAsync(m => m.Genre == "crime" && m.Year == 1995, top: 10))
+// 5. Filtered (non-vector) retrieval - the LINQ predicates below are translated by the connector
+//    into RedisVL FilterExpressions and run as FT.SEARCH queries.
+var preferredGenres = new[] { "scifi", "noir" };
+var linqQueries = new (string Description, Expression<Func<Movie, bool>> Filter)[]
 {
-    Console.WriteLine($"  {movie.Title}");
+    ("equality:           m => m.Genre == \"crime\"", m => m.Genre == "crime"),
+    ("numeric range:      m => m.Year >= 2000", m => m.Year >= 2000),
+    ("AND:                m => m.Genre == \"crime\" && m.Year == 1995", m => m.Genre == "crime" && m.Year == 1995),
+    ("OR:                 m => m.Year < 1996 || m.Year > 2015", m => m.Year < 1996 || m.Year > 2015),
+    ("IN (Contains):      preferredGenres.Contains(m.Genre)", m => preferredGenres.Contains(m.Genre)),
+    ("negation:           m => !(m.Genre == \"scifi\")", m => !(m.Genre == "scifi")),
+};
+
+foreach (var (description, filter) in linqQueries)
+{
+    var titles = new List<string>();
+    await foreach (var movie in movies.GetAsync(filter, top: 10))
+    {
+        titles.Add($"{movie.Title} ({movie.Year})");
+    }
+
+    Console.WriteLine($"\nLINQ {description}");
+    Console.WriteLine($"  -> {string.Join(", ", titles.OrderBy(t => t))}");
 }
 
 // 6. Chat-memory store on top of the MessageHistory workflow.

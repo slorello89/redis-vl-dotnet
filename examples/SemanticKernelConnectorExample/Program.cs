@@ -42,10 +42,10 @@ await movies.EnsureCollectionExistsAsync();
 // 2. Seed records, embedding each summary with OpenAI.
 var catalog = new[]
 {
-    new Movie { Id = "thematrix", Title = "The Matrix", Summary = "A hacker learns reality is a simulation and joins a rebellion against the machines." },
-    new Movie { Id = "arrival", Title = "Arrival", Summary = "A linguist decodes the language of aliens who arrive on Earth in towering ships." },
-    new Movie { Id = "heat", Title = "Heat", Summary = "A detective hunts a disciplined crew of bank robbers across Los Angeles." },
-    new Movie { Id = "interstellar", Title = "Interstellar", Summary = "Astronauts travel through a wormhole near Saturn seeking a new home for humanity." },
+    new Movie { Id = "thematrix", Title = "The Matrix", Year = 1999, Summary = "A hacker learns reality is a simulation and joins a rebellion against the machines." },
+    new Movie { Id = "arrival", Title = "Arrival", Year = 2016, Summary = "A linguist decodes the language of aliens who arrive on Earth in towering ships." },
+    new Movie { Id = "heat", Title = "Heat", Year = 1995, Summary = "A detective hunts a disciplined crew of bank robbers across Los Angeles." },
+    new Movie { Id = "interstellar", Title = "Interstellar", Year = 2014, Summary = "Astronauts travel through a wormhole near Saturn seeking a new home for humanity." },
 };
 
 var summaryEmbeddings = await embeddingGenerator.GenerateAsync(catalog.Select(movie => movie.Summary));
@@ -78,7 +78,19 @@ await foreach (var result in searchResults.Results)
     Console.WriteLine($"  - {result.Name}: {result.Value}");
 }
 
-// 4. The same text search can be exposed to a Kernel as a plugin for grounded prompts / tool calling.
+// 4. SK's generic TextSearchOptions<TRecord> carries a LINQ filter, which SK passes straight through
+//    to the RedisVL connector's vector search (translated to a RedisVL FilterExpression).
+ITextSearch<Movie> filterableSearch = textSearch;
+Console.WriteLine("\nSame query, filtered with a LINQ predicate (m => m.Year >= 2000):");
+var filteredResults = await filterableSearch.GetTextSearchResultsAsync(
+    question,
+    new TextSearchOptions<Movie> { Top = 3, Filter = m => m.Year >= 2000 });
+await foreach (var result in filteredResults.Results)
+{
+    Console.WriteLine($"  - {result.Name}: {result.Value}");
+}
+
+// 5. The same text search can be exposed to a Kernel as a plugin for grounded prompts / tool calling.
 var searchPlugin = textSearch.CreateWithGetTextSearchResults("RedisVLSearch");
 Console.WriteLine($"\nRegistered SK plugin '{searchPlugin.Name}' with function(s): {string.Join(", ", searchPlugin.Select(f => f.Name))}");
 
@@ -91,6 +103,9 @@ internal sealed class Movie
 
     [VectorStoreData(IsFullTextIndexed = true)]
     public string Title { get; set; } = string.Empty;
+
+    [VectorStoreData(IsIndexed = true)]
+    public int Year { get; set; }
 
     [VectorStoreData]
     public string Summary { get; set; } = string.Empty;

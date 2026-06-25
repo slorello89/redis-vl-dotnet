@@ -95,6 +95,49 @@ public sealed class RedisVLVectorStoreIntegrationTests
         Assert.False(await store.CollectionExistsAsync(name));
     }
 
+    [RedisSearchIntegrationFact]
+    public async Task GetAsync_LinqOperators_TranslateAndExecute()
+    {
+        await using var harness = await ConnectorTestHarness.CreateAsync($"vectordata-it-{Guid.NewGuid():N}");
+        var collection = harness.Collection;
+
+        await collection.UpsertAsync(SampleMovies());
+        await RedisSearchTestEnvironment.WaitForIndexDocumentCountAsync(harness.Index, 4);
+
+        // numeric range
+        Assert.Equal(["Arrival"], await TitlesAsync(collection, m => m.Year >= 2000));
+
+        // OR
+        Assert.Equal(
+            ["Arrival", "Heat", "Se7en"],
+            await TitlesAsync(collection, m => m.Year < 1996 || m.Year > 2015));
+
+        // IN (Contains over a constant collection)
+        var sciFiGenres = new[] { "scifi" };
+        Assert.Equal(
+            ["Arrival", "The Matrix"],
+            await TitlesAsync(collection, m => sciFiGenres.Contains(m.Genre)));
+
+        // negation
+        Assert.Equal(
+            ["Heat", "Se7en"],
+            await TitlesAsync(collection, m => !(m.Genre == "scifi")));
+    }
+
+    private static async Task<string[]> TitlesAsync(
+        RedisVLCollection<string, ConnectorMovie> collection,
+        System.Linq.Expressions.Expression<Func<ConnectorMovie, bool>> filter)
+    {
+        var titles = new List<string>();
+        await foreach (var movie in collection.GetAsync(filter, top: 50))
+        {
+            titles.Add(movie.Title);
+        }
+
+        titles.Sort(StringComparer.Ordinal);
+        return titles.ToArray();
+    }
+
     private static ConnectorMovie[] SampleMovies() =>
     [
         new() { Id = "thematrix", Title = "The Matrix", Genre = "scifi", Year = 1999, Embedding = new[] { 0.9f, 0.1f, 0.0f, 0.1f } },

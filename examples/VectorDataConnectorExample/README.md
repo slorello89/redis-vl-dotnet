@@ -14,7 +14,7 @@ It shows:
 - upsert records (vectors round-trip as JSON arrays)
 - fetch a record by key with `GetAsync(key)`
 - run a vector similarity search (OpenAI-embedded query) with a LINQ metadata pre-filter
-- run a filtered (non-vector) retrieval with `GetAsync(filter, top)`
+- run filtered (non-vector) retrievals with a variety of LINQ predicates — equality, numeric range, `&&`, `||`, `Contains` (IN), and negation — translated to RedisVL filters via `GetAsync(filter, top)`
 - persist and replay chat history with `RedisVLChatMessageStore` on top of `MessageHistory`
 
 ## Prerequisites

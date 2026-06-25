@@ -12,6 +12,7 @@ It shows:
 - seed records, embedding each summary with OpenAI through a Microsoft.Extensions.AI `IEmbeddingGenerator`
 - wrap the RedisVL collection in SK's `VectorStoreTextSearch<Movie>`
 - run `GetTextSearchResultsAsync(...)` — SK embeds the query and searches RedisVL (RAG retrieval)
+- run a LINQ-filtered text search with `TextSearchOptions<Movie> { Filter = m => m.Year >= 2000 }` — SK passes the LINQ predicate straight through to the RedisVL connector
 - expose the search to a `Kernel` as a plugin with `CreateWithGetTextSearchResults(...)`
 
 The same OpenAI `IEmbeddingGenerator` is shared by the collection and SK, so document and query

@@ -305,7 +305,7 @@ Semantic Kernel-compatible vector-store connector backed by RedisVL:
 - embed summaries and the query with OpenAI through a Microsoft.Extensions.AI `IEmbeddingGenerator`
 - upsert records and fetch one by key
 - run a vector search with a LINQ metadata pre-filter
-- run a filtered (non-vector) retrieval
+- run filtered (non-vector) retrievals with a range of LINQ predicates (equality, range, `&&`, `||`, `Contains`/IN, negation)
 - persist and replay chat history with `RedisVLChatMessageStore`
 
 Redis prerequisites:
@@ -331,6 +331,7 @@ plugged into SK's `VectorStoreTextSearch<T>`:
 - wrap a `RedisVLCollection<string, Movie>` in `VectorStoreTextSearch<Movie>`
 - embed records and queries with OpenAI through a Microsoft.Extensions.AI `IEmbeddingGenerator`
 - run `GetTextSearchResultsAsync(...)` for RAG retrieval over RedisVL
+- run a LINQ-filtered text search (`TextSearchOptions<Movie>.Filter`) routed through to the connector
 - expose the search to a `Kernel` as a plugin
 
 Redis prerequisites:
