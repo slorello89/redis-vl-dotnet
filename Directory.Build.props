@@ -23,7 +23,8 @@
                             '$(MSBuildProjectName)' == 'RedisVL.Rerankers.Abstractions' Or
                             '$(MSBuildProjectName)' == 'RedisVL.Rerankers.Cohere' Or
                             '$(MSBuildProjectName)' == 'RedisVL.Rerankers.Onnx' Or
-                            '$(MSBuildProjectName)' == 'RedisVL.Vectorizers.Onnx'">
+                            '$(MSBuildProjectName)' == 'RedisVL.Vectorizers.Onnx' Or
+                            '$(MSBuildProjectName)' == 'RedisVL.Connectors.VectorData'">
     <IsPackable>true</IsPackable>
   </PropertyGroup>
 

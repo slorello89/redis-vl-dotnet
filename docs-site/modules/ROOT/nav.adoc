@@ -32,6 +32,7 @@
 ** xref:extensions/onnx-vectorizer.adoc[ONNX Vectorizer]
 ** xref:extensions/cohere-reranker.adoc[Cohere Reranker]
 ** xref:extensions/onnx-reranker.adoc[ONNX Reranker]
+** xref:extensions/vector-data-connector.adoc[Microsoft.Extensions.VectorData Connector]
 * xref:examples/index.adoc[Examples]
 * xref:cli/index.adoc[CLI]
 * xref:testing/index.adoc[Testing]
