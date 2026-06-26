@@ -31,6 +31,7 @@ Use this map when you want the fastest path to a parity feature area:
 | Advanced schema options, YAML loading, from-existing index, index listing, JSON partial updates, `TextQuery`, aggregation, clear helper | [Core Features](../docs-site/modules/ROOT/pages/core-features/index.adoc) | [JsonStorageExample](./JsonStorageExample/README.md) | RediSearch + RedisJSON. Supports `REDIS_VL_REDIS_URL`, `REDIS_VL_REDIS_CLUSTER_NODES`, or `REDIS_VL_REDIS_SENTINEL_NODES` plus `REDIS_VL_REDIS_SENTINEL_SERVICE_NAME` |
 | Vector query basics, runtime vector search tuning, `MultiVectorQuery`, aggregate hybrid search, HASH partial updates | [Core Features](../docs-site/modules/ROOT/pages/core-features/index.adoc) | [VectorSearchExample](./VectorSearchExample/README.md) | RediSearch with vector similarity support and optional `REDIS_VL_REDIS_URL` |
 | SVS-VAMANA vector index, vector compression (LVQ/LeanVec), SVS query-time runtime knobs | [Field Definitions](../docs-site/modules/ROOT/pages/core-features/field-definitions.adoc) | [SvsVamanaExample](./SvsVamanaExample/README.md) | Redis 8.x with RediSearch vector support and optional `REDIS_VL_REDIS_URL` |
+| Native `FT.HYBRID` hybrid search, linear/RRF fusion, vector pre-filter, typed mapping | [HybridSearchQuery](../docs-site/modules/ROOT/pages/core-features/hybrid-search-query.adoc) | [HybridSearchExample](./HybridSearchExample/README.md) | Redis 8.4+ with RediSearch and optional `REDIS_VL_REDIS_URL` |
 | Exact-input embedding reuse with TTL | [EmbeddingsCache](../docs-site/modules/ROOT/pages/core-features/embeddings-cache.adoc) | [EmbeddingsCacheExample](./EmbeddingsCacheExample/README.md) | Basic Redis only with optional `REDIS_VL_REDIS_URL` |
 | Semantic message history with recency and semantic retrieval | [SemanticMessageHistory](../docs-site/modules/ROOT/pages/core-features/semantic-message-history.adoc) | [MessageHistoryExample](./MessageHistoryExample/README.md) | RediSearch with vector similarity support and optional `REDIS_VL_REDIS_URL`; no provider credentials required |
 | Semantic cache filter fields and metadata payloads | [SemanticCache](../docs-site/modules/ROOT/pages/core-features/semantic-cache.adoc) | [SemanticCacheExample](./SemanticCacheExample/README.md) | RediSearch with vector similarity support and optional `REDIS_VL_REDIS_URL` |
@@ -98,7 +99,6 @@ Demonstrates the SVS-VAMANA vector index with compression:
 - seed deterministic float32 embeddings
 - run a nearest-neighbor query with SVS-VAMANA runtime knobs (`searchWindowSize`, `useSearchHistory`, `searchBufferCapacity`)
 - run a vector range query with an `epsilon` runtime knob
-- drop the example index and documents
 
 Redis prerequisites:
 
@@ -108,6 +108,28 @@ Run it from the repository root:
 
 ```bash
 dotnet run --project examples/SvsVamanaExample/SvsVamanaExample.csproj
+```
+
+### [HybridSearchExample](./HybridSearchExample/README.md)
+
+Demonstrates the native `FT.HYBRID` hybrid search flow with `HybridSearchQuery`:
+
+- define a HASH-backed schema with text fields, a tag, and an HNSW vector field
+- seed deterministic float32 embeddings
+- run linear fusion (`COMBINE LINEAR`, explicit `alpha`/`beta`) with `EF_RUNTIME` tuning
+- run server-default and explicit reciprocal rank fusion (RRF)
+- apply a vector pre-filter that restricts the candidate set before fusion
+- project results onto a typed record with `SearchAsync<T>(...)`
+- drop the example index and documents
+
+Redis prerequisites:
+
+- Redis 8.4+ with RediSearch (`FT.HYBRID` is unavailable on older servers)
+
+Run it from the repository root:
+
+```bash
+dotnet run --project examples/HybridSearchExample/HybridSearchExample.csproj
 ```
 
 ### [EmbeddingsCacheExample](./EmbeddingsCacheExample/README.md)
