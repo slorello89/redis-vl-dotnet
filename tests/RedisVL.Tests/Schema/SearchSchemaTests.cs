@@ -690,7 +690,7 @@ public sealed class SearchSchemaTests
         const string yaml = """
             index:
               name: docs-idx
-              prefix: docs:
+              prefix: "docs:"
               storage_type: hash
             fields:
               - name: embedding
