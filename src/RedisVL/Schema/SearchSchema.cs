@@ -184,8 +184,20 @@ public sealed record SearchSchema
                 blockSize: ParseOptionalInt(attributes.BlockSize, "fields.attrs.block_size"),
                 m: ParseOptionalInt(attributes.M, "fields.attrs.m"),
                 efConstruction: ParseOptionalInt(attributes.EfConstruction, "fields.attrs.ef_construction"),
-                efRuntime: ParseOptionalInt(attributes.EfRuntime, "fields.attrs.ef_runtime"));
+                efRuntime: ParseOptionalInt(attributes.EfRuntime, "fields.attrs.ef_runtime"),
+                compression: ParseOptionalCompression(attributes.Compression, "fields.attrs.compression"),
+                constructionWindowSize: ParseOptionalInt(attributes.ConstructionWindowSize, "fields.attrs.construction_window_size"),
+                graphMaxDegree: ParseOptionalInt(attributes.GraphMaxDegree, "fields.attrs.graph_max_degree"),
+                searchWindowSize: ParseOptionalInt(attributes.SearchWindowSize, "fields.attrs.search_window_size"),
+                epsilon: ParseOptionalDouble(attributes.Epsilon, "fields.attrs.epsilon", 0d),
+                trainingThreshold: ParseOptionalInt(attributes.TrainingThreshold, "fields.attrs.training_threshold"),
+                reduce: ParseOptionalInt(attributes.Reduce, "fields.attrs.reduce"));
         }
+
+        private static VectorCompression ParseOptionalCompression(string? rawValue, string paramName) =>
+            string.IsNullOrWhiteSpace(rawValue)
+                ? VectorCompression.None
+                : ParseEnum<VectorCompression>(rawValue, paramName);
 
         private static TEnum ParseEnum<TEnum>(string? rawValue, string paramName)
             where TEnum : struct, Enum
@@ -373,5 +385,19 @@ public sealed record SearchSchema
         public string? EfConstruction { get; init; }
 
         public string? EfRuntime { get; init; }
+
+        public string? Compression { get; init; }
+
+        public string? ConstructionWindowSize { get; init; }
+
+        public string? GraphMaxDegree { get; init; }
+
+        public string? SearchWindowSize { get; init; }
+
+        public string? Epsilon { get; init; }
+
+        public string? TrainingThreshold { get; init; }
+
+        public string? Reduce { get; init; }
     }
 }

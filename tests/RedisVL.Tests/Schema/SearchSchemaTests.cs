@@ -629,4 +629,96 @@ public sealed class SearchSchemaTests
         Assert.Equal("algorithm", exception.ParamName);
         Assert.Contains("FLAT", exception.Message, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void CreatesSvsVamanaVectorFieldAttributes()
+    {
+        var attributes = new VectorFieldAttributes(
+            VectorAlgorithm.SvsVamana,
+            VectorDataType.Float16,
+            VectorDistanceMetric.Cosine,
+            1536,
+            compression: VectorCompression.LeanVec4x8,
+            constructionWindowSize: 250,
+            graphMaxDegree: 40,
+            searchWindowSize: 20,
+            epsilon: 0.05,
+            trainingThreshold: 20480,
+            reduce: 768);
+
+        Assert.Equal(VectorAlgorithm.SvsVamana, attributes.Algorithm);
+        Assert.Equal(VectorCompression.LeanVec4x8, attributes.Compression);
+        Assert.Equal(250, attributes.ConstructionWindowSize);
+        Assert.Equal(40, attributes.GraphMaxDegree);
+        Assert.Equal(20, attributes.SearchWindowSize);
+        Assert.Equal(0.05, attributes.Epsilon);
+        Assert.Equal(20480, attributes.TrainingThreshold);
+        Assert.Equal(768, attributes.Reduce);
+    }
+
+    [Fact]
+    public void RejectsSvsOptionsForHnswVectorFields()
+    {
+        var exception = Assert.Throws<ArgumentException>(() => new VectorFieldAttributes(
+            VectorAlgorithm.Hnsw,
+            VectorDataType.Float32,
+            VectorDistanceMetric.Cosine,
+            256,
+            compression: VectorCompression.Lvq8));
+
+        Assert.Equal("algorithm", exception.ParamName);
+        Assert.Contains("SVS-VAMANA", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void RejectsHnswOptionsForSvsVectorFields()
+    {
+        var exception = Assert.Throws<ArgumentException>(() => new VectorFieldAttributes(
+            VectorAlgorithm.SvsVamana,
+            VectorDataType.Float32,
+            VectorDistanceMetric.Cosine,
+            256,
+            m: 16));
+
+        Assert.Equal("algorithm", exception.ParamName);
+        Assert.Contains("SVS-VAMANA", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ParsesSvsVamanaVectorFieldFromYaml()
+    {
+        const string yaml = """
+            index:
+              name: docs-idx
+              prefix: "docs:"
+              storage_type: hash
+            fields:
+              - name: embedding
+                type: vector
+                attrs:
+                  algorithm: svs-vamana
+                  datatype: float16
+                  distance_metric: cosine
+                  dims: 1536
+                  compression: lvq8
+                  construction_window_size: 250
+                  graph_max_degree: 40
+                  search_window_size: 20
+                  epsilon: 0.05
+                  training_threshold: 20480
+                  reduce: 768
+            """;
+
+        var schema = SearchSchema.FromYaml(yaml);
+
+        var vectorField = Assert.IsType<VectorFieldDefinition>(Assert.Single(schema.Fields));
+        Assert.Equal(VectorAlgorithm.SvsVamana, vectorField.Attributes.Algorithm);
+        Assert.Equal(VectorCompression.Lvq8, vectorField.Attributes.Compression);
+        Assert.Equal(250, vectorField.Attributes.ConstructionWindowSize);
+        Assert.Equal(40, vectorField.Attributes.GraphMaxDegree);
+        Assert.Equal(20, vectorField.Attributes.SearchWindowSize);
+        Assert.Equal(0.05, vectorField.Attributes.Epsilon);
+        Assert.Equal(20480, vectorField.Attributes.TrainingThreshold);
+        Assert.Equal(768, vectorField.Attributes.Reduce);
+    }
 }

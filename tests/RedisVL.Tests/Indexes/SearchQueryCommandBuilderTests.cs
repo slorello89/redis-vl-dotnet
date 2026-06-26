@@ -538,6 +538,93 @@ public sealed class SearchQueryCommandBuilderTests
     }
 
     [Fact]
+    public void BuildsVectorSearchArgumentsWithSvsRuntimeKnobs()
+    {
+        var schema = new SearchSchema(
+            new IndexDefinition("movies-idx", "movie:", StorageType.Hash),
+            [
+                new TagFieldDefinition("genre"),
+                new VectorFieldDefinition(
+                    "embedding",
+                    new VectorFieldAttributes(
+                        VectorAlgorithm.SvsVamana,
+                        VectorDataType.Float32,
+                        VectorDistanceMetric.Cosine,
+                        2,
+                        compression: VectorCompression.Lvq8))
+            ]);
+        var query = VectorQuery.FromFloat32(
+            "embedding",
+            [1f, 2f],
+            3,
+            Filter.Tag("genre").Eq("crime"),
+            ["title"],
+            scoreAlias: "distance",
+            runtimeOptions: new VectorKnnRuntimeOptions(
+                searchWindowSize: 30,
+                useSearchHistory: SvsSearchHistory.On,
+                searchBufferCapacity: 60));
+
+        var arguments = SearchQueryCommandBuilder.BuildVectorSearchArguments(schema, query);
+        var rendered = arguments.Select(RenderArgument).ToArray();
+
+        Assert.Equal(
+            "@genre:{crime}=>[KNN 3 @embedding $vector SEARCH_WINDOW_SIZE $search_window_size USE_SEARCH_HISTORY $use_search_history SEARCH_BUFFER_CAPACITY $search_buffer_capacity AS distance]",
+            rendered[1]);
+        Assert.Equal(
+            [
+                "PARAMS", "8", "vector", "<binary>",
+                "search_window_size", "30",
+                "use_search_history", "ON",
+                "search_buffer_capacity", "60"
+            ],
+            rendered[2..12]);
+    }
+
+    [Fact]
+    public void RejectsSvsRuntimeKnobsForHnswVectorFields()
+    {
+        var schema = new SearchSchema(
+            new IndexDefinition("docs-idx", "doc:", StorageType.Hash),
+            [
+                new VectorFieldDefinition(
+                    "embedding",
+                    new VectorFieldAttributes(
+                        VectorAlgorithm.Hnsw,
+                        VectorDataType.Float32,
+                        VectorDistanceMetric.Cosine,
+                        2,
+                        m: 16))
+            ]);
+        var query = VectorQuery.FromFloat32("embedding", [1f, 2f], 2, runtimeOptions: new VectorKnnRuntimeOptions(searchWindowSize: 30));
+
+        var exception = Assert.Throws<InvalidOperationException>(() => SearchQueryCommandBuilder.BuildVectorSearchArguments(schema, query));
+
+        Assert.Contains("SEARCH_WINDOW_SIZE", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void RejectsEfRuntimeForSvsVectorFields()
+    {
+        var schema = new SearchSchema(
+            new IndexDefinition("docs-idx", "doc:", StorageType.Hash),
+            [
+                new VectorFieldDefinition(
+                    "embedding",
+                    new VectorFieldAttributes(
+                        VectorAlgorithm.SvsVamana,
+                        VectorDataType.Float32,
+                        VectorDistanceMetric.Cosine,
+                        2))
+            ]);
+        var query = VectorQuery.FromFloat32("embedding", [1f, 2f], 2, runtimeOptions: new VectorKnnRuntimeOptions(efRuntime: 50));
+
+        var exception = Assert.Throws<InvalidOperationException>(() => SearchQueryCommandBuilder.BuildVectorSearchArguments(schema, query));
+
+        Assert.Contains("EF_RUNTIME", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void ParsesSearchResultsFromRedisResponse()
     {
         var rawResult = RedisResult.Create(

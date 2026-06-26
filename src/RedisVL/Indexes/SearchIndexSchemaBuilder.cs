@@ -172,7 +172,14 @@ internal static class SearchIndexSchemaBuilder
                     blockSize: ParseOptionalInt(attributes, "block_size"),
                     m: ParseOptionalInt(attributes, "m"),
                     efConstruction: ParseOptionalInt(attributes, "ef_construction"),
-                    efRuntime: ParseOptionalInt(attributes, "ef_runtime")),
+                    efRuntime: ParseOptionalInt(attributes, "ef_runtime"),
+                    compression: ParseVectorCompression(GetOptionalString(attributes, "compression")),
+                    constructionWindowSize: ParseOptionalInt(attributes, "construction_window_size"),
+                    graphMaxDegree: ParseOptionalInt(attributes, "graph_max_degree"),
+                    searchWindowSize: ParseOptionalInt(attributes, "search_window_size"),
+                    epsilon: ParseOptionalDouble(attributes, "epsilon", 0d),
+                    trainingThreshold: ParseOptionalInt(attributes, "training_threshold"),
+                    reduce: ParseOptionalInt(attributes, "reduce")),
                 alias: alias,
                 indexMissing: HasFlag(attributes, "INDEXMISSING")),
             _ => throw new InvalidOperationException($"Redis FT.INFO contained unsupported field type '{type}'.")
@@ -470,8 +477,28 @@ internal static class SearchIndexSchemaBuilder
         {
             "FLAT" => VectorAlgorithm.Flat,
             "HNSW" => VectorAlgorithm.Hnsw,
+            "SVSVAMANA" => VectorAlgorithm.SvsVamana,
             _ => throw new InvalidOperationException($"Redis FT.INFO contained unsupported vector algorithm '{value}'.")
         };
+
+    private static VectorCompression ParseVectorCompression(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return VectorCompression.None;
+        }
+
+        return NormalizeToken(value) switch
+        {
+            "LVQ8" => VectorCompression.Lvq8,
+            "LVQ4" => VectorCompression.Lvq4,
+            "LVQ4X4" => VectorCompression.Lvq4x4,
+            "LVQ4X8" => VectorCompression.Lvq4x8,
+            "LEANVEC4X8" => VectorCompression.LeanVec4x8,
+            "LEANVEC8X8" => VectorCompression.LeanVec8x8,
+            _ => throw new InvalidOperationException($"Redis FT.INFO contained unsupported vector compression '{value}'.")
+        };
+    }
 
     private static VectorDataType ParseVectorDataType(string value) =>
         NormalizeToken(value) switch

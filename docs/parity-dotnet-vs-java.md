@@ -26,7 +26,7 @@ Legend: ✅ present · ⚠️ partial/limited · ❌ absent
 | Core schema model (text/tag/numeric/geo/vector) | ✅ | ✅ | Parity on baseline field model. |
 | YAML schema loading | ✅ | ✅ | Java also loads from JSON/Map and serializes back (`toYaml/toJson`). |
 | Multiple prefixes / stopwords / key separator | ✅ | ✅ | Parity. |
-| Vector algorithms | ⚠️ Flat, HNSW | ✅ Flat, HNSW, **SVS-VAMANA** | Java adds SVS-VAMANA + vector compression (LVQ, LeanVec). |
+| Vector algorithms | ✅ Flat, HNSW, SVS-VAMANA | ✅ Flat, HNSW, SVS-VAMANA | Parity. .NET added SVS-VAMANA + vector compression (LVQ, LeanVec) in issue #12. |
 | Vector data types | ✅ float32/64, float16, bfloat16, int8, uint8 | ✅ same set | Parity. |
 | Index lifecycle (create/exists/info/drop) | ✅ | ✅ | Parity. |
 | Clear / list / from-existing | ✅ | ✅ | Parity. |
@@ -44,7 +44,7 @@ Legend: ✅ present · ⚠️ partial/limited · ❌ absent
 | **Native `FT.HYBRID` (Redis 8.4+)** | ✅ `HybridSearchQuery` | ✅ `HybridQuery` | Recently added in .NET (PR #5). Java auto-falls back to FT.AGGREGATE for pre-8.4 (`toAggregateHybridQuery()`); .NET keeps the two as separate types. |
 | Pagination / batch query helpers | ✅ | ✅ | Parity. |
 | Filter expression API (tag/text/numeric/geo, boolean) | ✅ | ✅ | Java is richer: `timestamp`, `fuzzy`, `wildcard`, `prefix`, `box` geo, `tagLike`. |
-| Runtime vector params | ✅ efRuntime, epsilon | ✅ + SVS knobs | Java adds searchWindowSize / useSearchHistory / searchBufferCapacity (SVS). |
+| Runtime vector params | ✅ efRuntime, epsilon, SVS knobs | ✅ same set | Parity. .NET added searchWindowSize / useSearchHistory / searchBufferCapacity (SVS) in issue #12. |
 | Built-in vectorizers | ✅ OpenAI, HuggingFace, Microsoft.Extensions.AI | ✅ LangChain4J pass-through (OpenAI/Azure/Cohere/HF/Ollama/Vertex/Mistral/Voyage), local SentenceTransformers (ONNX) | Different strategy: .NET ships discrete provider packages + a MEAI adapter; Java funnels everything through LangChain4J + a local ONNX embedder. |
 | Local/offline embeddings | ❌ (no ONNX *embedder*) | ✅ `SentenceTransformersVectorizer` | .NET has a local ONNX *reranker* but no local embedder. |
 | Built-in rerankers | ✅ Cohere, local ONNX | ✅ Cohere, local ONNX (HFCrossEncoder), **VoyageAI** | Java adds VoyageAI. |
@@ -76,7 +76,7 @@ Roughly in priority order for a .NET consumer:
 2. **Richer semantic router** — `routeMany` (multiple matches), multiple references per route, `RoutingConfig`, distance-aggregation methods.
 3. **Filter breadth** — `timestamp` helper, `fuzzy`, `wildcard`, `box` geo, `tagLike`; per-field text weighting (`textFieldWeights`).
 4. **Local/offline embeddings** — Java has a SentenceTransformers (ONNX) vectorizer; .NET only has a local ONNX *reranker*.
-5. **Vector index breadth** — SVS-VAMANA algorithm + vector compression (LVQ / LeanVec) and the associated runtime knobs.
+5. ~~**Vector index breadth** — SVS-VAMANA algorithm + vector compression (LVQ / LeanVec) and the associated runtime knobs.~~ **Closed (issue #12, gap #5):** `VectorAlgorithm.SvsVamana` + `VectorCompression` (LVQ4/4x4/4x8/8, LeanVec4x8/8x8) and build/runtime knobs (`graphMaxDegree`, `constructionWindowSize`, `searchWindowSize`, `epsilon`, `trainingThreshold`, `reduce`; query-time `searchWindowSize` / `useSearchHistory` / `searchBufferCapacity`).
 6. **LangCache integration** (`LangCacheSemanticCache`) — already tracked as "Deferred" in the older roadmap.
 7. **VoyageAI reranker**.
 8. ~~**Framework/ecosystem hooks** — Java's LangChain4J adapters (EmbeddingStore, ContentRetriever, DocumentStore, ChatMemoryStore).~~ **Closed:** `RedisVL.Connectors.VectorData` ships a Microsoft.Extensions.VectorData `VectorStore`/`VectorStoreCollection` connector (consumable by Semantic Kernel), a LINQ→`FilterExpression` mapper, and a `RedisVLChatMessageStore` on top of `MessageHistory`.
@@ -94,7 +94,7 @@ Roughly in priority order for a .NET consumer:
 
 The two libraries are at **near-parity on the core vector-search surface** — schema, index lifecycle, document CRUD, the full query set (including native `FT.HYBRID`, which .NET just added), filters, embeddings cache, the four workflow primitives, and cluster/sentinel connectivity. **.NET is ahead on CLI, typed mapping, async ergonomics, and modular packaging.**
 
-Java is the more mature, broader **platform** (0.13.1 vs 0.0.4): it leads on AI-ecosystem breadth (LangChain4J adapters, more vectorizer/reranker providers, local embeddings), advanced vector indexing (SVS-VAMANA + compression), richer cache/router feature depth, filter breadth, and extras like LangCache, extractive summarization, and a VCR test harness. None of those are core-search gaps — they're platform-maturity and ecosystem-integration gaps.
+Java is the more mature, broader **platform** (0.13.1 vs 0.0.4): it leads on AI-ecosystem breadth (LangChain4J adapters, more vectorizer/reranker providers, local embeddings), richer cache/router feature depth, filter breadth, and extras like LangCache, extractive summarization, and a VCR test harness. None of those are core-search gaps — they're platform-maturity and ecosystem-integration gaps.
 
 ## Sources
 
