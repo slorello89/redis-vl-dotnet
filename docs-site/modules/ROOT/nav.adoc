@@ -23,6 +23,7 @@
 ** xref:core-features/semantic-router.adoc[SemanticRouter]
 ** xref:core-features/message-history.adoc[MessageHistory]
 ** xref:core-features/semantic-message-history.adoc[SemanticMessageHistory]
+** xref:core-features/extractive-summarization.adoc[Extractive Summarization]
 * xref:extensions/index.adoc[Extensions]
 ** xref:extensions/vectorizer-abstractions.adoc[Vectorizer Abstractions]
 ** xref:extensions/reranker-abstractions.adoc[Reranker Abstractions]

@@ -55,7 +55,7 @@ Legend: ✅ present · ⚠️ partial/limited · ❌ absent
 | Message history | ✅ | ✅ | Parity (Java adds role enum/tool-call metadata, `getRecent`). |
 | Semantic message history | ✅ | ✅ | Parity. |
 | Framework adapters | ✅ Microsoft.Extensions.AI embeddings + Microsoft.Extensions.VectorData (MEVD) vector-store connector & chat-memory store | ✅ LangChain4J `EmbeddingStore`/`ContentRetriever`/`DocumentStore`/`ChatMemoryStore` + filter mapper | .NET now ships `RedisVL.Connectors.VectorData` (`VectorStore`/`VectorStoreCollection`, LINQ filter mapper, `RedisVLChatMessageStore`), consumable by Semantic Kernel since SK builds on MEVD. |
-| Extractive summarization | ❌ | ✅ `ExtractiveSelector` + sentence splitter | Java-only. |
+| Extractive summarization | ✅ `ExtractiveSelector` + `SentenceSplitter` | ✅ `ExtractiveSelector` + sentence splitter | Parity. .NET added in issue #12 (embedding + k-means++ selection; rule-based splitter, no NLP model dependency). |
 | VCR record/replay test harness | ❌ | ✅ `com.redis.vl.test.vcr` (shipped in main jar) | Java-only; records LLM/embedding calls to Redis. |
 | Connection: standalone / cluster / sentinel | ✅ | ✅ | Parity (different clients). |
 | CLI | ✅ `RedisVL.Cli` | ❌ none | **.NET ahead** — Java ships no CLI. |
@@ -80,7 +80,7 @@ Roughly in priority order for a .NET consumer:
 6. **LangCache integration** (`LangCacheSemanticCache`) — already tracked as "Deferred" in the older roadmap.
 7. **VoyageAI reranker**.
 8. ~~**Framework/ecosystem hooks** — Java's LangChain4J adapters (EmbeddingStore, ContentRetriever, DocumentStore, ChatMemoryStore).~~ **Closed:** `RedisVL.Connectors.VectorData` ships a Microsoft.Extensions.VectorData `VectorStore`/`VectorStoreCollection` connector (consumable by Semantic Kernel), a LINQ→`FilterExpression` mapper, and a `RedisVLChatMessageStore` on top of `MessageHistory`.
-9. **Extractive summarization** utilities.
+9. ~~**Extractive summarization** utilities.~~ **Closed (issue #12, gap #9):** `RedisVL.Summarization` ships `ExtractiveSelector` (embedding + k-means++ key-sentence selection) and a rule-based `SentenceSplitter` — no NLP-model dependency in core.
 10. **VCR-style test harness** for deterministic LLM/embedding tests.
 
 ## Intentional .NET-native differences (not gaps)
@@ -94,7 +94,7 @@ Roughly in priority order for a .NET consumer:
 
 The two libraries are at **near-parity on the core vector-search surface** — schema, index lifecycle, document CRUD, the full query set (including native `FT.HYBRID`, which .NET just added), filters, embeddings cache, the four workflow primitives, and cluster/sentinel connectivity. **.NET is ahead on CLI, typed mapping, async ergonomics, and modular packaging.**
 
-Java is the more mature, broader **platform** (0.13.1 vs 0.0.4): it leads on AI-ecosystem breadth (LangChain4J adapters, more vectorizer/reranker providers, local embeddings), richer cache/router feature depth, filter breadth, and extras like LangCache, extractive summarization, and a VCR test harness. None of those are core-search gaps — they're platform-maturity and ecosystem-integration gaps.
+Java is the more mature, broader **platform** (0.13.1 vs 0.0.4): it leads on AI-ecosystem breadth (LangChain4J adapters, more vectorizer/reranker providers, local embeddings), richer cache/router feature depth, filter breadth, and extras like LangCache and a VCR test harness. None of those are core-search gaps — they're platform-maturity and ecosystem-integration gaps.
 
 ## Sources
 

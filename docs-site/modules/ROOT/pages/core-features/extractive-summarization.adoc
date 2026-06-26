@@ -1,0 +1,63 @@
+= Extractive Summarization
+
+`ExtractiveSelector` trims a body of text down to its most representative sentences. Because it is *extractive* (it selects existing sentences rather than rewriting them), named entities, numbers, and quotations are preserved exactly — which makes it well suited to trimming RAG or chat-history context without introducing paraphrase errors.
+
+It pairs with `SentenceSplitter`, a lightweight rule-based splitter, and any `IBatchTextVectorizer` for embeddings.
+
+== How it works
+
+. Sentences are embedded in a single batch call through the supplied vectorizer.
+. The embeddings are clustered with k-means++ (a small, dependency-free implementation).
+. The sentence nearest each cluster centroid is selected.
+. Selected sentences are returned in their original order with their exact original text.
+
+== Usage
+
+[source,csharp]
+----
+using RedisVL.Summarization;
+using RedisVL.Vectorizers;
+
+IBatchTextVectorizer vectorizer = /* OpenAI, Hugging Face, ONNX, or a Microsoft.Extensions.AI adapter */;
+
+var splitter = new SentenceSplitter();
+var selector = new ExtractiveSelector(vectorizer, defaultNumSentences: 3);
+
+var document = "Jennifer is the main character. She lives in Semantico. " +
+               "The weather there is often gray. Will Ladislaw appears later.";
+
+IReadOnlyList<string> sentences = splitter.Split(document);
+IReadOnlyList<string> summary = await selector.SelectKeySentencesAsync(sentences, k: 2);
+----
+
+`SelectKeySentencesAsync` overloads:
+
+* `SelectKeySentencesAsync(sentences)` — uses the configured `defaultNumSentences`.
+* `SelectKeySentencesAsync(sentences, k)` — selects up to `k` sentences.
+
+Behavior:
+
+* blank sentences are ignored
+* when there are at most `k` non-blank sentences, they are all returned (in original order)
+* an empty input returns an empty list
+* the result may contain fewer than `k` sentences when the embeddings collapse into fewer distinct clusters
+
+== Determinism
+
+k-means++ uses randomized initialization. Pass `randomSeed` to `ExtractiveSelector` for reproducible selection:
+
+[source,csharp]
+----
+var selector = new ExtractiveSelector(vectorizer, defaultNumSentences: 5, maxIterations: 100, randomSeed: 42);
+----
+
+== Sentence splitting
+
+`SentenceSplitter.Split(text)` splits on sentence-terminating punctuation (`.`, `!`, `?`) followed by whitespace, while suppressing splits after common abbreviations (`Dr.`, `e.g.`), single-letter initials (`J.`), and decimal numbers (`3.14`).
+
+It is a heuristic, not a statistical model — no NLP model is downloaded. For specialized or non-English text, supply pre-split sentences to `ExtractiveSelector` directly.
+
+== Related pages
+
+* xref:extensions/vectorizer-abstractions.adoc[Vectorizer Abstractions]
+* xref:core-features/semantic-message-history.adoc[SemanticMessageHistory]
