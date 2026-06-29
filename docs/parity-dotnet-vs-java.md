@@ -80,7 +80,7 @@ Roughly in priority order for a .NET consumer:
 6. **LangCache integration** (`LangCacheSemanticCache`) — already tracked as "Deferred" in the older roadmap.
 7. **VoyageAI reranker**.
 8. ~~**Framework/ecosystem hooks** — Java's LangChain4J adapters (EmbeddingStore, ContentRetriever, DocumentStore, ChatMemoryStore).~~ **Closed:** `RedisVL.Connectors.VectorData` ships a Microsoft.Extensions.VectorData `VectorStore`/`VectorStoreCollection` connector (consumable by Semantic Kernel), a LINQ→`FilterExpression` mapper, and a `RedisVLChatMessageStore` on top of `MessageHistory`.
-9. ~~**Extractive summarization** utilities.~~ **Closed (issue #12, gap #9):** `RedisVL.Summarization` ships `ExtractiveSelector` (embedding + k-means++ key-sentence selection) and a rule-based `SentenceSplitter` — no NLP-model dependency in core.
+9. ~~**Extractive summarization** utilities.~~ **Closed (issue #12, gap #9):** the opt-in `RedisVL.Summarization` package ships `ExtractiveSelector` (embedding + k-means++ key-sentence selection) and a rule-based `SentenceSplitter` — no NLP-model dependency.
 10. **VCR-style test harness** for deterministic LLM/embedding tests.
 
 ## Intentional .NET-native differences (not gaps)

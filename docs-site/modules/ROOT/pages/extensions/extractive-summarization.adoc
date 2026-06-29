@@ -1,5 +1,7 @@
 = Extractive Summarization
 
+The `RedisVL.Summarization` package provides extractive summarization. It is an opt-in package — install it only if you need this functionality, and it pulls in no NLP-model or clustering dependencies.
+
 `ExtractiveSelector` trims a body of text down to its most representative sentences. Because it is *extractive* (it selects existing sentences rather than rewriting them), named entities, numbers, and quotations are preserved exactly — which makes it well suited to trimming RAG or chat-history context without introducing paraphrase errors.
 
 It pairs with `SentenceSplitter`, a lightweight rule-based splitter, and any `IBatchTextVectorizer` for embeddings.

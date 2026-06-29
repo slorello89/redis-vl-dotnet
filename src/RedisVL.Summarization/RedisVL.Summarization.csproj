@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <Version>0.0.5</Version>
+    <Description>Embedding-based extractive summarization (key-sentence selection) for redis-vl-dotnet.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\RedisVL.Vectorizers.Abstractions\RedisVL.Vectorizers.Abstractions.csproj" />
+  </ItemGroup>
+
+</Project>

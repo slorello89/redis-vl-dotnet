@@ -15,6 +15,7 @@ The repository keeps provider contracts and implementations outside the core pac
 * `src/RedisVL.Rerankers.Cohere` for Cohere reranking
 * `src/RedisVL.Rerankers.Onnx` for local ONNX cross-encoder reranking
 * `src/RedisVL.Connectors.VectorData` for the Microsoft.Extensions.VectorData (MEVD) / Semantic Kernel vector-store connector
+* `src/RedisVL.Summarization` for embedding-based extractive summarization (key-sentence selection)
 
 == Shared contracts
 

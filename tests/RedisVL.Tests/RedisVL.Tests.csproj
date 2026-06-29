@@ -31,6 +31,7 @@
     <ProjectReference Include="..\..\src\RedisVL.Vectorizers.HuggingFace\RedisVL.Vectorizers.HuggingFace.csproj" />
     <ProjectReference Include="..\..\src\RedisVL.Vectorizers.Onnx\RedisVL.Vectorizers.Onnx.csproj" />
     <ProjectReference Include="..\..\src\RedisVL.Vectorizers.OpenAI\RedisVL.Vectorizers.OpenAI.csproj" />
+    <ProjectReference Include="..\..\src\RedisVL.Summarization\RedisVL.Summarization.csproj" />
   </ItemGroup>
 
   <ItemGroup>

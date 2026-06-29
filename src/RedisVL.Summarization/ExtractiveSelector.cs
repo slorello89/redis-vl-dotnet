@@ -58,9 +58,10 @@ public sealed class ExtractiveSelector
     /// <param name="k">Maximum number of sentences to select.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>
-    /// The selected sentences in their original order. Returns all non-blank sentences when there are
-    /// at most <paramref name="k"/> of them. May return fewer than <paramref name="k"/> when the
-    /// embeddings collapse into fewer distinct clusters.
+    /// The selected sentences in their original order. The result can contain fewer than
+    /// <paramref name="k"/> sentences in two cases: when the input has at most <paramref name="k"/>
+    /// non-blank sentences (all of them are returned without clustering), or when more than
+    /// <paramref name="k"/> sentences embed into fewer than <paramref name="k"/> distinct clusters.
     /// </returns>
     public async Task<IReadOnlyList<string>> SelectKeySentencesAsync(
         IReadOnlyList<string> sentences,
@@ -78,14 +79,10 @@ public sealed class ExtractiveSelector
             return [];
         }
 
-        var valid = new List<(int Index, string Text)>(sentences.Count);
-        for (var i = 0; i < sentences.Count; i++)
-        {
-            if (!string.IsNullOrWhiteSpace(sentences[i]))
-            {
-                valid.Add((i, sentences[i]));
-            }
-        }
+        var valid = sentences
+            .Select(static (text, index) => (Index: index, Text: text))
+            .Where(static entry => !string.IsNullOrWhiteSpace(entry.Text))
+            .ToList();
 
         if (valid.Count == 0)
         {
@@ -99,12 +96,6 @@ public sealed class ExtractiveSelector
 
         var texts = valid.Select(static entry => entry.Text).ToList();
         var embeddings = await _embedder.VectorizeAsync(texts, cancellationToken).ConfigureAwait(false);
-
-        if (embeddings.Count != texts.Count)
-        {
-            throw new InvalidOperationException(
-                $"Vectorizer returned {embeddings.Count} embeddings for {texts.Count} sentences.");
-        }
 
         var seed = _randomSeed ?? Random.Shared.Next();
         var representativeLocalIndices = KMeansClustering.SelectRepresentatives(embeddings, k, _maxIterations, seed);
