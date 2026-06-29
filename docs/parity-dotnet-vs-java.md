@@ -55,7 +55,7 @@ Legend: ✅ present · ⚠️ partial/limited · ❌ absent
 | Message history | ✅ | ✅ | Parity (Java adds role enum/tool-call metadata, `getRecent`). |
 | Semantic message history | ✅ | ✅ | Parity. |
 | Framework adapters | ✅ Microsoft.Extensions.AI embeddings + Microsoft.Extensions.VectorData (MEVD) vector-store connector & chat-memory store | ✅ LangChain4J `EmbeddingStore`/`ContentRetriever`/`DocumentStore`/`ChatMemoryStore` + filter mapper | .NET now ships `RedisVL.Connectors.VectorData` (`VectorStore`/`VectorStoreCollection`, LINQ filter mapper, `RedisVLChatMessageStore`), consumable by Semantic Kernel since SK builds on MEVD. |
-| Extractive summarization | ❌ | ✅ `ExtractiveSelector` + sentence splitter | Java-only. |
+| Extractive summarization | ❌ (out of scope) | ✅ `ExtractiveSelector` + sentence splitter | Java-only. Intentionally not ported — see "Where Java leads" #9. |
 | VCR record/replay test harness | ❌ | ✅ `com.redis.vl.test.vcr` (shipped in main jar) | Java-only; records LLM/embedding calls to Redis. |
 | Connection: standalone / cluster / sentinel | ✅ | ✅ | Parity (different clients). |
 | CLI | ✅ `RedisVL.Cli` | ❌ none | **.NET ahead** — Java ships no CLI. |
@@ -80,7 +80,7 @@ Roughly in priority order for a .NET consumer:
 6. **LangCache integration** (`LangCacheSemanticCache`) — already tracked as "Deferred" in the older roadmap.
 7. **VoyageAI reranker**.
 8. ~~**Framework/ecosystem hooks** — Java's LangChain4J adapters (EmbeddingStore, ContentRetriever, DocumentStore, ChatMemoryStore).~~ **Closed:** `RedisVL.Connectors.VectorData` ships a Microsoft.Extensions.VectorData `VectorStore`/`VectorStoreCollection` connector (consumable by Semantic Kernel), a LINQ→`FilterExpression` mapper, and a `RedisVLChatMessageStore` on top of `MessageHistory`.
-9. **Extractive summarization** utilities.
+9. ~~**Extractive summarization** utilities.~~ **Intentionally out of scope (issue #12, gap #9):** evaluated and declined. redis-vl-python does not ship this, and the only well-supported .NET k-means library is ML.NET — too heavy a dependency for a niche utility, while hand-rolling clustering isn't worth maintaining. Left to consumers.
 10. **VCR-style test harness** for deterministic LLM/embedding tests.
 
 ## Intentional .NET-native differences (not gaps)
