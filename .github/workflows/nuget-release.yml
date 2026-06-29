@@ -66,9 +66,11 @@ jobs:
         id: version
         shell: bash
         run: |
-          version=$(sed -n 's:.*<Version>\(.*\)</Version>.*:\1:p' src/RedisVL/RedisVL.csproj | head -1)
+          # Evaluate the effective Version property so this keeps working regardless of which
+          # file defines it (currently Directory.Build.props).
+          version=$(dotnet msbuild src/RedisVL/RedisVL.csproj -getProperty:Version -nologo 2>/dev/null | tr -d '[:space:]')
           if [ -z "$version" ]; then
-            echo "Could not determine package version from src/RedisVL/RedisVL.csproj" >&2
+            echo "Could not determine package version from the RedisVL project." >&2
             exit 1
           fi
           echo "version=$version" >> "$GITHUB_OUTPUT"
