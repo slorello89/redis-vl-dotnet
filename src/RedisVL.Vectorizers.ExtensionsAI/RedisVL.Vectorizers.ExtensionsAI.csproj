@@ -4,7 +4,6 @@
     <TargetFramework>net9.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <Version>0.0.5</Version>
     <Description>Microsoft.Extensions.AI embedding-generator adapters for redis-vl-dotnet.</Description>
   </PropertyGroup>
 
