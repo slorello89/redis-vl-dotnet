@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: nuget-release
@@ -61,3 +61,32 @@ jobs:
 
       - name: Publish packages to NuGet
         run: dotnet nuget push "${{ runner.temp }}/packages/*.nupkg" --api-key "${{ secrets.NUGET_API_KEY }}" --source https://api.nuget.org/v3/index.json --skip-duplicate
+
+      - name: Read package version
+        id: version
+        shell: bash
+        run: |
+          version=$(sed -n 's:.*<Version>\(.*\)</Version>.*:\1:p' src/RedisVL/RedisVL.csproj | head -1)
+          if [ -z "$version" ]; then
+            echo "Could not determine package version from src/RedisVL/RedisVL.csproj" >&2
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Tag release and create GitHub release
+        # Runs only after a successful publish. Tags the built commit as v<version>
+        # and creates a GitHub release. Safe to re-run: skips if the release already exists.
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          tag="v${{ steps.version.outputs.version }}"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo "Release $tag already exists; skipping tag and release creation."
+            exit 0
+          fi
+          gh release create "$tag" \
+            --target "${{ github.sha }}" \
+            --title "$tag" \
+            --generate-notes \
+            "${{ runner.temp }}/packages/"*.nupkg
