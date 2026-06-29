@@ -1,0 +1,50 @@
+= Voyage AI Reranker
+
+`RedisVL.Rerankers.VoyageAI` provides `VoyageAiTextReranker`, an `ITextReranker` implementation backed by Voyage AI's rerank API.
+
+== Package contents
+
+* `VoyageAiTextReranker` for remote reranking requests
+* `VoyageAiRerankerOptions` for request shaping and endpoint selection
+* `VoyageAiRerankerPackage` as the package marker type
+
+== Request options
+
+`VoyageAiRerankerOptions` supports:
+
+* `Truncation` to control whether the provider truncates inputs longer than the model context (provider default is enabled)
+* `EndpointOverride` when the application needs a non-default rerank endpoint
+
+The default provider endpoint is `https://api.voyageai.com/v1/rerank`. `RerankRequest.TopN` maps onto the Voyage AI `top_k` parameter.
+
+== Required environment variables
+
+The runnable sample reads:
+
+* `VOYAGE_API_KEY` as the required provider credential
+* `VOYAGE_RERANK_MODEL` as an optional model override (defaults to `rerank-2.5`)
+* `REDIS_VL_REDIS_URL` as the Redis connection string override
+
+If `VOYAGE_API_KEY` is missing, `/examples/VoyageAiRerankerExample` throws an `InvalidOperationException` before it attempts the provider request.
+
+== Example workflow
+
+`/examples/VoyageAiRerankerExample` shows the expected integration pattern:
+
+* load a Redis index with candidate documents
+* collect an initial candidate set through `TextQuery`
+* build `RerankDocument` values from those Redis hits
+* rerank the candidates with `VoyageAiTextReranker`
+* print both the Redis order and the reranked provider order
+
+Run it from the repository root:
+
+[source,bash]
+----
+dotnet run --project examples/VoyageAiRerankerExample/VoyageAiRerankerExample.csproj
+----
+
+== Validation references
+
+* `tests/RedisVL.Tests/Rerankers/VoyageAiTextRerankerTests.cs` covers request construction and response validation
+* `tests/RedisVL.Tests/Rerankers/VoyageAiTextRerankerSmokeTests.cs` is the live-provider smoke test gate

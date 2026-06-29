@@ -31,6 +31,7 @@
 ** xref:extensions/huggingface-vectorizer.adoc[Hugging Face Vectorizer]
 ** xref:extensions/onnx-vectorizer.adoc[ONNX Vectorizer]
 ** xref:extensions/cohere-reranker.adoc[Cohere Reranker]
+** xref:extensions/voyageai-reranker.adoc[Voyage AI Reranker]
 ** xref:extensions/onnx-reranker.adoc[ONNX Reranker]
 ** xref:extensions/vector-data-connector.adoc[Microsoft.Extensions.VectorData Connector]
 * xref:examples/index.adoc[Examples]

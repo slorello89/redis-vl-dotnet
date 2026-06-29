@@ -22,6 +22,7 @@
                             '$(MSBuildProjectName)' == 'RedisVL.Vectorizers.HuggingFace' Or
                             '$(MSBuildProjectName)' == 'RedisVL.Rerankers.Abstractions' Or
                             '$(MSBuildProjectName)' == 'RedisVL.Rerankers.Cohere' Or
+                            '$(MSBuildProjectName)' == 'RedisVL.Rerankers.VoyageAI' Or
                             '$(MSBuildProjectName)' == 'RedisVL.Rerankers.Onnx' Or
                             '$(MSBuildProjectName)' == 'RedisVL.Vectorizers.Onnx' Or
                             '$(MSBuildProjectName)' == 'RedisVL.Connectors.VectorData'">

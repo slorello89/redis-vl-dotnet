@@ -13,6 +13,7 @@ The repository keeps provider contracts and implementations outside the core pac
 * `src/RedisVL.Vectorizers.ExtensionsAI` for Microsoft.Extensions.AI adapter-based embeddings
 * `src/RedisVL.Vectorizers.Onnx` for local ONNX SentenceTransformers embeddings
 * `src/RedisVL.Rerankers.Cohere` for Cohere reranking
+* `src/RedisVL.Rerankers.VoyageAI` for Voyage AI reranking
 * `src/RedisVL.Rerankers.Onnx` for local ONNX cross-encoder reranking
 * `src/RedisVL.Connectors.VectorData` for the Microsoft.Extensions.VectorData (MEVD) / Semantic Kernel vector-store connector
 
@@ -42,6 +43,7 @@ Use these package pages when you need constructor, environment, and example guid
 * xref:extensions/extensions-ai-vectorizer.adoc[Microsoft.Extensions.AI vectorizer]
 * xref:extensions/onnx-vectorizer.adoc[ONNX vectorizer]
 * xref:extensions/cohere-reranker.adoc[Cohere reranker]
+* xref:extensions/voyageai-reranker.adoc[Voyage AI reranker]
 * xref:extensions/onnx-reranker.adoc[ONNX reranker]
 * xref:extensions/vector-data-connector.adoc[Microsoft.Extensions.VectorData connector]
 
@@ -54,6 +56,7 @@ Use these examples when you want runnable package coverage:
 * `/examples/ExtensionsAiVectorizerExample` uses an OpenAI-backed `IEmbeddingGenerator<string, Embedding<float>>`
 * `/examples/OnnxVectorizerExample` requires local `model.onnx` and `tokenizer.json` assets
 * `/examples/CohereRerankerExample` requires `COHERE_API_KEY`
+* `/examples/VoyageAiRerankerExample` requires `VOYAGE_API_KEY`
 * `/examples/OnnxRerankerExample` requires local `model.onnx` and `tokenizer.json` assets
 * `/examples/VectorDataConnectorExample` requires RediSearch + RedisJSON and `OPENAI_API_KEY` (embeds with OpenAI)
 * `/examples/SemanticKernelConnectorExample` shows Semantic Kernel consuming the connector; requires RediSearch + RedisJSON and `OPENAI_API_KEY`

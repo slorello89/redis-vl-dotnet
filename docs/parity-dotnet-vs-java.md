@@ -47,7 +47,7 @@ Legend: ✅ present · ⚠️ partial/limited · ❌ absent
 | Runtime vector params | ✅ efRuntime, epsilon, SVS knobs | ✅ same set | Parity. .NET added searchWindowSize / useSearchHistory / searchBufferCapacity (SVS) in issue #12. |
 | Built-in vectorizers | ✅ OpenAI, HuggingFace, Microsoft.Extensions.AI | ✅ LangChain4J pass-through (OpenAI/Azure/Cohere/HF/Ollama/Vertex/Mistral/Voyage), local SentenceTransformers (ONNX) | Different strategy: .NET ships discrete provider packages + a MEAI adapter; Java funnels everything through LangChain4J + a local ONNX embedder. |
 | Local/offline embeddings | ❌ (no ONNX *embedder*) | ✅ `SentenceTransformersVectorizer` | .NET has a local ONNX *reranker* but no local embedder. |
-| Built-in rerankers | ✅ Cohere, local ONNX | ✅ Cohere, local ONNX (HFCrossEncoder), **VoyageAI** | Java adds VoyageAI. |
+| Built-in rerankers | ✅ Cohere, VoyageAI, local ONNX | ✅ Cohere, local ONNX (HFCrossEncoder), VoyageAI | Parity. .NET added `RedisVL.Rerankers.VoyageAI` in issue #12 (gap #7). |
 | Embeddings cache | ✅ | ✅ | Parity. |
 | Semantic cache | ⚠️ store/check/delete | ✅ + hit-rate stats, `checkTopK`, batch store/check, `update` | Java richer. |
 | LangCache-style integration | ❌ | ✅ `LangCacheSemanticCache` | Java integrates a hosted LangCache server. |
@@ -78,7 +78,7 @@ Roughly in priority order for a .NET consumer:
 4. **Local/offline embeddings** — Java has a SentenceTransformers (ONNX) vectorizer; .NET only has a local ONNX *reranker*.
 5. ~~**Vector index breadth** — SVS-VAMANA algorithm + vector compression (LVQ / LeanVec) and the associated runtime knobs.~~ **Closed (issue #12, gap #5):** `VectorAlgorithm.SvsVamana` + `VectorCompression` (LVQ4/4x4/4x8/8, LeanVec4x8/8x8) and build/runtime knobs (`graphMaxDegree`, `constructionWindowSize`, `searchWindowSize`, `epsilon`, `trainingThreshold`, `reduce`; query-time `searchWindowSize` / `useSearchHistory` / `searchBufferCapacity`).
 6. **LangCache integration** (`LangCacheSemanticCache`) — already tracked as "Deferred" in the older roadmap.
-7. **VoyageAI reranker**.
+7. ~~**VoyageAI reranker**.~~ **Closed (issue #12, gap #7):** `RedisVL.Rerankers.VoyageAI` ships `VoyageAiTextReranker` (an `ITextReranker` over Voyage AI's `/v1/rerank` API).
 8. ~~**Framework/ecosystem hooks** — Java's LangChain4J adapters (EmbeddingStore, ContentRetriever, DocumentStore, ChatMemoryStore).~~ **Closed:** `RedisVL.Connectors.VectorData` ships a Microsoft.Extensions.VectorData `VectorStore`/`VectorStoreCollection` connector (consumable by Semantic Kernel), a LINQ→`FilterExpression` mapper, and a `RedisVLChatMessageStore` on top of `MessageHistory`.
 9. **Extractive summarization** utilities.
 10. **VCR-style test harness** for deterministic LLM/embedding tests.

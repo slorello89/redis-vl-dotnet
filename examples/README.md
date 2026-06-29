@@ -41,6 +41,7 @@ Use this map when you want the fastest path to a parity feature area:
 | Microsoft.Extensions.AI vectorizer adapter | [Microsoft.Extensions.AI Vectorizer](../docs-site/modules/ROOT/pages/extensions/extensions-ai-vectorizer.adoc) | [ExtensionsAiVectorizerExample](./ExtensionsAiVectorizerExample/README.md) | `OPENAI_API_KEY` and optional `OPENAI_EMBEDDING_MODEL`, `OPENAI_EMBEDDING_DIMENSIONS`; no Redis required |
 | Local/offline ONNX vectorizer package | [ONNX Vectorizer](../docs-site/modules/ROOT/pages/extensions/onnx-vectorizer.adoc) | [OnnxVectorizerExample](./OnnxVectorizerExample/README.md) | Local `model.onnx` and `tokenizer.json` assets exposed through `ONNX_VECTORIZER_MODEL_PATH` and `ONNX_VECTORIZER_TOKENIZER_PATH`; no Redis or provider credentials required |
 | Cohere reranker package | [Cohere Reranker](../docs-site/modules/ROOT/pages/extensions/cohere-reranker.adoc) | [CohereRerankerExample](./CohereRerankerExample/README.md) | RediSearch + RedisJSON, `COHERE_API_KEY`, and optional `COHERE_RERANK_MODEL`, `REDIS_VL_REDIS_URL` |
+| Voyage AI reranker package | [Voyage AI Reranker](../docs-site/modules/ROOT/pages/extensions/voyageai-reranker.adoc) | [VoyageAiRerankerExample](./VoyageAiRerankerExample/README.md) | RediSearch + RedisJSON, `VOYAGE_API_KEY`, and optional `VOYAGE_RERANK_MODEL`, `REDIS_VL_REDIS_URL` |
 | ONNX reranker package | [ONNX Reranker](../docs-site/modules/ROOT/pages/extensions/onnx-reranker.adoc) | [OnnxRerankerExample](./OnnxRerankerExample/README.md) | Local `model.onnx` and `tokenizer.json` assets exposed through `ONNX_RERANKER_MODEL_PATH` and `ONNX_RERANKER_TOKENIZER_PATH` |
 | Microsoft.Extensions.VectorData / Semantic Kernel vector-store connector and chat-memory store | [Vector Data Connector](../docs-site/modules/ROOT/pages/extensions/vector-data-connector.adoc) | [VectorDataConnectorExample](./VectorDataConnectorExample/README.md) | RediSearch + RedisJSON, `OPENAI_API_KEY`, and optional `OPENAI_EMBEDDING_MODEL`, `REDIS_VL_REDIS_URL` |
 | Semantic Kernel consuming the RedisVL MEVD connector (`VectorStoreTextSearch`) | [Vector Data Connector](../docs-site/modules/ROOT/pages/extensions/vector-data-connector.adoc) | [SemanticKernelConnectorExample](./SemanticKernelConnectorExample/README.md) | RediSearch + RedisJSON, `OPENAI_API_KEY`, and optional `OPENAI_EMBEDDING_MODEL`, `REDIS_VL_REDIS_URL` |
@@ -297,6 +298,31 @@ Run it from the repository root:
 
 ```bash
 dotnet run --project examples/CohereRerankerExample/CohereRerankerExample.csproj
+```
+
+### [VoyageAiRerankerExample](./VoyageAiRerankerExample/README.md)
+
+Demonstrates text search plus Voyage AI reranking:
+
+- create a JSON-backed search index with support articles
+- retrieve an initial candidate set from Redis with `TextQuery`
+- rerank those candidates through the Voyage AI extension package
+- print the original Redis order alongside the Voyage AI-adjusted order
+- drop the example index and documents
+
+Redis prerequisites:
+
+- RediSearch
+- RedisJSON
+
+Additional prerequisites:
+
+- `VOYAGE_API_KEY`
+
+Run it from the repository root:
+
+```bash
+dotnet run --project examples/VoyageAiRerankerExample/VoyageAiRerankerExample.csproj
 ```
 
 ### [OnnxRerankerExample](./OnnxRerankerExample/README.md)
