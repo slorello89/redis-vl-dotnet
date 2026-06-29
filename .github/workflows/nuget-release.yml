@@ -47,23 +47,9 @@ jobs:
         run: dotnet test redis-vl-dotnet.sln --configuration Release --no-build --verbosity normal
 
       - name: Pack publishable projects
-        shell: bash
-        run: |
-          projects=(
-            "src/RedisVL/RedisVL.csproj"
-            "src/RedisVL.Vectorizers.Abstractions/RedisVL.Vectorizers.Abstractions.csproj"
-            "src/RedisVL.Vectorizers.OpenAI/RedisVL.Vectorizers.OpenAI.csproj"
-            "src/RedisVL.Vectorizers.HuggingFace/RedisVL.Vectorizers.HuggingFace.csproj"
-            "src/RedisVL.Vectorizers.Onnx/RedisVL.Vectorizers.Onnx.csproj"
-            "src/RedisVL.Rerankers.Abstractions/RedisVL.Rerankers.Abstractions.csproj"
-            "src/RedisVL.Rerankers.Cohere/RedisVL.Rerankers.Cohere.csproj"
-          )
-
-          mkdir -p "${{ runner.temp }}/packages"
-
-          for project in "${projects[@]}"; do
-            dotnet pack "$project" --configuration Release --no-build --output "${{ runner.temp }}/packages"
-          done
+        # Packs every project with <IsPackable>true</IsPackable> (see Directory.Build.props),
+        # so new opt-in packages ship automatically without editing this workflow.
+        run: dotnet pack redis-vl-dotnet.sln --configuration Release --no-build --output "${{ runner.temp }}/packages"
 
       - name: Upload package artifacts
         uses: actions/upload-artifact@v4
