@@ -38,6 +38,7 @@ Use this map when you want the fastest path to a parity feature area:
 | Semantic route registration and nearest-route matching | [SemanticRouter](../docs-site/modules/ROOT/pages/core-features/semantic-router.adoc) | [SemanticRouterExample](./SemanticRouterExample/README.md) | RediSearch with vector similarity support and optional `REDIS_VL_REDIS_URL`; no provider credentials required |
 | OpenAI vectorizer package | [OpenAI Vectorizer](../docs-site/modules/ROOT/pages/extensions/openai-vectorizer.adoc) | [OpenAiVectorizerExample](./OpenAiVectorizerExample/README.md) | RediSearch with vector similarity support, `OPENAI_API_KEY`, and optional `OPENAI_EMBEDDING_MODEL`, `OPENAI_EMBEDDING_DIMENSIONS`, `REDIS_VL_REDIS_URL` |
 | Hugging Face vectorizer package | [Hugging Face Vectorizer](../docs-site/modules/ROOT/pages/extensions/huggingface-vectorizer.adoc) | [HuggingFaceVectorizerExample](./HuggingFaceVectorizerExample/README.md) | RediSearch with vector similarity support, `HF_TOKEN`, and optional `HF_EMBEDDING_MODEL`, `REDIS_VL_REDIS_URL` |
+| Cohere vectorizer package | [Cohere Vectorizer](../docs-site/modules/ROOT/pages/extensions/cohere-vectorizer.adoc) | [CohereVectorizerExample](./CohereVectorizerExample/README.md) | RediSearch with vector similarity support, `COHERE_API_KEY`, and optional `COHERE_EMBEDDING_MODEL`, `REDIS_VL_REDIS_URL` |
 | Microsoft.Extensions.AI vectorizer adapter | [Microsoft.Extensions.AI Vectorizer](../docs-site/modules/ROOT/pages/extensions/extensions-ai-vectorizer.adoc) | [ExtensionsAiVectorizerExample](./ExtensionsAiVectorizerExample/README.md) | `OPENAI_API_KEY` and optional `OPENAI_EMBEDDING_MODEL`, `OPENAI_EMBEDDING_DIMENSIONS`; no Redis required |
 | Local/offline ONNX vectorizer package | [ONNX Vectorizer](../docs-site/modules/ROOT/pages/extensions/onnx-vectorizer.adoc) | [OnnxVectorizerExample](./OnnxVectorizerExample/README.md) | Local `model.onnx` and `tokenizer.json` assets exposed through `ONNX_VECTORIZER_MODEL_PATH` and `ONNX_VECTORIZER_TOKENIZER_PATH`; no Redis or provider credentials required |
 | Cohere reranker package | [Cohere Reranker](../docs-site/modules/ROOT/pages/extensions/cohere-reranker.adoc) | [CohereRerankerExample](./CohereRerankerExample/README.md) | RediSearch + RedisJSON, `COHERE_API_KEY`, and optional `COHERE_RERANK_MODEL`, `REDIS_VL_REDIS_URL` |
@@ -252,6 +253,30 @@ Run it from the repository root:
 
 ```bash
 dotnet run --project examples/HuggingFaceVectorizerExample/HuggingFaceVectorizerExample.csproj
+```
+
+### [CohereVectorizerExample](./CohereVectorizerExample/README.md)
+
+Demonstrates provider-backed vectorization with `SemanticCache` and Cohere's input-type distinction:
+
+- create a HASH-backed semantic cache sized from a live Cohere embedding response
+- generate seed embeddings with a `SearchDocument` vectorizer in one batch request
+- store a semantic cache entry with the generated embedding
+- retrieve a semantically similar cache hit by vectorizing a new prompt with a `SearchQuery` vectorizer
+- drop the example index and documents
+
+Redis prerequisites:
+
+- RediSearch with vector similarity support
+
+Additional prerequisites:
+
+- `COHERE_API_KEY`
+
+Run it from the repository root:
+
+```bash
+dotnet run --project examples/CohereVectorizerExample/CohereVectorizerExample.csproj
 ```
 
 ### [ExtensionsAiVectorizerExample](./ExtensionsAiVectorizerExample/README.md)
