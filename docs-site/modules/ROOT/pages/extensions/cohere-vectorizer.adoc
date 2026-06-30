@@ -1,0 +1,35 @@
+= Cohere Vectorizer
+
+`RedisVL.Vectorizers.Cohere` provides `CohereTextVectorizer`, a batch-capable `IBatchTextVectorizer` backed by the Cohere v2 `embed` API.
+
+== Package contents
+
+* `CohereTextVectorizer` for single-input and batch embedding requests
+* `CohereVectorizerOptions` for request shaping
+* `CohereInputType` for selecting the task prefix Cohere applies to inputs
+* `CohereTruncate` for overflow handling
+* `CohereVectorizerPackage` as the package marker type
+
+== Request options
+
+`CohereVectorizerOptions` currently supports:
+
+* `InputType` to select the Cohere task prefix (`SearchDocument`, `SearchQuery`, `Classification`, `Clustering`); defaults to `SearchDocument`
+* `OutputDimension` to request a specific embedding dimensionality from models that support it (for example, `embed-v4.0`)
+* `Truncate` to control overflow handling (`None`, `Start`, `End`)
+* `ClientName` to send the `X-Client-Name` header
+* `EndpointOverride` when the application needs a non-default embed endpoint
+
+The vectorizer requests `float` embeddings and the default provider endpoint is `https://api.cohere.com/v2/embed`.
+
+== Required environment variables
+
+The smoke test reads:
+
+* `COHERE_API_KEY` as the required provider credential
+* `COHERE_EMBEDDING_MODEL` as an optional model override (defaults to `embed-english-v3.0`)
+
+== Validation references
+
+* `tests/RedisVL.Tests/Vectorizers/CohereTextVectorizerTests.cs` covers request construction and response parsing
+* `tests/RedisVL.Tests/Vectorizers/CohereTextVectorizerSmokeTests.cs` is the live-provider smoke test gate
