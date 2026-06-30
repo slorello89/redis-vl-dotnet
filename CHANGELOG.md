@@ -3,7 +3,22 @@
 All notable changes to this project are documented here. This project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.0.5] - Unreleased
+## [0.0.6] - Unreleased
+
+### Added
+
+- **`RedisVL.Vectorizers.Cohere`** — a Cohere v2 `embed`-backed `IBatchTextVectorizer`
+  (`CohereTextVectorizer`) with single + batch embedding support, configurable input type
+  (`search_document`/`search_query`/`classification`/`clustering`), output dimensionality,
+  truncation, optional `X-Client-Name`, and endpoint override. Includes a runnable
+  `CohereVectorizerExample` (#26).
+
+### Packaging
+
+- **`RedisVL.Vectorizers.Cohere`** is published to NuGet for the first time. It is marked
+  `<IsPackable>true</IsPackable>`, so the existing `nuget-release` workflow ships it automatically.
+
+## [0.0.5] - 2026-06-29
 
 ### Added
 
