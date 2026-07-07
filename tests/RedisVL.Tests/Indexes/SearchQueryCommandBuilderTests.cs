@@ -23,7 +23,9 @@ public sealed class SearchQueryCommandBuilderTests
         var rendered = arguments.Select(RenderArgument).ToArray();
 
         Assert.Equal("movies-idx", rendered[0]);
-        Assert.Equal("hel* world", rendered[1]);
+        // The default (no-weights) path tokenizes and escapes each term: whitespace becomes an OR and the
+        // prefix wildcard is preserved, but no other RediSearch syntax leaks through.
+        Assert.Equal("hel* | world", rendered[1]);
         Assert.Equal(
             ["RETURN", "2", "title", "year", "LIMIT", "5", "10", "DIALECT", "2"],
             rendered[2..]);
@@ -849,12 +851,54 @@ public sealed class SearchQueryCommandBuilderTests
     }
 
     [Fact]
-    public void TextQueryWithoutWeightsUsesRawText()
+    public void TextQueryWithoutWeightsEscapesTerms()
     {
         var query = new TextQuery("@title:redis");
 
         Assert.Empty(query.FieldWeights);
-        Assert.Equal("@title:redis", query.QueryString);
+        Assert.False(query.IsRaw);
+        Assert.Equal(@"\@title\:redis", query.QueryString);
+    }
+
+    [Theory]
+    // Hidden-field probes, negation, and malformed syntax are all neutralized to literal terms.
+    [InlineData("@secret:{confidential}", @"\@secret\:\{confidential\}")]
+    [InlineData("-heat", @"\-heat")]
+    [InlineData("@@@(((", @"\@\@\@\(\(\(")]
+    [InlineData("heat fire", "heat | fire")]
+    // The prefix-wildcard character is deliberately preserved so search-box prefix queries keep working.
+    [InlineData("hel*", "hel*")]
+    public void TextQueryWithoutWeightsNeutralizesQuerySyntaxByDefault(string userInput, string expected)
+    {
+        var query = new TextQuery(userInput);
+
+        Assert.False(query.IsRaw);
+        Assert.Equal(expected, query.QueryString);
+    }
+
+    [Fact]
+    public void TextQueryRawSendsTextVerbatim()
+    {
+        var query = TextQuery.Raw("@title:redis | -heat");
+
+        Assert.True(query.IsRaw);
+        Assert.Empty(query.FieldWeights);
+        Assert.Equal("@title:redis | -heat", query.QueryString);
+    }
+
+    [Fact]
+    public void TextQueryRawFlowsThroughCommandArgumentsUnescaped()
+    {
+        var schema = new SearchSchema(
+            new IndexDefinition("movies-idx", "movie:", StorageType.Hash),
+            [new TextFieldDefinition("title")]);
+        var query = TextQuery.Raw("@title:redis");
+
+        var rendered = SearchQueryCommandBuilder.BuildTextSearchArguments(schema, query)
+            .Select(RenderArgument)
+            .ToArray();
+
+        Assert.Equal("@title:redis", rendered[1]);
     }
 
     [Fact]
@@ -910,6 +954,27 @@ public sealed class SearchQueryCommandBuilderTests
     {
         Assert.Throws<ArgumentException>(
             () => new TextQuery("redis", fieldWeights: new Dictionary<string, double> { ["title"] = 0 }));
+    }
+
+    [Fact]
+    public void TextQueryWithPaginationPreservesWeightsOrderAndRawFlag()
+    {
+        var weighted = new TextQuery(
+            "redis",
+            fieldWeights: new Dictionary<string, double> { ["title"] = 5.0, ["body"] = 1.0 });
+        var pagedWeighted = weighted.WithPagination(new QueryPagination(offset: 20, limit: 10));
+
+        Assert.Equal(20, pagedWeighted.Offset);
+        Assert.Equal(10, pagedWeighted.Limit);
+        Assert.False(pagedWeighted.IsRaw);
+        Assert.Equal(weighted.QueryString, pagedWeighted.QueryString);
+        Assert.Equal("(@title:(redis) => { $weight: 5 } | @body:(redis))", pagedWeighted.QueryString);
+
+        var raw = TextQuery.Raw("@title:redis | -heat");
+        var pagedRaw = raw.WithPagination(new QueryPagination(offset: 5, limit: 3));
+
+        Assert.True(pagedRaw.IsRaw);
+        Assert.Equal("@title:redis | -heat", pagedRaw.QueryString);
     }
 
     [Fact]

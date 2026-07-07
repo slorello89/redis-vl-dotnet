@@ -62,12 +62,12 @@ var scienceFictionQuery = new FilterQuery(
 
 var searchResults = await rediscoveredIndex.SearchAsync<MovieListing>(scienceFictionQuery);
 var projectedTextResults = await rediscoveredIndex.SearchAsync(
-    new TextQuery("Alien|Arrival", ["title", "year"], limit: 2));
+    new TextQuery("Alien Arrival", ["title", "year"], limit: 2));
 var typedTextResults = await rediscoveredIndex.SearchAsync<Movie>(
-    new TextQuery("Alien|Arrival", ["title", "year", "genre", "summary"], limit: 2));
+    new TextQuery("Alien Arrival", ["title", "year", "genre", "summary"], limit: 2));
 var batchedTitles = new List<string>();
 await foreach (var batch in rediscoveredIndex.SearchBatchesAsync(
-    new TextQuery("Alien|Arrival", ["title"], pagination: new QueryPagination(limit: 1)),
+    new TextQuery("Alien Arrival", ["title"], pagination: new QueryPagination(limit: 1)),
     batchSize: 1))
 {
     batchedTitles.AddRange(batch.Documents.Select(static document => document.Values["title"].ToString()));

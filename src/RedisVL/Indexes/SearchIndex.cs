@@ -663,7 +663,7 @@ public sealed class SearchIndex
             batchSize,
             SearchAsync,
             static query => query.Pagination,
-            static (query, pagination) => new TextQuery(query.Text, query.ReturnFields, pagination: pagination),
+            static (query, pagination) => query.WithPagination(pagination),
             static _ => null,
             static result => result.TotalCount,
             static result => result.Documents.Count,

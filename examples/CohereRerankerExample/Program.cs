@@ -47,8 +47,10 @@ try
     await index.CreateAsync(new CreateIndexOptions(skipIfExists: true));
     await Task.WhenAll(articles.Select(article => index.LoadJsonAsync(article)));
 
+    // The default TextQuery path tokenizes and escapes input, OR-combining terms, so "password token"
+    // becomes the query `password | token` — no raw RediSearch syntax needed for a simple search box.
     var initialResults = await index.SearchAsync<Article>(
-        new TextQuery("password | token", ["title", "body"], limit: 3));
+        new TextQuery("password token", ["title", "body"], limit: 3));
 
     var rerankResults = await reranker.RerankAsync(
         new RerankRequest(

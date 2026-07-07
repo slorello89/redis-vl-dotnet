@@ -1,14 +1,21 @@
 = TextQuery
 
-`TextQuery` wraps a raw RediSearch query string and optional projections.
+`TextQuery` runs a full-text search with optional projections and per-field weighting.
+
+By default it treats its input as **untrusted search-box text**: the string is split into whitespace-separated terms, each term is escaped, and the terms are OR-combined. This means RediSearch query operators typed by an end user (`@field:...`, `-term`, `(`, `{`, …) are matched **literally** rather than changing the query's meaning. The prefix-wildcard `*` is the one exception — it is preserved so that prefix queries such as `hel*` keep working. If you need to send a hand-authored RediSearch query expression verbatim, use `TextQuery.Raw(...)` (see <<Raw query syntax>>).
 
 == When to use it
 
-Use `TextQuery` when the user already has a text predicate such as:
+Use the default constructor for user-supplied search input, such as a search box:
 
 * token matches like `heat`
+* multi-word input like `star wars`, which becomes `star | wars`
+
+Use `TextQuery.Raw(...)` when *you* are authoring the query string and want RediSearch syntax to take effect:
+
 * OR expressions like `Alien|Arrival`
-* RediSearch prefix or grouped expressions authored directly as a query string
+* field predicates like `@title:redis`
+* prefix or grouped expressions
 
 `TextQuery` requires a non-blank string and trims surrounding whitespace before execution.
 
@@ -16,14 +23,40 @@ Use `TextQuery` when the user already has a text predicate such as:
 
 [source,csharp]
 ----
+// Default path: input is tokenized and escaped. "Alien Arrival" becomes the query `Alien | Arrival`.
 var projectedTextResults = await index.SearchAsync(
-    new TextQuery("Alien|Arrival", ["title", "year"], limit: 2));
+    new TextQuery("Alien Arrival", ["title", "year"], limit: 2));
 
 var typedTextResults = await index.SearchAsync<Movie>(
-    new TextQuery("Alien|Arrival", ["title", "year", "genre", "summary"], limit: 2));
+    new TextQuery("Alien Arrival", ["title", "year", "genre", "summary"], limit: 2));
 ----
 
 The canonical runnable reference is `/examples/JsonStorageExample`.
+
+== Raw query syntax
+
+`TextQuery.Raw(...)` sends `Text` to RediSearch verbatim, without escaping. Use it only for trusted,
+hand-authored query strings — never for unsanitized end-user input.
+
+[source,csharp]
+----
+// Raw path: the string is sent verbatim, so RediSearch operators take effect.
+var orResults = await index.SearchAsync(
+    TextQuery.Raw("Alien|Arrival", ["title", "year"], limit: 2));
+
+var fieldScoped = await index.SearchAsync(
+    TextQuery.Raw("@title:redis"));
+----
+
+[WARNING]
+====
+The FT.SEARCH query argument is itself a query language. Passing raw end-user text through
+`TextQuery.Raw(...)` lets that text change query semantics — matching every document (`*`), probing a
+field the application never intended to expose (`@secret:{...}`), negating results (`-term`), or
+triggering a server-side syntax error. Escape untrusted input by using the default constructor instead;
+it neutralizes those operators (a bare `*` still matches all documents because prefix wildcards are
+preserved, but results remain scoped to the index and capped by `limit`).
+====
 
 == Paging, projections, and mapping
 
@@ -37,12 +70,13 @@ If a required projected field is missing or cannot be converted into the target 
 
 == Batch helpers
 
-Use `SearchBatchesAsync` when you want to stream pages:
+Use `SearchBatchesAsync` when you want to stream pages. Paging preserves the query's escaping mode and
+per-field weights across every batch:
 
 [source,csharp]
 ----
 await foreach (var batch in index.SearchBatchesAsync(
-    new TextQuery("Alien|Arrival", ["title"], pagination: new QueryPagination(limit: 1)),
+    new TextQuery("Alien Arrival", ["title"], pagination: new QueryPagination(limit: 1)),
     batchSize: 1))
 {
     foreach (var document in batch.Documents)
@@ -56,7 +90,7 @@ This exact pattern is used in `/examples/JsonStorageExample`.
 
 == Per-field weights
 
-Pass `fieldWeights` to spread the query terms across multiple text fields and boost individual fields. When `fieldWeights` is supplied, the `Text` is treated as whitespace-separated terms (OR'd together) instead of a raw query string:
+Pass `fieldWeights` to spread the query terms across multiple text fields and boost individual fields. As with the default path, the `Text` is treated as whitespace-separated terms (escaped and OR'd together) — the weights only add field scoping and `$weight` modifiers:
 
 [source,csharp]
 ----
@@ -72,7 +106,7 @@ var weighted = new TextQuery(
 // (@title:(redis | search) => { $weight: 5 } | @body:(redis | search))
 ----
 
-A field with weight `1.0` is emitted without a `$weight` modifier, and a single weighted field is not wrapped in parentheses. Weights must be greater than zero. When `fieldWeights` is omitted the `QueryString` is the raw `Text`, preserving the existing behavior.
+A field with weight `1.0` is emitted without a `$weight` modifier, and a single weighted field is not wrapped in parentheses. Weights must be greater than zero. When `fieldWeights` is omitted the escaped terms are searched across all fields. `fieldWeights` cannot be combined with `TextQuery.Raw(...)`.
 
 == Related pages
 
