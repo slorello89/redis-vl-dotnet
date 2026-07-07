@@ -13,7 +13,7 @@ It:
 ## Prerequisites
 
 - .NET 9 SDK
-- Redis Stack or another Redis deployment with RediSearch enabled
+- Redis 8 or another Redis deployment with RediSearch enabled
 - `OPENAI_API_KEY`
 
 Optional environment variables:

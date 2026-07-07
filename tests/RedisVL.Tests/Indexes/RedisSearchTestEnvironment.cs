@@ -13,7 +13,7 @@ internal static class RedisSearchTestEnvironment
 
     public static string? SkipReason =>
         string.IsNullOrWhiteSpace(ConnectionString)
-            ? $"Set {RedisUrlEnvironmentVariable} to run Redis Stack integration tests."
+            ? $"Set {RedisUrlEnvironmentVariable} to run Redis integration tests."
             : null;
 
     public static async Task<IConnectionMultiplexer> ConnectAsync() =>

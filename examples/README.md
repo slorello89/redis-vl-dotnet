@@ -7,7 +7,7 @@ Use this directory as the entry point for runnable `redis-vl-dotnet` samples.
 All examples currently assume:
 
 - .NET 9 SDK
-- Redis Stack or another Redis deployment with RediSearch enabled
+- Redis 8 or another Redis deployment with RediSearch enabled
 - `REDIS_VL_REDIS_URL` set when Redis is not reachable at `localhost:6379`
 - `REDIS_VL_REDIS_CLUSTER_NODES` or `REDIS_VL_REDIS_SENTINEL_NODES` plus `REDIS_VL_REDIS_SENTINEL_SERVICE_NAME` when you want the JSON example to use cluster or Sentinel discovery instead of a direct endpoint
 
@@ -16,7 +16,7 @@ Examples that use JSON storage also require RedisJSON support.
 Start Redis locally from the repository root if needed:
 
 ```bash
-docker compose -f docker-compose.integration.yml up -d redis-stack
+docker compose -f docker-compose.integration.yml up -d redis
 export REDIS_VL_REDIS_URL=localhost:6379
 ```
 
