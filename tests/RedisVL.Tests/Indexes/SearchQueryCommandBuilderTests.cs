@@ -232,7 +232,7 @@ public sealed class SearchQueryCommandBuilderTests
         var rendered = arguments.Select(RenderArgument).ToArray();
 
         Assert.Equal("movies-idx", rendered[0]);
-        Assert.Equal("@genre:{crime}=>[KNN 3 @embedding $vector EF_RUNTIME $ef_runtime AS distance]", rendered[1]);
+        Assert.Equal("(@genre:{crime})=>[KNN 3 @embedding $vector EF_RUNTIME $ef_runtime AS distance]", rendered[1]);
         Assert.Equal(
             [
                 "PARAMS", "4", "vector", "<binary>", "ef_runtime", "125",
@@ -268,9 +268,42 @@ public sealed class SearchQueryCommandBuilderTests
             "docs-idx",
             arguments[0].ToString());
         Assert.Equal(
-            "*=>[KNN 2 @embedding $vector AS vector_distance]",
+            "(*)=>[KNN 2 @embedding $vector AS vector_distance]",
             arguments[1].ToString());
     }
+
+    [Theory]
+    [MemberData(nameof(CompoundVectorFilterCases))]
+    public void ParenthesizesCompoundVectorSearchFilters(FilterExpression filter, string expectedFilterClause)
+    {
+        var schema = new SearchSchema(
+            new IndexDefinition("movies-idx", "movie:", StorageType.Hash),
+            [
+                new TagFieldDefinition("genre"),
+                new TextFieldDefinition("title"),
+                new VectorFieldDefinition(
+                    "embedding",
+                    new VectorFieldAttributes(
+                        VectorAlgorithm.Flat,
+                        VectorDataType.Float32,
+                        VectorDistanceMetric.Cosine,
+                        2))
+            ]);
+        var query = VectorQuery.FromFloat32("embedding", [1f, 2f], 3, filter, scoreAlias: "distance");
+
+        var arguments = SearchQueryCommandBuilder.BuildVectorSearchArguments(schema, query);
+
+        Assert.Equal(
+            $"{expectedFilterClause}=>[KNN 3 @embedding $vector AS distance]",
+            arguments[1].ToString());
+    }
+
+    public static TheoryData<FilterExpression, string> CompoundVectorFilterCases() => new()
+    {
+        { Filter.Tag("genre").Eq("crime") & Filter.Text("title").Match("heat"), "(@genre:{crime} @title:heat)" },
+        { Filter.Tag("genre").Eq("crime") | Filter.Tag("genre").Eq("action"), "(@genre:{crime} | @genre:{action})" },
+        { Filter.Not(Filter.Tag("genre").Eq("crime")), "(-@genre:{crime})" },
+    };
 
     [Fact]
     public void BuildsMultiVectorSearchArgumentsWithStableAliases()
@@ -316,7 +349,7 @@ public sealed class SearchQueryCommandBuilderTests
         Assert.Equal(
             [
                 "products-idx",
-                "@category:{footwear}=>[KNN 3 @text_embedding $vector EF_RUNTIME $ef_runtime AS __mv_score_0]",
+                "(@category:{footwear})=>[KNN 3 @text_embedding $vector EF_RUNTIME $ef_runtime AS __mv_score_0]",
                 "PARAMS", "4", "vector", "<binary>", "ef_runtime", "64",
                 "SORTBY", "__mv_score_0", "ASC",
                 "RETURN", "2", "title", "__mv_score_0",
@@ -327,7 +360,7 @@ public sealed class SearchQueryCommandBuilderTests
         Assert.Equal(
             [
                 "products-idx",
-                "@category:{footwear}=>[KNN 3 @image_embedding $vector EF_RUNTIME $ef_runtime AS __mv_score_1]",
+                "(@category:{footwear})=>[KNN 3 @image_embedding $vector EF_RUNTIME $ef_runtime AS __mv_score_1]",
                 "PARAMS", "4", "vector", "<binary>", "ef_runtime", "64",
                 "SORTBY", "__mv_score_1", "ASC",
                 "RETURN", "2", "title", "__mv_score_1",
@@ -569,7 +602,7 @@ public sealed class SearchQueryCommandBuilderTests
         var rendered = arguments.Select(RenderArgument).ToArray();
 
         Assert.Equal(
-            "@genre:{crime}=>[KNN 3 @embedding $vector SEARCH_WINDOW_SIZE $search_window_size USE_SEARCH_HISTORY $use_search_history SEARCH_BUFFER_CAPACITY $search_buffer_capacity AS distance]",
+            "(@genre:{crime})=>[KNN 3 @embedding $vector SEARCH_WINDOW_SIZE $search_window_size USE_SEARCH_HISTORY $use_search_history SEARCH_BUFFER_CAPACITY $search_buffer_capacity AS distance]",
             rendered[1]);
         Assert.Equal(
             [

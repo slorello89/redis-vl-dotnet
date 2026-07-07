@@ -384,9 +384,12 @@ internal static class SearchQueryCommandBuilder
 
     private static string BuildVectorSearchQuery(SearchSchema schema, VectorFieldDefinition field, VectorQuery query)
     {
+        // The filter must be parenthesized so a compound filter (`&`/`|`/`!`) binds as the
+        // pre-filter for the KNN clause; an unparenthesized compound filter makes the server
+        // reject the query with a syntax error near `=>[`. This matches the hybrid builders.
         var filter = query.Filter?.ToQueryString() ?? "*";
         var runtimeClause = BuildKnnRuntimeClause(query.RuntimeOptions);
-        return $"{filter}=>[KNN {query.TopK.ToString(CultureInfo.InvariantCulture)} @{GetQueryFieldName(schema, field)} $vector{runtimeClause} AS {query.ScoreAlias}]";
+        return $"({filter})=>[KNN {query.TopK.ToString(CultureInfo.InvariantCulture)} @{GetQueryFieldName(schema, field)} $vector{runtimeClause} AS {query.ScoreAlias}]";
     }
 
     private static string BuildHybridSearchQuery(SearchSchema schema, VectorFieldDefinition field, HybridQuery query)
