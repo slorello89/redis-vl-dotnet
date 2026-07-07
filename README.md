@@ -2,7 +2,7 @@
 
 `redis-vl-dotnet` is a .NET-native Redis Vector Library for Redis Search and vector workloads.
 
-The canonical documentation now lives in the Antora site source at [docs-site/modules/ROOT/pages/index.adoc](docs-site/modules/ROOT/pages/index.adoc). Start there for the current overview, getting-started flow, examples map, CLI guidance, and validation instructions.
+The canonical documentation now lives in the Antora site source at [docs-site/modules/ROOT/pages/index.adoc](docs-site/modules/ROOT/pages/index.adoc). Start there for the current overview, getting-started flow, examples map, and validation instructions.
 
 ## Documentation
 
@@ -25,6 +25,5 @@ GitHub Pages publishing runs from `.github/workflows/docs-pages.yml` on pushes t
 ## Repository Pointers
 
 - Active parity roadmap: [docs/parity-roadmap.md](docs/parity-roadmap.md)
-- CLI project: `src/RedisVL.Cli`
 - Solution file: `redis-vl-dotnet.sln`
 - Ralph plan and iteration log: `prd.json`, `progress.txt`

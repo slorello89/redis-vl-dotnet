@@ -58,11 +58,10 @@ Legend: ✅ present · ⚠️ partial/limited · ❌ absent
 | Extractive summarization | ❌ (out of scope) | ✅ `ExtractiveSelector` + sentence splitter | Java-only. Intentionally not ported — see "Where Java leads" #9. |
 | VCR record/replay test harness | ❌ | ✅ `com.redis.vl.test.vcr` (shipped in main jar) | Java-only; records LLM/embedding calls to Redis. |
 | Connection: standalone / cluster / sentinel | ✅ | ✅ | Parity (different clients). |
-| CLI | ✅ `RedisVL.Cli` | ❌ none | **.NET ahead** — Java ships no CLI. |
+| CLI | ❌ none | ❌ none | Parity — neither library ships a CLI. |
 
 ## Where .NET leads
 
-- **CLI** — `RedisVL.Cli` (create/list/info/clear/delete index, load YAML schema). Java has no CLI module at all.
 - **Typed result mapping** as the default workflow (records/POCOs via `Map<T>`), vs Java's map/`SearchResult` orientation.
 - **Async-first** idiomatic API with `CancellationToken` on every I/O call.
 - **Microsoft.Extensions.AI** integration — idiomatic .NET embedding abstraction (`IEmbeddingGenerator`).
@@ -92,7 +91,7 @@ Roughly in priority order for a .NET consumer:
 
 ## Bottom line
 
-The two libraries are at **near-parity on the core vector-search surface** — schema, index lifecycle, document CRUD, the full query set (including native `FT.HYBRID`, which .NET just added), filters, embeddings cache, the four workflow primitives, and cluster/sentinel connectivity. **.NET is ahead on CLI, typed mapping, async ergonomics, and modular packaging.**
+The two libraries are at **near-parity on the core vector-search surface** — schema, index lifecycle, document CRUD, the full query set (including native `FT.HYBRID`, which .NET just added), filters, embeddings cache, the four workflow primitives, and cluster/sentinel connectivity. **.NET is ahead on typed mapping, async ergonomics, and modular packaging.**
 
 Java is the more mature, broader **platform** (0.13.1 vs 0.0.4): it leads on AI-ecosystem breadth (LangChain4J adapters, more vectorizer/reranker providers, local embeddings), richer cache/router feature depth, filter breadth, and extras like LangCache, extractive summarization, and a VCR test harness. None of those are core-search gaps — they're platform-maturity and ecosystem-integration gaps.
 

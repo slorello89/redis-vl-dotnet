@@ -35,6 +35,5 @@
 ** xref:extensions/onnx-reranker.adoc[ONNX Reranker]
 ** xref:extensions/vector-data-connector.adoc[Microsoft.Extensions.VectorData Connector]
 * xref:examples/index.adoc[Examples]
-* xref:cli/index.adoc[CLI]
 * xref:testing/index.adoc[Testing]
 * xref:reference/index.adoc[Reference]
