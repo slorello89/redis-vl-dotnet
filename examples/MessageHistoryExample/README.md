@@ -11,13 +11,13 @@ Demonstrates semantic message history retrieval:
 ## Prerequisites
 
 - .NET 9 SDK
-- Redis Stack or another Redis deployment with RediSearch enabled
+- Redis 8 or another Redis deployment with RediSearch enabled
 - Optional: `REDIS_VL_REDIS_URL` to point at a Redis instance other than `localhost:6379`
 
 Start Redis locally from the repository root if needed:
 
 ```bash
-docker compose -f docker-compose.integration.yml up -d redis-stack
+docker compose -f docker-compose.integration.yml up -d redis
 export REDIS_VL_REDIS_URL=localhost:6379
 ```
 

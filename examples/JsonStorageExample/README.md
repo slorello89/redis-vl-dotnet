@@ -16,12 +16,12 @@ This example is a runnable .NET 9 console app that demonstrates a JSON-backed `r
 ## Prerequisites
 
 - .NET 9 SDK
-- Redis Stack or another Redis deployment with RediSearch and RedisJSON enabled
+- Redis 8 or another Redis deployment with RediSearch and RedisJSON enabled
 
 Start Redis locally from the repository root if needed:
 
 ```bash
-docker compose -f docker-compose.integration.yml up -d redis-stack
+docker compose -f docker-compose.integration.yml up -d redis
 export REDIS_VL_REDIS_URL=localhost:6379
 ```
 

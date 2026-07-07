@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
 
     services:
-      redis-stack:
+      redis:
         image: redis:latest
         ports:
           - 6379:6379

@@ -65,7 +65,7 @@ The roadmap targets feature parity, not API cloning. These differences are inten
 
 Most items from the original `prd.json` delivery order are now complete. The remaining roadmap focus is narrower:
 
-1. Keep CI and integration coverage aligned with the Redis Stack versions used in automation
+1. Keep CI and integration coverage aligned with the Redis versions used in automation
 2. Close any remaining ecosystem-level gaps such as LangCache-style integrations
 3. Refine documentation, examples, and packaging now that the parity surface is broad
 4. Preserve .NET-native ergonomics while validating parity against upstream RedisVL changes over time

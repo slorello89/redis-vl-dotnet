@@ -7,18 +7,18 @@ This section is the canonical entry point for installation, local Redis setup, c
 The current local development flow assumes:
 
 * .NET 9 SDK
-* Redis Stack or another Redis deployment with RediSearch enabled
-* RedisJSON support for JSON-backed examples and document workflows
+* Redis 8 or another Redis deployment with the Query Engine (RediSearch) enabled
+* JSON support for JSON-backed examples and document workflows
 * Docker Desktop or another Docker-compatible runtime when you want the repository-managed local Redis instance
 * A reachable Redis connection string such as `localhost:6379`
 
 == Default local setup
 
-Start Redis Stack locally from the repository root:
+Start Redis locally from the repository root:
 
 [source,bash]
 ----
-docker compose -f docker-compose.integration.yml up -d redis-stack
+docker compose -f docker-compose.integration.yml up -d redis
 export REDIS_VL_REDIS_URL=localhost:6379
 ----
 
@@ -84,7 +84,7 @@ Use only one topology block at a time.
 
 [source,bash]
 ----
-docker compose -f docker-compose.integration.yml up -d redis-stack
+docker compose -f docker-compose.integration.yml up -d redis
 export REDIS_VL_REDIS_URL=localhost:6379
 dotnet run --project examples/JsonStorageExample/JsonStorageExample.csproj
 ----

@@ -20,14 +20,14 @@ It shows:
 ## Prerequisites
 
 - .NET 9 SDK
-- Redis Stack or another Redis deployment with RediSearch and RedisJSON enabled (JSON storage is used)
+- Redis 8 or another Redis deployment with RediSearch and RedisJSON enabled (JSON storage is used)
 - `OPENAI_API_KEY` (the example embeds summaries and the query with OpenAI)
 - optional `OPENAI_EMBEDDING_MODEL` (defaults to `text-embedding-3-small`, which produces the 1536-dim vectors the record expects)
 
 Start Redis locally from the repository root if needed:
 
 ```bash
-docker compose -f docker-compose.integration.yml up -d redis-stack
+docker compose -f docker-compose.integration.yml up -d redis
 export REDIS_VL_REDIS_URL=localhost:6379
 ```
 

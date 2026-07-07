@@ -7,7 +7,7 @@ This section maps the main feature areas to runnable sample projects and the can
 All current examples assume:
 
 * .NET 9 SDK
-* Redis Stack or another RediSearch-capable Redis deployment
+* Redis 8 or another RediSearch-capable Redis deployment
 * `REDIS_VL_REDIS_URL` when Redis is not reachable at `localhost:6379`
 
 Examples that use JSON storage also require RedisJSON. Provider-backed examples additionally require:
