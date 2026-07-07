@@ -2031,6 +2031,92 @@ public sealed class SearchIndexIntegrationTests
         }
     }
 
+    [RedisSearchIntegrationFact]
+    public async Task FromExistingAsync_PreservesMultiFlagFieldsAcrossRoundTrip()
+    {
+        await using var connection = await RedisSearchTestEnvironment.ConnectAsync();
+        var database = connection.GetDatabase();
+
+        var token = Guid.NewGuid().ToString("N");
+        var originalName = $"multi-flag-idx-{token}";
+        var roundTripName = $"multi-flag-roundtrip-idx-{token}";
+        var schema = new SearchSchema(
+            new IndexDefinition(originalName, $"multi-flag:{token}:", StorageType.Hash),
+            [
+                new TextFieldDefinition(
+                    "title",
+                    sortable: true,
+                    noStem: true,
+                    withSuffixTrie: true,
+                    indexEmpty: true,
+                    indexMissing: true,
+                    unNormalizedForm: true),
+                new TagFieldDefinition(
+                    "genre",
+                    sortable: true,
+                    caseSensitive: true,
+                    withSuffixTrie: true,
+                    indexEmpty: true,
+                    indexMissing: true),
+                new NumericFieldDefinition("year", sortable: true, indexMissing: true)
+            ]);
+        var originalIndex = new SearchIndex(database, schema);
+        SearchIndex? roundTripIndex = null;
+
+        try
+        {
+            await originalIndex.CreateAsync(new CreateIndexOptions(overwrite: true));
+
+            var reconstructed = await SearchIndex.FromExistingAsync(database, originalName);
+            AssertMultiFlagFields(reconstructed.Schema);
+
+            // Re-create a fresh index from the reconstructed schema and read it back:
+            // a dropped flag on the first pass would be permanently lost here.
+            roundTripIndex = new SearchIndex(
+                database,
+                new SearchSchema(
+                    new IndexDefinition(roundTripName, $"multi-flag-roundtrip:{token}:", StorageType.Hash),
+                    reconstructed.Schema.Fields));
+            await roundTripIndex.CreateAsync(new CreateIndexOptions(overwrite: true));
+
+            var roundTripped = await SearchIndex.FromExistingAsync(database, roundTripName);
+            AssertMultiFlagFields(roundTripped.Schema);
+        }
+        finally
+        {
+            if (await originalIndex.ExistsAsync())
+            {
+                await originalIndex.DropAsync();
+            }
+
+            if (roundTripIndex is not null && await roundTripIndex.ExistsAsync())
+            {
+                await roundTripIndex.DropAsync();
+            }
+        }
+    }
+
+    private static void AssertMultiFlagFields(SearchSchema schema)
+    {
+        var textField = Assert.IsType<TextFieldDefinition>(schema.Fields.Single(static field => field.Name == "title"));
+        Assert.True(textField.Sortable);
+        Assert.True(textField.NoStem);
+        Assert.True(textField.WithSuffixTrie);
+        Assert.True(textField.IndexEmpty);
+        Assert.True(textField.IndexMissing);
+
+        var tagField = Assert.IsType<TagFieldDefinition>(schema.Fields.Single(static field => field.Name == "genre"));
+        Assert.True(tagField.Sortable);
+        Assert.True(tagField.CaseSensitive);
+        Assert.True(tagField.WithSuffixTrie);
+        Assert.True(tagField.IndexEmpty);
+        Assert.True(tagField.IndexMissing);
+
+        var numericField = Assert.IsType<NumericFieldDefinition>(schema.Fields.Single(static field => field.Name == "year"));
+        Assert.True(numericField.Sortable);
+        Assert.True(numericField.IndexMissing);
+    }
+
     private static async Task SeedHashDocumentsAsync(
         IDatabase database,
         SearchSchema schema,
