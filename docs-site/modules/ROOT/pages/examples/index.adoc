@@ -25,7 +25,7 @@ Examples that use JSON storage also require RedisJSON. Provider-backed examples 
 | Core JSON workflows
 | xref:../core-features/index.adoc[Core Features]
 | `/examples/JsonStorageExample`
-| RediSearch + RedisJSON. Supports `REDIS_VL_REDIS_URL`, `REDIS_VL_REDIS_CLUSTER_NODES`, or `REDIS_VL_REDIS_SENTINEL_NODES` plus `REDIS_VL_REDIS_SENTINEL_SERVICE_NAME`.
+| RediSearch + RedisJSON. Supports `REDIS_VL_REDIS_URL` or `REDIS_VL_REDIS_CLUSTER_NODES`.
 
 | Core vector workflows
 | xref:../core-features/index.adoc[Core Features]

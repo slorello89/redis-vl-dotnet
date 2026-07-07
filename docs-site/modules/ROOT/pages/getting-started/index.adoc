@@ -41,7 +41,7 @@ dotnet run --project examples/JsonStorageExample/JsonStorageExample.csproj
 
 == Connection environment variables
 
-The examples and tests use environment variables so the same commands work across local, cluster, and Sentinel deployments.
+The examples and tests use environment variables so the same commands work across local and cluster deployments.
 
 [cols="1,1,3"]
 |===
@@ -55,24 +55,16 @@ The examples and tests use environment variables so the same commands work acros
 | Cluster flow
 | Comma-delimited Redis cluster seed nodes such as `127.0.0.1:7000,127.0.0.1:7001`.
 
-| `REDIS_VL_REDIS_SENTINEL_NODES`
-| Sentinel flow
-| Comma-delimited Redis Sentinel nodes such as `127.0.0.1:26379,127.0.0.1:26380`.
-
-| `REDIS_VL_REDIS_SENTINEL_SERVICE_NAME`
-| Sentinel flow
-| Sentinel primary service name, for example `mymaster`.
-
 | `REDIS_VL_REDIS_USER`
-| Authenticated cluster or Sentinel flow
+| Authenticated cluster flow
 | Redis username forwarded through the connection factory helpers.
 
 | `REDIS_VL_REDIS_PASSWORD`
-| Authenticated cluster or Sentinel flow
+| Authenticated cluster flow
 | Redis password forwarded through the connection factory helpers.
 
 | `REDIS_VL_REDIS_SSL`
-| TLS-enabled cluster or Sentinel flow
+| TLS-enabled cluster flow
 | Set to `true` when the target deployment requires TLS.
 |===
 
@@ -101,19 +93,6 @@ export REDIS_VL_REDIS_SSL=false
 dotnet run --project examples/JsonStorageExample/JsonStorageExample.csproj
 ----
 
-=== Redis Sentinel
-
-[source,bash]
-----
-unset REDIS_VL_REDIS_URL
-export REDIS_VL_REDIS_SENTINEL_NODES=127.0.0.1:26379,127.0.0.1:26380,127.0.0.1:26381
-export REDIS_VL_REDIS_SENTINEL_SERVICE_NAME=mymaster
-export REDIS_VL_REDIS_USER=default
-export REDIS_VL_REDIS_PASSWORD=secret
-export REDIS_VL_REDIS_SSL=false
-dotnet run --project examples/JsonStorageExample/JsonStorageExample.csproj
-----
-
 == First workflow
 
 The minimal library flow is:
@@ -136,8 +115,7 @@ The current canonical walkthrough for that sequence still starts from the JSON e
 Use `RedisConnectionFactory` when you need StackExchange.Redis `ConfigurationOptions` helpers for more than a direct endpoint:
 
 * cluster discovery through `ConnectClusterAsync(...)`
-* Sentinel discovery through `ConnectSentinelPrimaryAsync(...)`
-* parsed option creation through `CreateClusterOptions(...)` and `CreateSentinelOptions(...)`
+* parsed option creation through `CreateClusterOptions(...)`
 
 These helpers normalize seed-node lists, reject unsupported configuration early, and keep the rest of the library on the same `IDatabase`-based APIs.
 
