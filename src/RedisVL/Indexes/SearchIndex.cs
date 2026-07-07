@@ -977,22 +977,34 @@ public sealed class SearchIndex
         var initialPagination = getPagination(query);
         var effectiveBatchSize = GetBatchSize(batchSize, initialPagination);
         var offset = initialPagination.Offset;
-        long? totalCount = null;
+        var isFirstBatch = true;
 
-        while (!totalCount.HasValue || offset < totalCount.Value)
+        while (true)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
             var currentQuery = cloneWithPagination(query, new QueryPagination(offset, effectiveBatchSize));
             var batch = await executeAsync(currentQuery, cancellationToken).ConfigureAwait(false);
-            yield return batch;
 
-            if (batch.Rows.Count == 0)
+            // FT.AGGREGATE's leading reply element (surfaced as AggregationResults.TotalCount)
+            // is not a reliable count of matching rows: for non-GROUPBY (LOAD/APPLY-only)
+            // pipelines Redis returns 1 rather than the true row count, so it cannot be used to
+            // terminate paging. Instead page until a batch comes back short of the requested
+            // size. An empty batch after the first page just means we landed exactly on the
+            // end of the result set, so it is not surfaced to the caller.
+            if (batch.Rows.Count == 0 && !isFirstBatch)
             {
                 yield break;
             }
 
-            totalCount = batch.TotalCount;
+            yield return batch;
+            isFirstBatch = false;
+
+            if (batch.Rows.Count < effectiveBatchSize)
+            {
+                yield break;
+            }
+
             offset += effectiveBatchSize;
         }
     }

@@ -132,6 +132,45 @@ internal static class SearchIndexSeedData
             ])
     ];
 
+    public static IReadOnlyList<HashSeedDocument> NonGroupedAggregationMovies { get; } =
+    [
+        new(
+            "1",
+            [
+                new HashEntry("title", "Heat"),
+                new HashEntry("genre", "crime"),
+                new HashEntry("year", 1995)
+            ]),
+        new(
+            "2",
+            [
+                new HashEntry("title", "Thief"),
+                new HashEntry("genre", "crime"),
+                new HashEntry("year", 1981)
+            ]),
+        new(
+            "3",
+            [
+                new HashEntry("title", "Arrival"),
+                new HashEntry("genre", "science-fiction"),
+                new HashEntry("year", 2016)
+            ]),
+        new(
+            "4",
+            [
+                new HashEntry("title", "Collateral"),
+                new HashEntry("genre", "crime"),
+                new HashEntry("year", 2004)
+            ]),
+        new(
+            "5",
+            [
+                new HashEntry("title", "Dune"),
+                new HashEntry("genre", "science-fiction"),
+                new HashEntry("year", 2021)
+            ])
+    ];
+
     public static IReadOnlyList<HashSeedDocument> AggregateHybridMovies { get; } =
     [
         new(

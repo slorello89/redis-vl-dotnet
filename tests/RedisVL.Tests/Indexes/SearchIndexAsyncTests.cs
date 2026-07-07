@@ -775,6 +775,64 @@ public sealed class SearchIndexAsyncTests
     }
 
     [Fact]
+    public async Task AggregateBatchesAsync_NonGroupByPipeline_PagesAllRowsDespiteUnreliableCount()
+    {
+        // Regression test for issue #34: for LOAD/APPLY-only (non-GROUPBY) pipelines Redis
+        // returns 1 as the leading reply element (surfaced as AggregationResults.TotalCount).
+        // The pager must not treat that as a total row count, otherwise it stops after the first
+        // batch and silently drops the remaining rows.
+        var (database, recorder) = RecordingDatabaseProxy.CreatePair();
+        var index = new SearchIndex(database, CreateHashSchema("aggregate-nongroup-batches"));
+        recorder.ExecuteAsyncResponses.Enqueue(
+            RedisResult.Create(
+                [
+                    RedisResult.Create(1),
+                    NonGroupByRow("alpha"),
+                    NonGroupByRow("bravo")
+                ]));
+        recorder.ExecuteAsyncResponses.Enqueue(
+            RedisResult.Create(
+                [
+                    RedisResult.Create(1),
+                    NonGroupByRow("charlie"),
+                    NonGroupByRow("delta")
+                ]));
+        recorder.ExecuteAsyncResponses.Enqueue(
+            RedisResult.Create(
+                [
+                    RedisResult.Create(1),
+                    NonGroupByRow("echo")
+                ]));
+
+        var titles = new List<string>();
+        await foreach (var batch in index.AggregateBatchesAsync(
+            new AggregationQuery(loadFields: ["title"]),
+            batchSize: 2))
+        {
+            titles.AddRange(batch.Rows.Select(static row => row.Values["title"].ToString()));
+        }
+
+        Assert.Equal(["alpha", "bravo", "charlie", "delta", "echo"], titles);
+        Assert.Equal(3, recorder.ExecuteAsyncCallCount);
+        Assert.Equal(
+            [
+                ["LIMIT", "0", "2", "DIALECT", "2"],
+                ["LIMIT", "2", "2", "DIALECT", "2"],
+                ["LIMIT", "4", "2", "DIALECT", "2"]
+            ],
+            recorder.ExecuteAsyncCalls
+                .Select(static call => call.Arguments.Select(static argument => argument?.ToString() ?? string.Empty).TakeLast(5).ToArray())
+                .ToArray());
+
+        static RedisResult NonGroupByRow(string title) =>
+            RedisResult.Create(
+                [
+                    RedisResult.Create((RedisValue)"title"),
+                    RedisResult.Create((RedisValue)title)
+                ]);
+    }
+
+    [Fact]
     public async Task AggregateHybridAsync_ExecutesFtAggregateWithHybridArguments()
     {
         var (database, recorder) = RecordingDatabaseProxy.CreatePair();

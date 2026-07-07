@@ -17,6 +17,13 @@ public sealed class AggregationResults
         Rows = rows;
     }
 
+    /// <summary>
+    /// The leading element of the <c>FT.AGGREGATE</c> reply. For GROUPBY pipelines this is the
+    /// number of groups. For non-GROUPBY (LOAD/APPLY-only) pipelines Redis returns <c>1</c>
+    /// rather than the number of matching rows, so this value is not a reliable total row count
+    /// for those pipelines. Use <see cref="Rows"/>.<see cref="System.Collections.Generic.IReadOnlyList{T}.Count"/>
+    /// for the number of rows actually returned.
+    /// </summary>
     public long TotalCount { get; }
 
     public IReadOnlyList<AggregationResultRow> Rows { get; }
@@ -62,6 +69,13 @@ public sealed class AggregationResults<TDocument>
         Rows = rows;
     }
 
+    /// <summary>
+    /// The leading element of the <c>FT.AGGREGATE</c> reply. For GROUPBY pipelines this is the
+    /// number of groups. For non-GROUPBY (LOAD/APPLY-only) pipelines Redis returns <c>1</c>
+    /// rather than the number of matching rows, so this value is not a reliable total row count
+    /// for those pipelines. Use <see cref="Rows"/>.<see cref="System.Collections.Generic.IReadOnlyList{T}.Count"/>
+    /// for the number of rows actually returned.
+    /// </summary>
     public long TotalCount { get; }
 
     public IReadOnlyList<TDocument> Rows { get; }
