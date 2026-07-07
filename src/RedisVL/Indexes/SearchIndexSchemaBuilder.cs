@@ -7,6 +7,25 @@ namespace RedisVL.Indexes;
 
 internal static class SearchIndexSchemaBuilder
 {
+    // FT.INFO attribute rows terminate with standalone boolean flag tokens
+    // (e.g. "... WEIGHT 1 SORTABLE NOSTEM NOINDEX"). These keywords carry no
+    // value token, so they must not be treated as the key half of a key/value
+    // pair; otherwise the following flag is consumed as their "value" and lost.
+    private static readonly HashSet<string> StandaloneAttributeFlags = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "SORTABLE",
+        "UNF",
+        "NOSTEM",
+        "NOINDEX",
+        "CASESENSITIVE",
+        "WITHSUFFIXTRIE",
+        "INDEXEMPTY",
+        "INDEXMISSING",
+    };
+
+    private static bool IsStandaloneAttributeFlag(string? token) =>
+        !string.IsNullOrWhiteSpace(token) && StandaloneAttributeFlags.Contains(token.Trim());
+
     public static SearchSchema FromInfo(SearchIndexInfo info)
     {
         ArgumentNullException.ThrowIfNull(info);
@@ -65,6 +84,20 @@ internal static class SearchIndexSchemaBuilder
         var currentRow = new List<RedisResult>();
         for (var index = 0; index < entries.Length;)
         {
+            // Standalone boolean flags (SORTABLE, NOSTEM, ...) have no value token,
+            // so emit them as a lone token and let ParseEntryMap resolve them; pairing
+            // them with the next token would drop the following flag.
+            if (entries[index].Resp2Type != ResultType.Array)
+            {
+                var token = entries[index].ToString()?.Trim();
+                if (IsStandaloneAttributeFlag(token))
+                {
+                    currentRow.Add(RedisResult.Create((RedisValue)token!));
+                    index++;
+                    continue;
+                }
+            }
+
             string? key;
             RedisResult value;
 
@@ -258,6 +291,11 @@ internal static class SearchIndexSchemaBuilder
             ? (RedisResult[]?)result ?? []
             : throw new InvalidOperationException($"Redis FT.INFO {context} response must contain key-value pairs.");
 
+        // Attribute rows mix key/value pairs (WEIGHT 1, SEPARATOR ;) with
+        // standalone boolean flags (SORTABLE, NOSTEM, ...); the index_definition
+        // map is strictly key/value, so flag detection only applies to attributes.
+        var treatFlagsAsStandalone = string.Equals(context, "attributes", StringComparison.Ordinal);
+
         var dictionary = new Dictionary<string, RedisResult>(StringComparer.OrdinalIgnoreCase);
         for (var index = 0; index < entries.Length; index++)
         {
@@ -299,7 +337,16 @@ internal static class SearchIndexSchemaBuilder
                 continue;
             }
 
-            dictionary[key.Trim()] = entries[index + 1];
+            var trimmedKey = key.Trim();
+            if (treatFlagsAsStandalone && StandaloneAttributeFlags.Contains(trimmedKey))
+            {
+                // No value token follows a standalone flag; record it as a boolean
+                // and let the loop advance a single position to the next token.
+                dictionary[trimmedKey] = RedisResult.Create(RedisValue.Null);
+                continue;
+            }
+
+            dictionary[trimmedKey] = entries[index + 1];
             index++;
         }
 

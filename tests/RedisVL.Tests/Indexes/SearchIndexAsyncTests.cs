@@ -459,6 +459,74 @@ public sealed class SearchIndexAsyncTests
     }
 
     [Fact]
+    public async Task FromExistingAsync_PreservesStandaloneTrailingFlagsFromRealFtInfoLayout()
+    {
+        // Raw attribute-row token layout captured verbatim from FT.INFO on live
+        // Redis 8.8.0. Boolean options arrive as standalone tokens with no value,
+        // so naive pairwise parsing pairs SORTABLE->NOSTEM / INDEXEMPTY->INDEXMISSING
+        // and silently drops the trailing flag (issue #36).
+        var (database, recorder) = RecordingDatabaseProxy.CreatePair();
+        recorder.ExecuteAsyncResponses.Enqueue(
+            CreateIndexInfoWithAttributeRows(
+                "JSON",
+                CreateRawAttributeRow(
+                    "identifier", "$.title", "attribute", "title", "type", "TEXT",
+                    "WEIGHT", "2.5", "SORTABLE", "UNF", "NOSTEM", "WITHSUFFIXTRIE", "INDEXEMPTY", "INDEXMISSING"),
+                CreateRawAttributeRow(
+                    "identifier", "$.genre", "attribute", "genre", "type", "TAG",
+                    "SEPARATOR", ";", "CASESENSITIVE", "SORTABLE", "UNF", "WITHSUFFIXTRIE", "INDEXEMPTY", "INDEXMISSING"),
+                CreateRawAttributeRow(
+                    "identifier", "$.year", "attribute", "year", "type", "NUMERIC",
+                    "SORTABLE", "UNF", "INDEXMISSING"),
+                CreateRawAttributeRow(
+                    "identifier", "$.location", "attribute", "location", "type", "GEO",
+                    "SORTABLE", "UNF", "INDEXMISSING")));
+
+        var index = await SearchIndex.FromExistingAsync(database, "reconnected-idx");
+
+        Assert.Collection(
+            index.Schema.Fields,
+            field =>
+            {
+                var textField = Assert.IsType<TextFieldDefinition>(field);
+                Assert.Equal("title", textField.Name);
+                Assert.True(textField.Sortable);
+                Assert.True(textField.UnNormalizedForm);
+                Assert.True(textField.NoStem);
+                Assert.True(textField.WithSuffixTrie);
+                Assert.True(textField.IndexEmpty);
+                Assert.True(textField.IndexMissing);
+                Assert.Equal(2.5d, textField.Weight);
+            },
+            field =>
+            {
+                var tagField = Assert.IsType<TagFieldDefinition>(field);
+                Assert.Equal("genre", tagField.Name);
+                Assert.Equal(';', tagField.Separator);
+                Assert.True(tagField.CaseSensitive);
+                Assert.True(tagField.Sortable);
+                Assert.True(tagField.WithSuffixTrie);
+                Assert.True(tagField.IndexEmpty);
+                Assert.True(tagField.IndexMissing);
+            },
+            field =>
+            {
+                var numericField = Assert.IsType<NumericFieldDefinition>(field);
+                Assert.Equal("year", numericField.Name);
+                Assert.True(numericField.Sortable);
+                Assert.True(numericField.UnNormalizedForm);
+                Assert.True(numericField.IndexMissing);
+            },
+            field =>
+            {
+                var geoField = Assert.IsType<GeoFieldDefinition>(field);
+                Assert.Equal("location", geoField.Name);
+                Assert.True(geoField.Sortable);
+                Assert.True(geoField.IndexMissing);
+            });
+    }
+
+    [Fact]
     public async Task TextSearchAsync_ExecutesFtSearchWithTextQueryArguments()
     {
         var (database, recorder) = RecordingDatabaseProxy.CreatePair();
@@ -1267,12 +1335,49 @@ public sealed class SearchIndexAsyncTests
                             ("dim", RedisResult.Create((RedisValue)"3")),
                             ("distance_metric", RedisResult.Create((RedisValue)"COSINE")))))));
 
+    // Boolean field options (SORTABLE, NOSTEM, INDEXMISSING, ...) are emitted by
+    // FT.INFO as standalone flag tokens with no value, e.g.
+    // "... WEIGHT 2.5 SORTABLE UNF NOSTEM WITHSUFFIXTRIE INDEXEMPTY INDEXMISSING".
+    // Only WEIGHT/PHONETIC/SEPARATOR/vector-parameter entries carry a value token.
+    private static readonly HashSet<string> StandaloneAttributeFlags = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "SORTABLE",
+        "UNF",
+        "NOSTEM",
+        "NOINDEX",
+        "CASESENSITIVE",
+        "WITHSUFFIXTRIE",
+        "INDEXEMPTY",
+        "INDEXMISSING",
+    };
+
     private static RedisResult CreateFieldAttributeRow(params (string Key, string Value)[] entries) =>
-        RedisResult.Create(entries.SelectMany(static entry => new[]
-        {
-            RedisResult.Create((RedisValue)entry.Key),
-            RedisResult.Create((RedisValue)entry.Value)
-        }).ToArray());
+        RedisResult.Create(entries.SelectMany(static entry =>
+            StandaloneAttributeFlags.Contains(entry.Key)
+                ? new[] { RedisResult.Create((RedisValue)entry.Key) }
+                : new[]
+                {
+                    RedisResult.Create((RedisValue)entry.Key),
+                    RedisResult.Create((RedisValue)entry.Value)
+                }).ToArray());
+
+    private static RedisResult CreateRawAttributeRow(params string[] tokens) =>
+        RedisResult.Create(tokens.Select(static token => RedisResult.Create((RedisValue)token)).ToArray());
+
+    private static RedisResult CreateIndexInfoWithAttributeRows(string keyType, params RedisResult[] attributeRows) =>
+        RedisResult.Create(
+            CreateRedisPairs(
+                ("index_name", RedisResult.Create((RedisValue)"reconnected-idx")),
+                (
+                    "index_definition",
+                    RedisResult.Create(
+                        [
+                            RedisResult.Create((RedisValue)"key_type"),
+                            RedisResult.Create((RedisValue)keyType),
+                            RedisResult.Create((RedisValue)"prefixes"),
+                            RedisResult.Create([RedisResult.Create((RedisValue)"doc:")])
+                        ])),
+                ("attributes", RedisResult.Create(attributeRows))));
 
     private static RedisResult[] CreateRedisPairs(params (string Key, RedisResult Value)[] entries) =>
         entries.SelectMany(static entry => new[] { RedisResult.Create((RedisValue)entry.Key), entry.Value }).ToArray();
