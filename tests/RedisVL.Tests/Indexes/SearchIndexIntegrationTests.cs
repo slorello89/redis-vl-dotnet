@@ -1096,6 +1096,56 @@ public sealed class SearchIndexIntegrationTests
     }
 
     [RedisSearchIntegrationFact]
+    public async Task AggregateBatchesAsyncPagesAllRowsForNonGroupedPipeline()
+    {
+        // Regression test for issue #34: for non-GROUPBY (LOAD-only) pipelines Redis returns 1 as
+        // the leading FT.AGGREGATE reply element, so paging must not rely on TotalCount to stop.
+        await using var connection = await RedisSearchTestEnvironment.ConnectAsync();
+        var database = connection.GetDatabase();
+
+        var token = Guid.NewGuid().ToString("N");
+        var schema = new SearchSchema(
+            new IndexDefinition($"aggregate-nongroup-idx-{token}", $"aggregate-nongroup:{token}:", StorageType.Hash),
+            [
+                new TextFieldDefinition("title"),
+                new NumericFieldDefinition("year"),
+                new TagFieldDefinition("genre")
+            ]);
+        var index = new SearchIndex(database, schema);
+
+        try
+        {
+            await index.CreateAsync();
+            await SeedHashDocumentsAsync(database, schema, SearchIndexSeedData.NonGroupedAggregationMovies);
+            await RedisSearchTestEnvironment.WaitForIndexDocumentCountAsync(index, SearchIndexSeedData.NonGroupedAggregationMovies.Count);
+
+            // No SORTBY: a sorted non-GROUPBY pipeline makes Redis return the true row count as the
+            // leading reply element, which would mask the bug. LOAD-only keeps the leading element
+            // pinned at 1 so this exercises the truncation path from issue #34.
+            var query = new AggregationQuery(loadFields: ["title"]);
+
+            var titles = new List<string>();
+            var batchCount = 0;
+            await foreach (var batch in index.AggregateBatchesAsync(query, batchSize: 2))
+            {
+                batchCount++;
+                titles.AddRange(batch.Rows.Select(static row => row.Values["title"].ToString()));
+            }
+
+            Assert.Equal(SearchIndexSeedData.NonGroupedAggregationMovies.Count, titles.Count);
+            Assert.Equal(["Arrival", "Collateral", "Dune", "Heat", "Thief"], titles.OrderBy(static title => title, StringComparer.Ordinal).ToArray());
+            Assert.True(batchCount >= 3, $"Expected at least 3 batches when paging 5 rows two at a time but observed {batchCount}.");
+        }
+        finally
+        {
+            if (await index.ExistsAsync())
+            {
+                await index.DropAsync(deleteDocuments: true);
+            }
+        }
+    }
+
+    [RedisSearchIntegrationFact]
     public async Task ExecutesAggregateHybridQueriesWithDeterministicGrouping()
     {
         await using var connection = await RedisSearchTestEnvironment.ConnectAsync();
