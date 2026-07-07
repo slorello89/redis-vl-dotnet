@@ -1530,6 +1530,76 @@ public sealed class SearchIndexIntegrationTests
     }
 
     [RedisSearchIntegrationFact]
+    public async Task VectorRangeQueryWithTopLevelOrFilterExcludesOutOfRangeDocuments()
+    {
+        await using var connection = await RedisSearchTestEnvironment.ConnectAsync();
+        var database = connection.GetDatabase();
+
+        var token = Guid.NewGuid().ToString("N");
+        var schema = new SearchSchema(
+            new IndexDefinition($"vector-range-or-idx-{token}", $"vrange-or:{token}:", StorageType.Hash),
+            [
+                new TagFieldDefinition("genre"),
+                new TextFieldDefinition("title"),
+                new VectorFieldDefinition(
+                    "embedding",
+                    new VectorFieldAttributes(
+                        VectorAlgorithm.Flat,
+                        VectorDataType.Float32,
+                        VectorDistanceMetric.Cosine,
+                        2))
+            ]);
+        var index = new SearchIndex(database, schema);
+
+        try
+        {
+            await index.CreateAsync();
+            await SeedHashDocumentsAsync(database, schema, SearchIndexSeedData.VectorMovies);
+            await RedisSearchTestEnvironment.WaitForIndexDocumentCountAsync(index, SearchIndexSeedData.VectorMovies.Count);
+
+            // Arrival (science-fiction, embedding [0, 1]) has cosine distance 1.0 to the query
+            // vector [1, 0] — far outside the 0.1 radius. It matches the left branch of the OR
+            // filter. Before the parenthesization fix the query parsed as
+            // `science-fiction | (crime AND range)`, so Arrival leaked in via the unconstrained
+            // left branch with no distance constraint.
+            const double distanceThreshold = 0.1;
+            var query = VectorRangeQuery.FromFloat32(
+                "embedding",
+                [1f, 0f],
+                distanceThreshold,
+                Filter.Tag("genre").Eq("science-fiction") | Filter.Tag("genre").Eq("crime"),
+                ["title", "genre"],
+                scoreAlias: "distance",
+                limit: 10);
+
+            var results = await index.SearchAsync(query);
+
+            Assert.DoesNotContain(
+                results.Documents,
+                document => document.Values.TryGetValue("title", out var title) && title == "Arrival");
+
+            // Every returned document must carry a distance within the requested radius.
+            foreach (var document in results.Documents)
+            {
+                Assert.True(document.Values.TryGetValue("distance", out var distanceValue) && !distanceValue.IsNull,
+                    $"Document '{document.Id}' was returned without a distance score.");
+                var distance = double.Parse(distanceValue!, System.Globalization.CultureInfo.InvariantCulture);
+                Assert.True(distance <= distanceThreshold,
+                    $"Document '{document.Id}' has distance {distance}, exceeding threshold {distanceThreshold}.");
+            }
+
+            Assert.Equal(2, results.Documents.Count);
+        }
+        finally
+        {
+            if (await index.ExistsAsync())
+            {
+                await index.DropAsync(deleteDocuments: true);
+            }
+        }
+    }
+
+    [RedisSearchIntegrationFact]
     public async Task ExecutesHnswVectorRangeQueriesWithRuntimeEpsilonParameter()
     {
         await using var connection = await RedisSearchTestEnvironment.ConnectAsync();
