@@ -45,7 +45,6 @@ Use this map when you want the fastest path to a parity feature area:
 | ONNX reranker package | [ONNX Reranker](../docs-site/modules/ROOT/pages/extensions/onnx-reranker.adoc) | [OnnxRerankerExample](./OnnxRerankerExample/README.md) | Local `model.onnx` and `tokenizer.json` assets exposed through `ONNX_RERANKER_MODEL_PATH` and `ONNX_RERANKER_TOKENIZER_PATH` |
 | Microsoft.Extensions.VectorData / Semantic Kernel vector-store connector and chat-memory store | [Vector Data Connector](../docs-site/modules/ROOT/pages/extensions/vector-data-connector.adoc) | [VectorDataConnectorExample](./VectorDataConnectorExample/README.md) | RediSearch + RedisJSON, `OPENAI_API_KEY`, and optional `OPENAI_EMBEDDING_MODEL`, `REDIS_VL_REDIS_URL` |
 | Semantic Kernel consuming the RedisVL MEVD connector (`VectorStoreTextSearch`) | [Vector Data Connector](../docs-site/modules/ROOT/pages/extensions/vector-data-connector.adoc) | [SemanticKernelConnectorExample](./SemanticKernelConnectorExample/README.md) | RediSearch + RedisJSON, `OPENAI_API_KEY`, and optional `OPENAI_EMBEDDING_MODEL`, `REDIS_VL_REDIS_URL` |
-| CLI index and schema commands | [CLI](../docs-site/modules/ROOT/pages/cli/index.adoc) | `dotnet run --project src/RedisVL.Cli -- ...` | Index commands require RediSearch plus `--redis` or `REDIS_VL_REDIS_URL`; JSON-backed index creation also requires RedisJSON |
 
 ### [JsonStorageExample](./JsonStorageExample/README.md)
 
@@ -423,4 +422,3 @@ dotnet run --project examples/SemanticKernelConnectorExample/SemanticKernelConne
 - [Getting Started](../docs-site/modules/ROOT/pages/getting-started/index.adoc)
 - [Examples](../docs-site/modules/ROOT/pages/examples/index.adoc)
 - [Testing](../docs-site/modules/ROOT/pages/testing/index.adoc)
-- [CLI](../docs-site/modules/ROOT/pages/cli/index.adoc)

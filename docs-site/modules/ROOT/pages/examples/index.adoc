@@ -71,11 +71,6 @@ Examples that use JSON storage also require RedisJSON. Provider-backed examples 
 | xref:../extensions/cohere-reranker.adoc[Cohere Reranker]
 | `/examples/CohereRerankerExample`
 | RediSearch + RedisJSON. Requires `COHERE_API_KEY`. Optional `COHERE_RERANK_MODEL` and `REDIS_VL_REDIS_URL`.
-
-| CLI workflows
-| xref:../cli/index.adoc[CLI]
-| `dotnet run --project src/RedisVL.Cli -- ...`
-| Index commands require RediSearch plus `--redis` or `REDIS_VL_REDIS_URL`. JSON-backed index creation also requires RedisJSON. Schema commands run locally without Redis.
 |===
 
 == Build validation

@@ -7,7 +7,6 @@ This section holds repository-oriented reference pointers until the API and beha
 Use these locations when navigating the codebase:
 
 * `src/RedisVL` for the core library
-* `src/RedisVL.Cli` for the command-line app
 * `src/RedisVL.Vectorizers.*` for vectorizer abstractions and providers
 * `src/RedisVL.Rerankers.*` for reranker abstractions and providers
 * `tests/RedisVL.Tests` for unit and integration coverage

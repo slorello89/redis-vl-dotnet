@@ -138,7 +138,6 @@ Query pagination is shared across the search APIs, and typed result mapping is d
 * xref:core-features/vector-query.adoc[VectorQuery] for vector search and runtime tuning
 * xref:core-features/aggregation-workflows.adoc[Aggregation workflows] for grouping and typed aggregate results
 * xref:../examples/index.adoc[Examples] for runnable coverage
-* xref:../cli/index.adoc[CLI] for terminal-oriented schema and index operations
 * xref:core-features/embeddings-cache.adoc[EmbeddingsCache] for exact embedding reuse
 * xref:core-features/semantic-cache.adoc[SemanticCache] for semantic response reuse
 * xref:core-features/semantic-router.adoc[SemanticRouter] for nearest-route matching
