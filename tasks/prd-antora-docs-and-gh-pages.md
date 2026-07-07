@@ -44,7 +44,7 @@ The goal is documentation and documentation infrastructure. This PRD does not ch
 
 **Acceptance Criteria:**
 - [ ] Add a getting-started page covering .NET SDK requirements, Redis prerequisites, Redis local startup, and current package/reference setup.
-- [ ] Document which features require RediSearch, RedisJSON, vector similarity support, cluster nodes, or Sentinel nodes.
+- [ ] Document which features require RediSearch, RedisJSON, vector similarity support, or cluster nodes.
 - [ ] Document required environment variables for Redis connectivity and provider integrations.
 - [ ] Include copy-paste-ready commands for the default local setup flow.
 - [ ] The page links to the relevant example and testing pages.

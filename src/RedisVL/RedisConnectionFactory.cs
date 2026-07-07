@@ -5,41 +5,6 @@ namespace RedisVL;
 public static class RedisConnectionFactory
 {
     private const int DefaultRedisPort = 6379;
-    private const int DefaultSentinelPort = 26379;
-
-    public static ConfigurationOptions CreateSentinelOptions(
-        string sentinelNodes,
-        string serviceName,
-        Action<ConfigurationOptions>? configure = null)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(sentinelNodes);
-        return CreateSentinelOptions(SplitNodes(sentinelNodes), serviceName, configure);
-    }
-
-    public static ConfigurationOptions CreateSentinelOptions(
-        IEnumerable<string> sentinelNodes,
-        string serviceName,
-        Action<ConfigurationOptions>? configure = null)
-    {
-        var normalizedSentinelNodes = NormalizeNodes(sentinelNodes, "sentinel");
-        var options = new ConfigurationOptions
-        {
-            AbortOnConnectFail = false,
-            CommandMap = CommandMap.Sentinel,
-            ServiceName = serviceName,
-            TieBreaker = string.Empty,
-        };
-
-        foreach (var sentinelNode in normalizedSentinelNodes)
-        {
-            AddNode(options, sentinelNode, "sentinel", DefaultSentinelPort);
-        }
-
-        configure?.Invoke(options);
-        ValidateSentinelOptions(options);
-
-        return options;
-    }
 
     public static ConfigurationOptions CreateClusterOptions(
         string seedNodes,
@@ -69,49 +34,6 @@ public static class RedisConnectionFactory
         ValidateClusterOptions(options);
 
         return options;
-    }
-
-    public static Task<IConnectionMultiplexer> ConnectSentinelAsync(
-        string sentinelNodes,
-        string serviceName,
-        Action<ConfigurationOptions>? configure = null,
-        CancellationToken cancellationToken = default) =>
-        ConnectSentinelAsync(SplitNodes(sentinelNodes), serviceName, configure, cancellationToken);
-
-    public static async Task<IConnectionMultiplexer> ConnectSentinelAsync(
-        IEnumerable<string> sentinelNodes,
-        string serviceName,
-        Action<ConfigurationOptions>? configure = null,
-        CancellationToken cancellationToken = default)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-
-        var options = CreateSentinelOptions(sentinelNodes, serviceName, configure);
-        return await ConnectionMultiplexer.SentinelConnectAsync(options)
-            .WaitAsync(cancellationToken)
-            .ConfigureAwait(false);
-    }
-
-    public static Task<IConnectionMultiplexer> ConnectSentinelPrimaryAsync(
-        string sentinelNodes,
-        string serviceName,
-        Action<ConfigurationOptions>? configure = null,
-        CancellationToken cancellationToken = default) =>
-        ConnectSentinelPrimaryAsync(SplitNodes(sentinelNodes), serviceName, configure, cancellationToken);
-
-    public static async Task<IConnectionMultiplexer> ConnectSentinelPrimaryAsync(
-        IEnumerable<string> sentinelNodes,
-        string serviceName,
-        Action<ConfigurationOptions>? configure = null,
-        CancellationToken cancellationToken = default)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-
-        var options = CreateSentinelOptions(sentinelNodes, serviceName, configure);
-        var sentinel = await ConnectionMultiplexer.SentinelConnectAsync(options)
-            .WaitAsync(cancellationToken)
-            .ConfigureAwait(false);
-        return sentinel.GetSentinelMasterConnection(options);
     }
 
     public static Task<IConnectionMultiplexer> ConnectClusterAsync(
@@ -235,28 +157,6 @@ public static class RedisConnectionFactory
         }
 
         return true;
-    }
-
-    private static void ValidateSentinelOptions(ConfigurationOptions options)
-    {
-        ArgumentNullException.ThrowIfNull(options);
-
-        if (options.EndPoints.Count == 0)
-        {
-            throw new ArgumentException("At least one Redis sentinel node is required.", nameof(options));
-        }
-
-        if (string.IsNullOrWhiteSpace(options.ServiceName))
-        {
-            throw new ArgumentException("Redis Sentinel connections require a non-empty service name.", nameof(options));
-        }
-
-        if (!ReferenceEquals(options.CommandMap, CommandMap.Sentinel))
-        {
-            throw new ArgumentException(
-                "Redis Sentinel connections must use CommandMap.Sentinel.",
-                nameof(options));
-        }
     }
 
     private static void ValidateClusterOptions(ConfigurationOptions options)

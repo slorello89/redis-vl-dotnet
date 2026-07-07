@@ -192,13 +192,12 @@ var hit = await cache.CheckAsync(prompt: "How do I reset my password?", embeddin
 Console.WriteLine(hit?.Response);
 ```
 
-## Connecting to cluster or Sentinel
+## Connecting to a cluster
 
-`RedisVL` operates on a StackExchange.Redis `IDatabase`, so any connection you can build works. For cluster and Sentinel topologies, the `RedisConnectionFactory` helpers normalize seed-node lists and build `ConfigurationOptions` for you:
+`RedisVL` operates on a StackExchange.Redis `IDatabase`, so any connection you can build works. For cluster topologies, the `RedisConnectionFactory` helpers normalize seed-node lists and build `ConfigurationOptions` for you:
 
 - `ConnectClusterAsync(...)` — cluster discovery
-- `ConnectSentinelPrimaryAsync(...)` — Sentinel primary discovery
-- `CreateClusterOptions(...)` / `CreateSentinelOptions(...)` — parsed option builders
+- `CreateClusterOptions(...)` — parsed option builder
 
 ## Examples
 

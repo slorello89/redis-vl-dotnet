@@ -9,7 +9,7 @@ All examples currently assume:
 - .NET 9 SDK
 - Redis 8 or another Redis deployment with RediSearch enabled
 - `REDIS_VL_REDIS_URL` set when Redis is not reachable at `localhost:6379`
-- `REDIS_VL_REDIS_CLUSTER_NODES` or `REDIS_VL_REDIS_SENTINEL_NODES` plus `REDIS_VL_REDIS_SENTINEL_SERVICE_NAME` when you want the JSON example to use cluster or Sentinel discovery instead of a direct endpoint
+- `REDIS_VL_REDIS_CLUSTER_NODES` when you want the JSON example to use cluster discovery instead of a direct endpoint
 
 Examples that use JSON storage also require RedisJSON support.
 
@@ -28,7 +28,7 @@ Use this map when you want the fastest path to a parity feature area:
 
 | Feature area | Antora entry point | Example or command | Runtime requirements |
 | --- | --- | --- | --- |
-| Advanced schema options, YAML loading, from-existing index, index listing, JSON partial updates, `TextQuery`, aggregation, clear helper | [Core Features](../docs-site/modules/ROOT/pages/core-features/index.adoc) | [JsonStorageExample](./JsonStorageExample/README.md) | RediSearch + RedisJSON. Supports `REDIS_VL_REDIS_URL`, `REDIS_VL_REDIS_CLUSTER_NODES`, or `REDIS_VL_REDIS_SENTINEL_NODES` plus `REDIS_VL_REDIS_SENTINEL_SERVICE_NAME` |
+| Advanced schema options, YAML loading, from-existing index, index listing, JSON partial updates, `TextQuery`, aggregation, clear helper | [Core Features](../docs-site/modules/ROOT/pages/core-features/index.adoc) | [JsonStorageExample](./JsonStorageExample/README.md) | RediSearch + RedisJSON. Supports `REDIS_VL_REDIS_URL` or `REDIS_VL_REDIS_CLUSTER_NODES` |
 | Vector query basics, runtime vector search tuning, `MultiVectorQuery`, aggregate hybrid search, HASH partial updates | [Core Features](../docs-site/modules/ROOT/pages/core-features/index.adoc) | [VectorSearchExample](./VectorSearchExample/README.md) | RediSearch with vector similarity support and optional `REDIS_VL_REDIS_URL` |
 | SVS-VAMANA vector index, vector compression (LVQ/LeanVec), SVS query-time runtime knobs | [Field Definitions](../docs-site/modules/ROOT/pages/core-features/field-definitions.adoc) | [SvsVamanaExample](./SvsVamanaExample/README.md) | Redis 8.x with RediSearch vector support and optional `REDIS_VL_REDIS_URL` |
 | Native `FT.HYBRID` hybrid search, linear/RRF fusion, vector pre-filter, typed mapping | [HybridSearchQuery](../docs-site/modules/ROOT/pages/core-features/hybrid-search-query.adoc) | [HybridSearchExample](./HybridSearchExample/README.md) | Redis 8.4+ with RediSearch and optional `REDIS_VL_REDIS_URL` |
