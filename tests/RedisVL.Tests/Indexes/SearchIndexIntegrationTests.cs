@@ -1230,6 +1230,82 @@ public sealed class SearchIndexIntegrationTests
     }
 
     [RedisSearchIntegrationFact]
+    public async Task ExecutesVectorQueriesWithCompoundFilters()
+    {
+        await using var connection = await RedisSearchTestEnvironment.ConnectAsync();
+        var database = connection.GetDatabase();
+
+        var token = Guid.NewGuid().ToString("N");
+        var schema = new SearchSchema(
+            new IndexDefinition($"vector-compound-idx-{token}", $"vector-compound:{token}:", StorageType.Hash),
+            [
+                new TagFieldDefinition("genre"),
+                new TextFieldDefinition("title"),
+                new VectorFieldDefinition(
+                    "embedding",
+                    new VectorFieldAttributes(
+                        VectorAlgorithm.Flat,
+                        VectorDataType.Float32,
+                        VectorDistanceMetric.Cosine,
+                        2))
+            ]);
+        var index = new SearchIndex(database, schema);
+
+        try
+        {
+            await index.CreateAsync();
+            await SeedHashDocumentsAsync(database, schema, SearchIndexSeedData.VectorMovies);
+            await RedisSearchTestEnvironment.WaitForIndexDocumentCountAsync(index, SearchIndexSeedData.VectorMovies.Count);
+
+            // AND: crime genre AND title matching "heat" -> only "Heat" (doc 1).
+            var andResults = await index.SearchAsync(VectorQuery.FromFloat32(
+                "embedding",
+                [1f, 0f],
+                3,
+                Filter.Tag("genre").Eq("crime") & Filter.Text("title").Match("heat"),
+                ["title", "genre"],
+                scoreAlias: "distance"));
+
+            Assert.Equal($"{schema.Index.Prefix}1", Assert.Single(andResults.Documents).Id);
+
+            // OR: science-fiction genre OR title matching "thief" -> "Thief" (doc 2) and "Arrival" (doc 3),
+            // ordered by ascending distance from [1, 0].
+            var orResults = await index.SearchAsync(VectorQuery.FromFloat32(
+                "embedding",
+                [1f, 0f],
+                3,
+                Filter.Tag("genre").Eq("science-fiction") | Filter.Text("title").Match("thief"),
+                ["title", "genre"],
+                scoreAlias: "distance"));
+
+            Assert.Equal(2, orResults.Documents.Count);
+            Assert.Equal(
+                [$"{schema.Index.Prefix}2", $"{schema.Index.Prefix}3"],
+                orResults.Documents.Select(document => document.Id).ToArray());
+
+            // NOT: everything that is not crime -> only "Arrival" (doc 3).
+            var notResults = await index.SearchAsync(VectorQuery.FromFloat32(
+                "embedding",
+                [1f, 0f],
+                3,
+                Filter.Not(Filter.Tag("genre").Eq("crime")),
+                ["title", "genre"],
+                scoreAlias: "distance"));
+
+            var notDocument = Assert.Single(notResults.Documents);
+            Assert.Equal($"{schema.Index.Prefix}3", notDocument.Id);
+            Assert.Equal("Arrival", notDocument.Values["title"]);
+        }
+        finally
+        {
+            if (await index.ExistsAsync())
+            {
+                await index.DropAsync(deleteDocuments: true);
+            }
+        }
+    }
+
+    [RedisSearchIntegrationFact]
     public async Task ExecutesVectorQueriesAcrossPages()
     {
         await using var connection = await RedisSearchTestEnvironment.ConnectAsync();
