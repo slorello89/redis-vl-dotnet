@@ -140,7 +140,7 @@ public sealed class SemanticMessageHistoryTests
         var matches = await history.GetRelevantAsync("session-1", [1f, 0f], limit: 2, role: "assistant", distanceThreshold: 0.2d);
 
         Assert.Equal("FT.SEARCH", recorder.ExecuteAsyncCalls[0].Command);
-        Assert.Equal("@sessionId:{session\\-1} @role:{assistant} @embedding:[VECTOR_RANGE 0.2 $vector]=>{$YIELD_DISTANCE_AS: distance}", recorder.ExecuteAsyncCalls[0].Arguments[1]);
+        Assert.Equal("(@sessionId:{session\\-1} @role:{assistant}) @embedding:[VECTOR_RANGE 0.2 $vector]=>{$YIELD_DISTANCE_AS: distance}", recorder.ExecuteAsyncCalls[0].Arguments[1]);
         Assert.Contains("SORTBY", recorder.ExecuteAsyncCalls[0].Arguments);
         Assert.Contains("distance", recorder.ExecuteAsyncCalls[0].Arguments);
         Assert.Equal(["refund status", "billing help"], matches.Select(static match => match.Message.Content).ToArray());

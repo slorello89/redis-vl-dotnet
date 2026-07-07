@@ -412,7 +412,7 @@ internal static class SearchQueryCommandBuilder
 
         return string.IsNullOrWhiteSpace(filter)
             ? vectorClause
-            : $"{filter} {vectorClause}";
+            : $"({filter}) {vectorClause}";
     }
 
     private static VectorFieldDefinition ResolveVectorField(SearchSchema schema, string fieldName)

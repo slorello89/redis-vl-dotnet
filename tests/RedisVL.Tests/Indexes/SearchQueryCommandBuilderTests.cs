@@ -415,7 +415,7 @@ public sealed class SearchQueryCommandBuilderTests
         var rendered = arguments.Select(RenderArgument).ToArray();
 
         Assert.Equal("movies-idx", rendered[0]);
-        Assert.Equal("@genre:{crime} @embedding:[VECTOR_RANGE 0.3 $vector]=>{$YIELD_DISTANCE_AS: distance; $EPSILON: $epsilon}", rendered[1]);
+        Assert.Equal("(@genre:{crime}) @embedding:[VECTOR_RANGE 0.3 $vector]=>{$YIELD_DISTANCE_AS: distance; $EPSILON: $epsilon}", rendered[1]);
         Assert.Equal(
             [
                 "PARAMS", "4", "vector", "<binary>", "epsilon", "0.05",
@@ -425,6 +425,39 @@ public sealed class SearchQueryCommandBuilderTests
                 "DIALECT", "2"
             ],
             rendered[2..]);
+    }
+
+    [Fact]
+    public void ParenthesizesTopLevelOrFilterInVectorRangeQuery()
+    {
+        var schema = new SearchSchema(
+            new IndexDefinition("movies-idx", "movie:", StorageType.Hash),
+            [
+                new TagFieldDefinition("genre"),
+                new VectorFieldDefinition(
+                    "embedding",
+                    new VectorFieldAttributes(
+                        VectorAlgorithm.Flat,
+                        VectorDataType.Float32,
+                        VectorDistanceMetric.Cosine,
+                        2))
+            ]);
+        var query = VectorRangeQuery.FromFloat32(
+            "embedding",
+            [1f, 0f],
+            0.3,
+            Filter.Tag("genre").Eq("crime") | Filter.Tag("genre").Eq("drama"),
+            scoreAlias: "distance");
+
+        var arguments = SearchQueryCommandBuilder.BuildVectorRangeArguments(schema, query);
+        var rendered = arguments.Select(RenderArgument).ToArray();
+
+        // The filter must be parenthesized so the VECTOR_RANGE clause applies to the
+        // whole OR expression. Without parens, DIALECT 2 precedence parses this as
+        // `A | (B AND range)`, silently returning out-of-range documents via the left branch.
+        Assert.Equal(
+            "(@genre:{crime} | @genre:{drama}) @embedding:[VECTOR_RANGE 0.3 $vector]=>{$YIELD_DISTANCE_AS: distance}",
+            rendered[1]);
     }
 
     [Fact]
