@@ -1,3 +1,5 @@
+using System.Collections.Concurrent;
+using System.Globalization;
 using System.Runtime.InteropServices;
 using System.Text.Json.Serialization;
 using RedisVL.Queries;
@@ -177,11 +179,65 @@ public sealed class SearchResultMappingTests
         Assert.Contains("aggregation result", exception.Message, StringComparison.OrdinalIgnoreCase);
     }
 
+    [Fact]
+    public void MapsConcurrentlyWithoutRacingOnSharedMetadata()
+    {
+        // The mapper previously shared a single NullabilityInfoContext (documented as not thread-safe)
+        // and recomputed reflection metadata per document. Mapping a cold-cache type from many threads
+        // at once exercises the concurrent metadata build; it must produce correct results and never throw.
+        const int documentCount = 4_000;
+        var documents = Enumerable.Range(0, documentCount)
+            .Select(i => new SearchDocument(
+                $"movie:{i}",
+                new Dictionary<string, RedisValue>(StringComparer.Ordinal)
+                {
+                    ["title"] = $"Movie {i}",
+                    ["year"] = (1900 + (i % 200)).ToString(CultureInfo.InvariantCulture),
+                    ["distance"] = "0.5",
+                    ["tagline"] = i % 2 == 0 ? "A tag" : RedisValue.Null,
+                    ["featured"] = (i % 2 == 0).ToString()
+                }))
+            .ToArray();
+
+        var mapped = new ConcurrentMovieProjection?[documentCount];
+        var failures = new ConcurrentQueue<Exception>();
+
+        Parallel.For(0, documentCount, index =>
+        {
+            try
+            {
+                mapped[index] = documents[index].Map<ConcurrentMovieProjection>();
+            }
+            catch (Exception exception)
+            {
+                failures.Enqueue(exception);
+            }
+        });
+
+        Assert.Empty(failures);
+        for (var i = 0; i < documentCount; i++)
+        {
+            Assert.NotNull(mapped[i]);
+            Assert.Equal($"movie:{i}", mapped[i]!.Id);
+            Assert.Equal($"Movie {i}", mapped[i]!.Title);
+            Assert.Equal(1900 + (i % 200), mapped[i]!.Year);
+            Assert.Equal(0.5d, mapped[i]!.Distance);
+        }
+    }
+
     private sealed record MovieProjection(
         string Id,
         string Title,
         int Year,
         [property: JsonPropertyName("distance")] double Distance);
+
+    private sealed record ConcurrentMovieProjection(
+        string Id,
+        string Title,
+        int Year,
+        [property: JsonPropertyName("distance")] double Distance,
+        string? Tagline,
+        bool Featured);
 
     private sealed record NestedMovieProjection(string Title, MovieMetadata Metadata);
 

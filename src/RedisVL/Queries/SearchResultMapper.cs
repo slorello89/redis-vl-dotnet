@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Globalization;
 using System.Reflection;
 using System.Runtime.InteropServices;
@@ -10,7 +11,12 @@ namespace RedisVL.Queries;
 internal static class SearchResultMapper
 {
     private static readonly JsonSerializerOptions DefaultSerializerOptions = new(JsonSerializerDefaults.Web);
-    private static readonly NullabilityInfoContext NullabilityContext = new();
+
+    // Per-type property metadata is computed once and reused across every mapped document. This removes
+    // the per-row reflection/nullability cost from the hot path and, critically, avoids sharing a
+    // NullabilityInfoContext across threads — that type is documented as not thread-safe, so a fresh,
+    // thread-confined context is created inside the value factory (below) instead.
+    private static readonly ConcurrentDictionary<MetadataCacheKey, IReadOnlyList<PropertyMetadata>> MetadataCache = new();
 
     public static TDocument Map<TDocument>(SearchDocument document, JsonSerializerOptions? serializerOptions = null)
     {
@@ -268,8 +274,16 @@ internal static class SearchResultMapper
         }
     }
 
-    private static IReadOnlyList<PropertyMetadata> GetPropertyMetadata(Type documentType, JsonSerializerOptions serializerOptions)
+    private static IReadOnlyList<PropertyMetadata> GetPropertyMetadata(Type documentType, JsonSerializerOptions serializerOptions) =>
+        MetadataCache.GetOrAdd(
+            new MetadataCacheKey(documentType, serializerOptions),
+            static key => BuildPropertyMetadata(key.DocumentType, key.SerializerOptions));
+
+    private static IReadOnlyList<PropertyMetadata> BuildPropertyMetadata(Type documentType, JsonSerializerOptions serializerOptions)
     {
+        // Confined to this call: NullabilityInfoContext is not thread-safe, and ConcurrentDictionary
+        // may invoke this factory on multiple threads for distinct types, so each build owns its context.
+        var nullabilityContext = new NullabilityInfoContext();
         var properties = new List<PropertyMetadata>();
         foreach (var property in documentType.GetProperties(BindingFlags.Public | BindingFlags.Instance))
         {
@@ -293,20 +307,20 @@ internal static class SearchResultMapper
                     property.Name,
                     jsonName,
                     [.. sourceNames],
-                    IsRequired(property)));
+                    IsRequired(property, nullabilityContext)));
         }
 
         return properties;
     }
 
-    private static bool IsRequired(PropertyInfo property)
+    private static bool IsRequired(PropertyInfo property, NullabilityInfoContext nullabilityContext)
     {
-        var nullability = NullabilityContext.Create(property);
         if (property.PropertyType.IsValueType && Nullable.GetUnderlyingType(property.PropertyType) is null)
         {
             return true;
         }
 
+        var nullability = nullabilityContext.Create(property);
         return nullability.WriteState == NullabilityState.NotNull || nullability.ReadState == NullabilityState.NotNull;
     }
 
@@ -321,6 +335,10 @@ internal static class SearchResultMapper
         string JsonName,
         IReadOnlyList<string> SourceNames,
         bool IsRequired);
+
+    // JsonSerializerOptions uses reference equality, so distinct callers that reuse the same options
+    // instance (the common case) share a cache entry; ad-hoc options instances get their own.
+    private readonly record struct MetadataCacheKey(Type DocumentType, JsonSerializerOptions SerializerOptions);
 }
 
 public sealed class SearchResultMappingException : InvalidOperationException
