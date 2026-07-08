@@ -79,7 +79,7 @@ public sealed class SemanticMessageHistoryTests
             new { sentiment = "positive" },
             timestamp);
 
-        var sessionHash = Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes("session-1")));
+        var sessionHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes("session-1"))).ToLowerInvariant();
 
         Assert.Equal("hello world", generator.LastInput);
         Assert.Equal($"semantic-message-history:unit-history:tests:msg:{sessionHash}:00000000000000000007", key);

@@ -35,7 +35,10 @@ jobs:
       - name: Set up .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: 9.0.x
+          dotnet-version: |
+            8.0.x
+            9.0.x
+            10.0.x
 
       - name: Restore solution
         run: dotnet restore redis-vl-dotnet.sln
@@ -44,7 +47,14 @@ jobs:
         run: dotnet build redis-vl-dotnet.sln --configuration Release --no-restore
 
       - name: Test solution
-        run: dotnet test redis-vl-dotnet.sln --configuration Release --no-build --verbosity normal
+        # Run each target framework's test host sequentially (the test project multi-targets
+        # net8.0/net9.0/net10.0); concurrent runs against the shared Redis service flake.
+        run: |
+          for tfm in net8.0 net9.0 net10.0; do
+            echo "::group::Test $tfm"
+            dotnet test redis-vl-dotnet.sln --configuration Release --no-build --framework "$tfm" --verbosity normal
+            echo "::endgroup::"
+          done
 
       - name: Pack publishable projects
         # Packs every project with <IsPackable>true</IsPackable> (see Directory.Build.props),

@@ -75,6 +75,11 @@ internal sealed class RedisVLFilterTranslator
                 ? (call.Arguments[0], call.Arguments[1])
                 : (call.Object, call.Arguments[0]);
 
+            // On .NET 10, `array.Contains(x)` binds to MemoryExtensions.Contains, which wraps the
+            // collection in an implicit ReadOnlySpan<T> conversion. That span is a ref struct we
+            // cannot evaluate, so peel the conversion back to the underlying collection expression.
+            source = UnwrapSpanConversion(source);
+
             // record.TagField.Contains(constant) -> membership in the tag set.
             if (TryGetProperty(source, out var collectionProperty))
             {
@@ -184,6 +189,21 @@ internal sealed class RedisVLFilterTranslator
         expression is UnaryExpression { NodeType: ExpressionType.Convert or ExpressionType.ConvertChecked } convert
             ? Unwrap(convert.Operand)
             : expression;
+
+    // Peels an implicit/explicit conversion to ReadOnlySpan<T>/Span<T> (e.g. the string[] ->
+    // ReadOnlySpan<string> conversion .NET 10 inserts for MemoryExtensions.Contains) back to the
+    // underlying collection expression so it can be evaluated as an IEnumerable.
+    private static Expression UnwrapSpanConversion(Expression expression) =>
+        expression is MethodCallExpression { Method.IsSpecialName: true, Arguments.Count: 1 } call
+        && call.Method.Name is "op_Implicit" or "op_Explicit"
+        && IsSpanType(call.Type)
+            ? call.Arguments[0]
+            : expression;
+
+    private static bool IsSpanType(Type type) =>
+        type.IsGenericType
+        && (type.GetGenericTypeDefinition() == typeof(ReadOnlySpan<>)
+            || type.GetGenericTypeDefinition() == typeof(Span<>));
 
     private object? Evaluate(Expression expression)
     {

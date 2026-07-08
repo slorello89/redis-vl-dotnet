@@ -66,7 +66,10 @@ jobs:
 
       - uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: 9.0.x
+          dotnet-version: |
+            8.0.x
+            9.0.x
+            10.0.x
 
       - name: Restore
         run: dotnet restore redis-vl-dotnet.sln
@@ -75,4 +78,12 @@ jobs:
         run: dotnet build redis-vl-dotnet.sln --no-restore
 
       - name: Test
-        run: dotnet test redis-vl-dotnet.sln --no-build --verbosity normal
+        # Run each target framework's test host sequentially. The test project multi-targets
+        # net8.0/net9.0/net10.0, and letting `dotnet test` run them concurrently against the single
+        # shared Redis service makes the integration tests flake, so drive one TFM at a time.
+        run: |
+          for tfm in net8.0 net9.0 net10.0; do
+            echo "::group::Test $tfm"
+            dotnet test redis-vl-dotnet.sln --no-build --framework "$tfm" --verbosity normal
+            echo "::endgroup::"
+          done

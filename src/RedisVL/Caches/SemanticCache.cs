@@ -474,7 +474,7 @@ public sealed class SemanticCache
     internal RedisKey CreateKey(string prompt, IReadOnlyDictionary<string, RedisValue>? filterValues = null)
     {
         var hashInput = CreateCacheIdentityPayload(prompt, filterValues);
-        var hash = Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(hashInput)));
+        var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(hashInput))).ToLowerInvariant();
         return $"{CreateKeyPrefix(Options)}{hash}";
     }
 

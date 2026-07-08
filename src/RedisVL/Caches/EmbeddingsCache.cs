@@ -492,7 +492,7 @@ public sealed class EmbeddingsCache
         var identity = string.IsNullOrEmpty(modelName)
             ? input
             : string.Concat(input, KeyHashSeparator, modelName);
-        var hash = Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(identity)));
+        var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(identity))).ToLowerInvariant();
         return string.IsNullOrEmpty(KeyNamespace)
             ? $"embeddings:{Name}:{hash}"
             : $"embeddings:{Name}:{KeyNamespace}:{hash}";
