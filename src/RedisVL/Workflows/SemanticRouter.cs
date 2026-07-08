@@ -565,7 +565,7 @@ public sealed class SemanticRouter
 
     internal RedisKey CreateKey(string routeName, string reference)
     {
-        var hash = Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes($"{routeName}\n{reference}")));
+        var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes($"{routeName}\n{reference}"))).ToLowerInvariant();
         return $"{CreateKeyPrefix(Options)}{hash}";
     }
 

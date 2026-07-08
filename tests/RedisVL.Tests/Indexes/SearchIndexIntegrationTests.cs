@@ -775,7 +775,10 @@ public sealed class SearchIndexIntegrationTests
             Assert.Equal(2, tagResults.TotalCount);
             Assert.Equal(
                 [$"{schema.Index.Prefix}1", $"{schema.Index.Prefix}2"],
-                tagResults.Documents.Select(static document => document.Id).ToArray());
+                tagResults.Documents
+                    .Select(static document => document.Id)
+                    .OrderBy(static id => id, StringComparer.Ordinal)
+                    .ToArray());
             Assert.Equal(2, numericResults.TotalCount);
             Assert.Equal(
                 [$"{schema.Index.Prefix}1", $"{schema.Index.Prefix}3"],
@@ -1267,8 +1270,8 @@ public sealed class SearchIndexIntegrationTests
             Assert.Equal($"{schema.Index.Prefix}2", results.Documents[1].Id);
             Assert.Equal("Heat", results.Documents[0].Values["title"]);
             Assert.Equal("Thief", results.Documents[1].Values["title"]);
-            Assert.True(double.Parse(results.Documents[0].Values["distance"]!, System.Globalization.CultureInfo.InvariantCulture) <
-                        double.Parse(results.Documents[1].Values["distance"]!, System.Globalization.CultureInfo.InvariantCulture));
+            Assert.True(double.Parse(results.Documents[0].Values["distance"].ToString(), System.Globalization.CultureInfo.InvariantCulture) <
+                        double.Parse(results.Documents[1].Values["distance"].ToString(), System.Globalization.CultureInfo.InvariantCulture));
         }
         finally
         {
@@ -1511,8 +1514,8 @@ public sealed class SearchIndexIntegrationTests
             Assert.Equal($"{schema.Index.Prefix}2", results.Documents[1].Id);
             Assert.Equal("Heat", results.Documents[0].Values["title"]);
             Assert.Equal("Heatwave", results.Documents[1].Values["title"]);
-            Assert.True(double.Parse(results.Documents[0].Values["distance"]!, System.Globalization.CultureInfo.InvariantCulture) <
-                        double.Parse(results.Documents[1].Values["distance"]!, System.Globalization.CultureInfo.InvariantCulture));
+            Assert.True(double.Parse(results.Documents[0].Values["distance"].ToString(), System.Globalization.CultureInfo.InvariantCulture) <
+                        double.Parse(results.Documents[1].Values["distance"].ToString(), System.Globalization.CultureInfo.InvariantCulture));
         }
         finally
         {
@@ -1567,8 +1570,8 @@ public sealed class SearchIndexIntegrationTests
             Assert.Equal($"{schema.Index.Prefix}2", results.Documents[1].Id);
             Assert.Equal("Heat", results.Documents[0].Values["title"]);
             Assert.Equal("Thief", results.Documents[1].Values["title"]);
-            Assert.True(double.Parse(results.Documents[0].Values["distance"]!, System.Globalization.CultureInfo.InvariantCulture) <
-                        double.Parse(results.Documents[1].Values["distance"]!, System.Globalization.CultureInfo.InvariantCulture));
+            Assert.True(double.Parse(results.Documents[0].Values["distance"].ToString(), System.Globalization.CultureInfo.InvariantCulture) <
+                        double.Parse(results.Documents[1].Values["distance"].ToString(), System.Globalization.CultureInfo.InvariantCulture));
         }
         finally
         {
@@ -1633,7 +1636,7 @@ public sealed class SearchIndexIntegrationTests
             {
                 Assert.True(document.Values.TryGetValue("distance", out var distanceValue) && !distanceValue.IsNull,
                     $"Document '{document.Id}' was returned without a distance score.");
-                var distance = double.Parse(distanceValue!, System.Globalization.CultureInfo.InvariantCulture);
+                var distance = double.Parse(distanceValue.ToString(), System.Globalization.CultureInfo.InvariantCulture);
                 Assert.True(distance <= distanceThreshold,
                     $"Document '{document.Id}' has distance {distance}, exceeding threshold {distanceThreshold}.");
             }
@@ -1759,7 +1762,7 @@ public sealed class SearchIndexIntegrationTests
             Assert.Equal("Boot", results.Documents[2].Values["title"]);
 
             var scores = results.Documents
-                .Select(document => double.Parse(document.Values["combined_distance"]!, System.Globalization.CultureInfo.InvariantCulture))
+                .Select(document => double.Parse(document.Values["combined_distance"].ToString(), System.Globalization.CultureInfo.InvariantCulture))
                 .ToArray();
 
             Assert.True(scores[0] < scores[1]);
@@ -1960,7 +1963,7 @@ public sealed class SearchIndexIntegrationTests
                 Assert.False(document.Values.ContainsKey(HybridSearchQuery.KeyField));
                 Assert.True(document.Values.ContainsKey(HybridSearchQuery.ScoreField));
                 Assert.True(double.TryParse(
-                    document.Values[HybridSearchQuery.ScoreField]!,
+                    document.Values[HybridSearchQuery.ScoreField].ToString(),
                     System.Globalization.NumberStyles.Float,
                     System.Globalization.CultureInfo.InvariantCulture,
                     out var score));

@@ -19,7 +19,7 @@ It is the .NET sibling of [redis-vl-python](https://github.com/redis/redis-vl-py
 
 ## Requirements
 
-- .NET 9 SDK
+- A supported .NET runtime: the packages multi-target **.NET 8 (LTS)**, **.NET 9**, and **.NET 10 (LTS)**.
 - A Redis deployment with the Redis Query Engine (`RediSearch`) module — [Redis 8](https://redis.io/docs/latest/operate/oss_and_stack/) or [Redis Cloud](https://redis.io/cloud/).
 - `RedisJSON` for JSON-backed document workflows (included in Redis 8).
 - Redis 8.4+ for native `FT.HYBRID` hybrid search.

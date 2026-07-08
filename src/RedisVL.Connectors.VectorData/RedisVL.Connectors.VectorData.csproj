@@ -1,7 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net9.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <Description>Microsoft.Extensions.VectorData (MEVD) vector-store connector for redis-vl-dotnet. Exposes RedisVL SearchIndex as a VectorStore / VectorStoreCollection consumable by Semantic Kernel and the Microsoft.Extensions.AI ecosystem.</Description>

@@ -254,7 +254,7 @@ public sealed class MessageHistory
             : $"message-history:{options.Name}:{options.KeyNamespace}:seq:";
 
     private static string HashSessionId(string sessionId) =>
-        Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(sessionId)));
+        Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(sessionId))).ToLowerInvariant();
 
     private static string NormalizeSessionId(string sessionId)
     {
