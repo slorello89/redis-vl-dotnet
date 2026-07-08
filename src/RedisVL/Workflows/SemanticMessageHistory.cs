@@ -49,41 +49,14 @@ public sealed class SemanticMessageHistory
 
     public double DistanceThreshold => Options.DistanceThreshold;
 
-    public bool Create(CreateIndexOptions? options = null) =>
-        CreateAsync(options).GetAwaiter().GetResult();
-
     public Task<bool> CreateAsync(CreateIndexOptions? options = null, CancellationToken cancellationToken = default) =>
         _index.CreateAsync(options, cancellationToken);
-
-    public bool Exists() =>
-        ExistsAsync().GetAwaiter().GetResult();
 
     public Task<bool> ExistsAsync(CancellationToken cancellationToken = default) =>
         _index.ExistsAsync(cancellationToken);
 
-    public void Drop(bool deleteDocuments = false) =>
-        DropAsync(deleteDocuments).GetAwaiter().GetResult();
-
     public Task DropAsync(bool deleteDocuments = false, CancellationToken cancellationToken = default) =>
         _index.DropAsync(deleteDocuments, cancellationToken);
-
-    public string Append(
-        string sessionId,
-        string role,
-        string content,
-        float[] embedding,
-        object? metadata = null,
-        DateTimeOffset? timestamp = null) =>
-        AppendAsync(sessionId, role, content, embedding, metadata, timestamp).GetAwaiter().GetResult();
-
-    public string Append(
-        string sessionId,
-        string role,
-        string content,
-        ITextVectorizer vectorizer,
-        object? metadata = null,
-        DateTimeOffset? timestamp = null) =>
-        AppendAsync(sessionId, role, content, vectorizer, metadata, timestamp).GetAwaiter().GetResult();
 
     public async Task<string> AppendAsync(
         string sessionId,
@@ -143,12 +116,6 @@ public sealed class SemanticMessageHistory
         return await AppendAsync(sessionId, role, normalizedContent, embedding, metadata, timestamp, cancellationToken).ConfigureAwait(false);
     }
 
-    public IReadOnlyList<MessageHistoryMessage> GetRecent(
-        string sessionId,
-        int limit = 10,
-        string? role = null) =>
-        GetRecentAsync(sessionId, limit, role).GetAwaiter().GetResult();
-
     public async Task<IReadOnlyList<MessageHistoryMessage>> GetRecentAsync(
         string sessionId,
         int limit = 10,
@@ -168,23 +135,6 @@ public sealed class SemanticMessageHistory
             .ThenByDescending(static message => message.Timestamp)
             .ToArray();
     }
-
-    public IReadOnlyList<SemanticMessageHistoryMatch> GetRelevant(
-        string sessionId,
-        float[] embedding,
-        int limit = 5,
-        string? role = null,
-        double? distanceThreshold = null) =>
-        GetRelevantAsync(sessionId, embedding, limit, role, distanceThreshold).GetAwaiter().GetResult();
-
-    public IReadOnlyList<SemanticMessageHistoryMatch> GetRelevant(
-        string sessionId,
-        string prompt,
-        ITextVectorizer vectorizer,
-        int limit = 5,
-        string? role = null,
-        double? distanceThreshold = null) =>
-        GetRelevantAsync(sessionId, prompt, vectorizer, limit, role, distanceThreshold).GetAwaiter().GetResult();
 
     public async Task<IReadOnlyList<SemanticMessageHistoryMatch>> GetRelevantAsync(
         string sessionId,

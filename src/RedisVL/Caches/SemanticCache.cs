@@ -74,9 +74,6 @@ public sealed class SemanticCache
         Interlocked.Exchange(ref _missCount, 0);
     }
 
-    public bool Create(CreateIndexOptions? options = null) =>
-        CreateAsync(options).GetAwaiter().GetResult();
-
     public async Task<bool> CreateAsync(CreateIndexOptions? options = null, CancellationToken cancellationToken = default)
     {
         options ??= new CreateIndexOptions();
@@ -89,23 +86,11 @@ public sealed class SemanticCache
         return await _index.CreateAsync(options, cancellationToken).ConfigureAwait(false);
     }
 
-    public bool Exists() =>
-        ExistsAsync().GetAwaiter().GetResult();
-
     public Task<bool> ExistsAsync(CancellationToken cancellationToken = default) =>
         _index.ExistsAsync(cancellationToken);
 
-    public void Drop(bool deleteDocuments = false) =>
-        DropAsync(deleteDocuments).GetAwaiter().GetResult();
-
     public Task DropAsync(bool deleteDocuments = false, CancellationToken cancellationToken = default) =>
         _index.DropAsync(deleteDocuments, cancellationToken);
-
-    public SemanticCacheHit? Check(string prompt, float[] embedding, FilterExpression? filter = null) =>
-        CheckAsync(prompt, embedding, filter).GetAwaiter().GetResult();
-
-    public SemanticCacheHit? Check(string prompt, ITextVectorizer vectorizer, FilterExpression? filter = null) =>
-        CheckAsync(prompt, vectorizer, filter).GetAwaiter().GetResult();
 
     public async Task<SemanticCacheHit?> CheckAsync(
         string prompt,
@@ -130,12 +115,6 @@ public sealed class SemanticCache
         cancellationToken.ThrowIfCancellationRequested();
         return await CheckAsync(prompt, embedding, filter, cancellationToken).ConfigureAwait(false);
     }
-
-    public IReadOnlyList<SemanticCacheHit> CheckTopK(string prompt, float[] embedding, int topK, FilterExpression? filter = null) =>
-        CheckTopKAsync(prompt, embedding, topK, filter).GetAwaiter().GetResult();
-
-    public IReadOnlyList<SemanticCacheHit> CheckTopK(string prompt, ITextVectorizer vectorizer, int topK, FilterExpression? filter = null) =>
-        CheckTopKAsync(prompt, vectorizer, topK, filter).GetAwaiter().GetResult();
 
     /// <summary>
     /// Returns up to <paramref name="topK" /> cached entries within the configured distance threshold,
@@ -170,12 +149,6 @@ public sealed class SemanticCache
         cancellationToken.ThrowIfCancellationRequested();
         return await CheckTopKAsync(prompt, embedding, topK, filter, cancellationToken).ConfigureAwait(false);
     }
-
-    public IReadOnlyList<SemanticCacheHit?> CheckMany(IEnumerable<SemanticCacheCheckRequest> requests) =>
-        CheckManyAsync(requests).GetAwaiter().GetResult();
-
-    public IReadOnlyList<SemanticCacheHit?> CheckMany(IEnumerable<SemanticCacheCheckRequest> requests, ITextVectorizer vectorizer) =>
-        CheckManyAsync(requests, vectorizer).GetAwaiter().GetResult();
 
     /// <summary>
     /// Runs a batch of cache lookups. The result list is aligned to the input order; a <see langword="null" />
@@ -282,22 +255,6 @@ public sealed class SemanticCache
         }
     }
 
-    public string Store(
-        string prompt,
-        string response,
-        float[] embedding,
-        object? metadata = null,
-        IReadOnlyDictionary<string, object?>? filterValues = null) =>
-        StoreAsync(prompt, response, embedding, metadata, filterValues).GetAwaiter().GetResult();
-
-    public string Store(
-        string prompt,
-        string response,
-        ITextVectorizer vectorizer,
-        object? metadata = null,
-        IReadOnlyDictionary<string, object?>? filterValues = null) =>
-        StoreAsync(prompt, response, vectorizer, metadata, filterValues).GetAwaiter().GetResult();
-
     public async Task<string> StoreAsync(
         string prompt,
         string response,
@@ -358,12 +315,6 @@ public sealed class SemanticCache
         return await StoreAsync(prompt, response, embedding, metadata, filterValues, cancellationToken).ConfigureAwait(false);
     }
 
-    public IReadOnlyList<string> StoreMany(IEnumerable<SemanticCacheStoreRequest> requests) =>
-        StoreManyAsync(requests).GetAwaiter().GetResult();
-
-    public IReadOnlyList<string> StoreMany(IEnumerable<SemanticCacheStoreRequest> requests, ITextVectorizer vectorizer) =>
-        StoreManyAsync(requests, vectorizer).GetAwaiter().GetResult();
-
     /// <summary>
     /// Stores multiple prompt/response pairs. Each request must carry its own embedding; the returned key
     /// list is aligned to the input order.
@@ -421,9 +372,6 @@ public sealed class SemanticCache
 
         return keys;
     }
-
-    public bool Update(string key, string? response = null, object? metadata = null) =>
-        UpdateAsync(key, response, metadata).GetAwaiter().GetResult();
 
     /// <summary>
     /// Updates the response and/or metadata of an existing cached entry identified by <paramref name="key" />

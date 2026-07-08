@@ -43,31 +43,14 @@ public sealed class MessageHistory
 
     public string? KeyNamespace => Options.KeyNamespace;
 
-    public bool Create(CreateIndexOptions? options = null) =>
-        CreateAsync(options).GetAwaiter().GetResult();
-
     public Task<bool> CreateAsync(CreateIndexOptions? options = null, CancellationToken cancellationToken = default) =>
         _index.CreateAsync(options, cancellationToken);
-
-    public bool Exists() =>
-        ExistsAsync().GetAwaiter().GetResult();
 
     public Task<bool> ExistsAsync(CancellationToken cancellationToken = default) =>
         _index.ExistsAsync(cancellationToken);
 
-    public void Drop(bool deleteDocuments = false) =>
-        DropAsync(deleteDocuments).GetAwaiter().GetResult();
-
     public Task DropAsync(bool deleteDocuments = false, CancellationToken cancellationToken = default) =>
         _index.DropAsync(deleteDocuments, cancellationToken);
-
-    public string Append(
-        string sessionId,
-        string role,
-        string content,
-        object? metadata = null,
-        DateTimeOffset? timestamp = null) =>
-        AppendAsync(sessionId, role, content, metadata, timestamp).GetAwaiter().GetResult();
 
     public async Task<string> AppendAsync(
         string sessionId,
@@ -106,12 +89,6 @@ public sealed class MessageHistory
         await _database.HashSetAsync(key, entries.ToArray()).WaitAsync(cancellationToken).ConfigureAwait(false);
         return key!;
     }
-
-    public IReadOnlyList<MessageHistoryMessage> GetRecent(
-        string sessionId,
-        int limit = 10,
-        string? role = null) =>
-        GetRecentAsync(sessionId, limit, role).GetAwaiter().GetResult();
 
     public async Task<IReadOnlyList<MessageHistoryMessage>> GetRecentAsync(
         string sessionId,

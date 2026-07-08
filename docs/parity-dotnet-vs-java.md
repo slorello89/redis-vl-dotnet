@@ -12,7 +12,7 @@ A point-in-time feature comparison between `redis-vl-dotnet` and `redis-vl-java`
 | Runtime | .NET 9 (`net9.0`) | Java 17 (toolchain 21) |
 | Redis client | StackExchange.Redis | Jedis 7.3.0 |
 | Packaging | 8 NuGet packages (core + opt-in provider extensions) | single Maven artifact `com.redis:redisvl` (providers `compileOnly`) |
-| API shape | async-first (`Task` + `CancellationToken`) with sync wrappers | synchronous |
+| API shape | async-only (`Task` + `CancellationToken`) | synchronous |
 | Result handling | typed record/POCO mapping (`Map<T>`) as default | `Map<String,Object>` / Jedis `SearchResult` oriented |
 
 > Caveat: `redis-vl-java`'s checked-in `FEATURE_PARITY_REPORT.md` and README are stale/self-contradictory (reference non-existent types, list `getRelevant()` and `VoyageAIReranker` as both done and missing, cite "~95% parity / 0.1.0" while the repo is at 0.13.1). This diff is based on the Java source tree, not those documents.

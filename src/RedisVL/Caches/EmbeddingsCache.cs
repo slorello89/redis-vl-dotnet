@@ -34,60 +34,6 @@ public sealed class EmbeddingsCache
 
     public TimeSpan? TimeToLive => Options.TimeToLive;
 
-    public bool Store(string input, float[] embedding) =>
-        StoreAsync(input, embedding).GetAwaiter().GetResult();
-
-    public bool Store(string input, float[] embedding, TimeSpan? timeToLive) =>
-        StoreAsync(input, embedding, metadata: null, timeToLive).GetAwaiter().GetResult();
-
-    public bool Store(string input, float[] embedding, object? metadata) =>
-        StoreAsync(input, embedding, metadata).GetAwaiter().GetResult();
-
-    public bool Store(string input, float[] embedding, object? metadata, TimeSpan? timeToLive) =>
-        StoreAsync(input, embedding, metadata, timeToLive).GetAwaiter().GetResult();
-
-    public bool Store(string input, string modelName, float[] embedding) =>
-        StoreAsync(input, modelName, embedding).GetAwaiter().GetResult();
-
-    public bool Store(string input, string modelName, float[] embedding, TimeSpan? timeToLive) =>
-        StoreAsync(input, modelName, embedding, metadata: null, timeToLive).GetAwaiter().GetResult();
-
-    public bool Store(string input, string modelName, float[] embedding, object? metadata) =>
-        StoreAsync(input, modelName, embedding, metadata).GetAwaiter().GetResult();
-
-    public bool Store(string input, string modelName, float[] embedding, object? metadata, TimeSpan? timeToLive) =>
-        StoreAsync(input, modelName, embedding, metadata, timeToLive).GetAwaiter().GetResult();
-
-    public EmbeddingsCacheEntry Set(string input, float[] embedding) =>
-        SetAsync(input, embedding).GetAwaiter().GetResult();
-
-    public EmbeddingsCacheEntry Set(string input, float[] embedding, TimeSpan? timeToLive) =>
-        SetAsync(input, embedding, metadata: null, timeToLive).GetAwaiter().GetResult();
-
-    public EmbeddingsCacheEntry Set(string input, float[] embedding, object? metadata) =>
-        SetAsync(input, embedding, metadata).GetAwaiter().GetResult();
-
-    public EmbeddingsCacheEntry Set(string input, float[] embedding, object? metadata, TimeSpan? timeToLive) =>
-        SetAsync(input, embedding, metadata, timeToLive).GetAwaiter().GetResult();
-
-    public EmbeddingsCacheEntry Set(string input, string modelName, float[] embedding) =>
-        SetAsync(input, modelName, embedding).GetAwaiter().GetResult();
-
-    public EmbeddingsCacheEntry Set(string input, string modelName, float[] embedding, TimeSpan? timeToLive) =>
-        SetAsync(input, modelName, embedding, metadata: null, timeToLive).GetAwaiter().GetResult();
-
-    public EmbeddingsCacheEntry Set(string input, string modelName, float[] embedding, object? metadata) =>
-        SetAsync(input, modelName, embedding, metadata).GetAwaiter().GetResult();
-
-    public EmbeddingsCacheEntry Set(string input, string modelName, float[] embedding, object? metadata, TimeSpan? timeToLive) =>
-        SetAsync(input, modelName, embedding, metadata, timeToLive).GetAwaiter().GetResult();
-
-    public bool StoreMany(IReadOnlyList<EmbeddingsCacheWriteRequest> entries) =>
-        StoreManyAsync(entries).GetAwaiter().GetResult();
-
-    public IReadOnlyList<EmbeddingsCacheEntry> SetMany(IReadOnlyList<EmbeddingsCacheWriteRequest> entries) =>
-        SetManyAsync(entries).GetAwaiter().GetResult();
-
     public async Task<bool> StoreAsync(string input, float[] embedding, CancellationToken cancellationToken = default)
     {
         await SetAsync(input, embedding, cancellationToken).ConfigureAwait(false);
@@ -225,66 +171,6 @@ public sealed class EmbeddingsCache
 
         return results;
     }
-
-    public EmbeddingsCacheEntry? Get(string input) =>
-        GetAsync(input).GetAwaiter().GetResult();
-
-    public EmbeddingsCacheEntry? Get(string input, string modelName) =>
-        GetAsync(input, modelName).GetAwaiter().GetResult();
-
-    public IReadOnlyList<EmbeddingsCacheEntry?> GetMany(IReadOnlyList<EmbeddingsCacheLookup> lookups) =>
-        GetManyAsync(lookups).GetAwaiter().GetResult();
-
-    public EmbeddingsCacheEntry? GetByKey(string key) =>
-        GetByKeyAsync(key).GetAwaiter().GetResult();
-
-    public IReadOnlyList<EmbeddingsCacheEntry?> GetManyByKey(IReadOnlyList<string> keys) =>
-        GetManyByKeyAsync(keys).GetAwaiter().GetResult();
-
-    public EmbeddingsCacheEntry? Lookup(string input) =>
-        Get(input);
-
-    public EmbeddingsCacheEntry? Lookup(string input, string modelName) =>
-        Get(input, modelName);
-
-    public IReadOnlyList<EmbeddingsCacheEntry?> LookupMany(IReadOnlyList<EmbeddingsCacheLookup> lookups) =>
-        GetMany(lookups);
-
-    public float[]? LookupEmbedding(string input) =>
-        Lookup(input)?.Embedding;
-
-    public float[]? LookupEmbedding(string input, string modelName) =>
-        Lookup(input, modelName)?.Embedding;
-
-    public bool Exists(string input) =>
-        ExistsAsync(input).GetAwaiter().GetResult();
-
-    public bool Exists(string input, string modelName) =>
-        ExistsAsync(input, modelName).GetAwaiter().GetResult();
-
-    public IReadOnlyList<bool> ExistsMany(IReadOnlyList<EmbeddingsCacheLookup> lookups) =>
-        ExistsManyAsync(lookups).GetAwaiter().GetResult();
-
-    public bool ExistsByKey(string key) =>
-        ExistsByKeyAsync(key).GetAwaiter().GetResult();
-
-    public IReadOnlyList<bool> ExistsManyByKey(IReadOnlyList<string> keys) =>
-        ExistsManyByKeyAsync(keys).GetAwaiter().GetResult();
-
-    public bool Delete(string input) =>
-        DeleteAsync(input).GetAwaiter().GetResult();
-
-    public bool Delete(string input, string modelName) =>
-        DeleteAsync(input, modelName).GetAwaiter().GetResult();
-
-    public long DeleteMany(IReadOnlyList<EmbeddingsCacheLookup> lookups) =>
-        DeleteManyAsync(lookups).GetAwaiter().GetResult();
-
-    public bool DeleteByKey(string key) =>
-        DeleteByKeyAsync(key).GetAwaiter().GetResult();
-
-    public long DeleteManyByKey(IReadOnlyList<string> keys) =>
-        DeleteManyByKeyAsync(keys).GetAwaiter().GetResult();
 
     public Task<EmbeddingsCacheEntry?> GetAsync(string input, CancellationToken cancellationToken = default) =>
         LookupAsyncCore(input, modelName: null, cancellationToken);
