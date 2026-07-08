@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Globalization;
 using System.Reflection;
 using System.Text.Json;
@@ -8,6 +9,11 @@ namespace RedisVL.Indexes;
 
 internal static class HashDocumentMapper
 {
+    // Per-type property name/type map, computed once and reused so materializing many hash documents
+    // doesn't re-run reflection for every entry. Keyed on the serializer options because the JSON name
+    // resolution depends on the naming policy.
+    private static readonly ConcurrentDictionary<PropertyTypeCacheKey, IReadOnlyDictionary<string, Type>> PropertyTypeCache = new();
+
     public static HashEntry[] ToHashEntries<TDocument>(TDocument document, JsonSerializerOptions serializerOptions)
     {
         ArgumentNullException.ThrowIfNull(document);
@@ -201,7 +207,12 @@ internal static class HashDocumentMapper
         }
     }
 
-    private static Dictionary<string, Type> GetPropertyTypes(Type documentType, JsonSerializerOptions serializerOptions)
+    private static IReadOnlyDictionary<string, Type> GetPropertyTypes(Type documentType, JsonSerializerOptions serializerOptions) =>
+        PropertyTypeCache.GetOrAdd(
+            new PropertyTypeCacheKey(documentType, serializerOptions),
+            static key => BuildPropertyTypes(key.DocumentType, key.SerializerOptions));
+
+    private static IReadOnlyDictionary<string, Type> BuildPropertyTypes(Type documentType, JsonSerializerOptions serializerOptions)
     {
         var properties = new Dictionary<string, Type>(StringComparer.OrdinalIgnoreCase);
         foreach (var property in documentType.GetProperties(BindingFlags.Public | BindingFlags.Instance))
@@ -220,4 +231,8 @@ internal static class HashDocumentMapper
 
         return properties;
     }
+
+    // JsonSerializerOptions uses reference equality, so callers reusing the same options instance
+    // (the common case) share a cache entry; ad-hoc options instances get their own.
+    private readonly record struct PropertyTypeCacheKey(Type DocumentType, JsonSerializerOptions SerializerOptions);
 }
