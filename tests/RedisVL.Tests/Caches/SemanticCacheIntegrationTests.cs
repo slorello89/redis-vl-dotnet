@@ -135,7 +135,7 @@ public sealed class SemanticCacheIntegrationTests
                     ["temperature"] = 0.2d
                 });
             await RedisSearchTestEnvironment.WaitForIndexDocumentCountAsync(
-                SearchIndex.FromExisting(database, $"semantic-cache:integration-semantic-cache:{token}"),
+                await SearchIndex.FromExistingAsync(database, $"semantic-cache:integration-semantic-cache:{token}"),
                 2);
 
             var teamAHit = await cache.CheckAsync("shared prompt", [1f, 0f], Filter.Tag("tenant").Eq("team-a"));
@@ -240,7 +240,7 @@ public sealed class SemanticCacheIntegrationTests
                 new SemanticCacheStoreRequest("prompt-near", "resp-near", [0.95f, 0f])
             ]);
             await RedisSearchTestEnvironment.WaitForIndexDocumentCountAsync(
-                SearchIndex.FromExisting(database, $"semantic-cache:integration-semantic-cache:{token}"),
+                await SearchIndex.FromExistingAsync(database, $"semantic-cache:integration-semantic-cache:{token}"),
                 2);
 
             var hits = await cache.CheckTopKAsync("query", [1f, 0f], topK: 5);

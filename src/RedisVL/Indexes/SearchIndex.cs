@@ -27,12 +27,6 @@ public sealed class SearchIndex
 
     public SearchSchema Schema { get; }
 
-    public static IReadOnlyList<SearchIndexListItem> List(IDatabase database) =>
-        ListAsync(database).GetAwaiter().GetResult();
-
-    public static SearchIndex FromExisting(IDatabase database, string indexName) =>
-        FromExistingAsync(database, indexName).GetAwaiter().GetResult();
-
     public static async Task<SearchIndex> FromExistingAsync(
         IDatabase database,
         string indexName,
@@ -56,9 +50,6 @@ public sealed class SearchIndex
         return SearchIndexListItem.FromRedisResult(result);
     }
 
-    public bool Create(CreateIndexOptions? options = null) =>
-        CreateAsync(options).GetAwaiter().GetResult();
-
     public async Task<bool> CreateAsync(CreateIndexOptions? options = null, CancellationToken cancellationToken = default)
     {
         options ??= new CreateIndexOptions();
@@ -79,9 +70,6 @@ public sealed class SearchIndex
         return true;
     }
 
-    public bool Exists() =>
-        ExistsAsync().GetAwaiter().GetResult();
-
     public async Task<bool> ExistsAsync(CancellationToken cancellationToken = default)
     {
         try
@@ -95,25 +83,16 @@ public sealed class SearchIndex
         }
     }
 
-    public SearchIndexInfo Info() =>
-        InfoAsync().GetAwaiter().GetResult();
-
     public async Task<SearchIndexInfo> InfoAsync(CancellationToken cancellationToken = default)
     {
         return await LoadInfoAsync(_database, Schema.Index.Name, cancellationToken).ConfigureAwait(false);
     }
-
-    public void Drop(bool deleteDocuments = false) =>
-        DropAsync(deleteDocuments).GetAwaiter().GetResult();
 
     public async Task DropAsync(bool deleteDocuments = false, CancellationToken cancellationToken = default)
     {
         await ExecuteAsync("FT.DROPINDEX", SearchIndexCommandBuilder.BuildDropArguments(Schema, deleteDocuments), cancellationToken)
             .ConfigureAwait(false);
     }
-
-    public long Clear(int batchSize = 1000) =>
-        ClearAsync(batchSize).GetAwaiter().GetResult();
 
     public async Task<long> ClearAsync(int batchSize = 1000, CancellationToken cancellationToken = default)
     {
@@ -128,9 +107,6 @@ public sealed class SearchIndex
         return deletedCount;
     }
 
-    public string LoadJson<TDocument>(TDocument document, string? key = null, string? id = null) =>
-        LoadJsonAsync(document, key, id).GetAwaiter().GetResult();
-
     public async Task<string> LoadJsonAsync<TDocument>(
         TDocument document,
         string? key = null,
@@ -143,12 +119,6 @@ public sealed class SearchIndex
         await SetJsonDocumentAsync(resolvedKey, document, cancellationToken).ConfigureAwait(false);
         return resolvedKey;
     }
-
-    public IReadOnlyList<string> LoadJson<TDocument>(
-        IEnumerable<TDocument> documents,
-        Func<TDocument, string>? keySelector = null,
-        Func<TDocument, string>? idSelector = null) =>
-        LoadJsonAsync(documents, keySelector, idSelector).GetAwaiter().GetResult();
 
     public async Task<IReadOnlyList<string>> LoadJsonAsync<TDocument>(
         IEnumerable<TDocument> documents,
@@ -172,9 +142,6 @@ public sealed class SearchIndex
         return loadedKeys;
     }
 
-    public TDocument? FetchJsonByKey<TDocument>(string key) =>
-        FetchJsonByKeyAsync<TDocument>(key).GetAwaiter().GetResult();
-
     public async Task<TDocument?> FetchJsonByKeyAsync<TDocument>(string key, CancellationToken cancellationToken = default)
     {
         EnsureJsonStorage();
@@ -189,14 +156,8 @@ public sealed class SearchIndex
         return JsonSerializer.Deserialize<TDocument>(result.ToString()!, _serializerOptions);
     }
 
-    public TDocument? FetchJsonById<TDocument>(string id) =>
-        FetchJsonByIdAsync<TDocument>(id).GetAwaiter().GetResult();
-
     public Task<TDocument?> FetchJsonByIdAsync<TDocument>(string id, CancellationToken cancellationToken = default) =>
         FetchJsonByKeyAsync<TDocument>(DocumentKeyResolver.ResolveKeyFromId(Schema, id), cancellationToken);
-
-    public bool DeleteJsonByKey(string key) =>
-        DeleteJsonByKeyAsync(key).GetAwaiter().GetResult();
 
     public async Task<bool> DeleteJsonByKeyAsync(string key, CancellationToken cancellationToken = default)
     {
@@ -207,14 +168,8 @@ public sealed class SearchIndex
         return deleted;
     }
 
-    public bool DeleteJsonById(string id) =>
-        DeleteJsonByIdAsync(id).GetAwaiter().GetResult();
-
     public Task<bool> DeleteJsonByIdAsync(string id, CancellationToken cancellationToken = default) =>
         DeleteJsonByKeyAsync(DocumentKeyResolver.ResolveKeyFromId(Schema, id), cancellationToken);
-
-    public bool UpdateJsonByKey(string key, params JsonPartialUpdate[] updates) =>
-        UpdateJsonByKeyAsync(key, updates).GetAwaiter().GetResult();
 
     public async Task<bool> UpdateJsonByKeyAsync(
         string key,
@@ -244,17 +199,11 @@ public sealed class SearchIndex
         return true;
     }
 
-    public bool UpdateJsonById(string id, params JsonPartialUpdate[] updates) =>
-        UpdateJsonByIdAsync(id, updates).GetAwaiter().GetResult();
-
     public Task<bool> UpdateJsonByIdAsync(
         string id,
         IEnumerable<JsonPartialUpdate> updates,
         CancellationToken cancellationToken = default) =>
         UpdateJsonByKeyAsync(DocumentKeyResolver.ResolveKeyFromId(Schema, id), updates, cancellationToken);
-
-    public string LoadHash<TDocument>(TDocument document, string? key = null, string? id = null) =>
-        LoadHashAsync(document, key, id).GetAwaiter().GetResult();
 
     public async Task<string> LoadHashAsync<TDocument>(
         TDocument document,
@@ -268,12 +217,6 @@ public sealed class SearchIndex
         await SetHashDocumentAsync(resolvedKey, document, cancellationToken).ConfigureAwait(false);
         return resolvedKey;
     }
-
-    public IReadOnlyList<string> LoadHash<TDocument>(
-        IEnumerable<TDocument> documents,
-        Func<TDocument, string>? keySelector = null,
-        Func<TDocument, string>? idSelector = null) =>
-        LoadHashAsync(documents, keySelector, idSelector).GetAwaiter().GetResult();
 
     public async Task<IReadOnlyList<string>> LoadHashAsync<TDocument>(
         IEnumerable<TDocument> documents,
@@ -297,9 +240,6 @@ public sealed class SearchIndex
         return loadedKeys;
     }
 
-    public TDocument? FetchHashByKey<TDocument>(string key) =>
-        FetchHashByKeyAsync<TDocument>(key).GetAwaiter().GetResult();
-
     public async Task<TDocument?> FetchHashByKeyAsync<TDocument>(string key, CancellationToken cancellationToken = default)
     {
         EnsureHashStorage();
@@ -312,14 +252,8 @@ public sealed class SearchIndex
             : HashDocumentMapper.FromHashEntries<TDocument>(entries, _serializerOptions);
     }
 
-    public TDocument? FetchHashById<TDocument>(string id) =>
-        FetchHashByIdAsync<TDocument>(id).GetAwaiter().GetResult();
-
     public Task<TDocument?> FetchHashByIdAsync<TDocument>(string id, CancellationToken cancellationToken = default) =>
         FetchHashByKeyAsync<TDocument>(DocumentKeyResolver.ResolveKeyFromId(Schema, id), cancellationToken);
-
-    public bool DeleteHashByKey(string key) =>
-        DeleteHashByKeyAsync(key).GetAwaiter().GetResult();
 
     public async Task<bool> DeleteHashByKeyAsync(string key, CancellationToken cancellationToken = default)
     {
@@ -331,14 +265,8 @@ public sealed class SearchIndex
         return deleted;
     }
 
-    public bool DeleteHashById(string id) =>
-        DeleteHashByIdAsync(id).GetAwaiter().GetResult();
-
     public Task<bool> DeleteHashByIdAsync(string id, CancellationToken cancellationToken = default) =>
         DeleteHashByKeyAsync(DocumentKeyResolver.ResolveKeyFromId(Schema, id), cancellationToken);
-
-    public bool UpdateHashByKey(string key, params HashPartialUpdate[] updates) =>
-        UpdateHashByKeyAsync(key, updates).GetAwaiter().GetResult();
 
     public async Task<bool> UpdateHashByKeyAsync(
         string key,
@@ -363,62 +291,11 @@ public sealed class SearchIndex
         return true;
     }
 
-    public bool UpdateHashById(string id, params HashPartialUpdate[] updates) =>
-        UpdateHashByIdAsync(id, updates).GetAwaiter().GetResult();
-
     public Task<bool> UpdateHashByIdAsync(
         string id,
         IEnumerable<HashPartialUpdate> updates,
         CancellationToken cancellationToken = default) =>
         UpdateHashByKeyAsync(DocumentKeyResolver.ResolveKeyFromId(Schema, id), updates, cancellationToken);
-
-    public SearchResults Search(VectorQuery query) =>
-        SearchAsync(query).GetAwaiter().GetResult();
-
-    public SearchResults<TDocument> Search<TDocument>(VectorQuery query, JsonSerializerOptions? serializerOptions = null) =>
-        SearchAsync<TDocument>(query, serializerOptions).GetAwaiter().GetResult();
-
-    public SearchResults Search(MultiVectorQuery query) =>
-        SearchAsync(query).GetAwaiter().GetResult();
-
-    public SearchResults<TDocument> Search<TDocument>(MultiVectorQuery query, JsonSerializerOptions? serializerOptions = null) =>
-        SearchAsync<TDocument>(query, serializerOptions).GetAwaiter().GetResult();
-
-    public SearchResults Search(FilterQuery query) =>
-        SearchAsync(query).GetAwaiter().GetResult();
-
-    public SearchResults<TDocument> Search<TDocument>(FilterQuery query, JsonSerializerOptions? serializerOptions = null) =>
-        SearchAsync<TDocument>(query, serializerOptions).GetAwaiter().GetResult();
-
-    public SearchResults Search(TextQuery query) =>
-        SearchAsync(query).GetAwaiter().GetResult();
-
-    public SearchResults<TDocument> Search<TDocument>(TextQuery query, JsonSerializerOptions? serializerOptions = null) =>
-        SearchAsync<TDocument>(query, serializerOptions).GetAwaiter().GetResult();
-
-    public AggregationResults Aggregate(AggregationQuery query) =>
-        AggregateAsync(query).GetAwaiter().GetResult();
-
-    public AggregationResults<TDocument> Aggregate<TDocument>(AggregationQuery query, JsonSerializerOptions? serializerOptions = null) =>
-        AggregateAsync<TDocument>(query, serializerOptions).GetAwaiter().GetResult();
-
-    public AggregationResults Aggregate(AggregateHybridQuery query) =>
-        AggregateAsync(query).GetAwaiter().GetResult();
-
-    public AggregationResults<TDocument> Aggregate<TDocument>(AggregateHybridQuery query, JsonSerializerOptions? serializerOptions = null) =>
-        AggregateAsync<TDocument>(query, serializerOptions).GetAwaiter().GetResult();
-
-    public SearchResults Search(HybridQuery query) =>
-        SearchAsync(query).GetAwaiter().GetResult();
-
-    public SearchResults<TDocument> Search<TDocument>(HybridQuery query, JsonSerializerOptions? serializerOptions = null) =>
-        SearchAsync<TDocument>(query, serializerOptions).GetAwaiter().GetResult();
-
-    public SearchResults Search(VectorRangeQuery query) =>
-        SearchAsync(query).GetAwaiter().GetResult();
-
-    public SearchResults<TDocument> Search<TDocument>(VectorRangeQuery query, JsonSerializerOptions? serializerOptions = null) =>
-        SearchAsync<TDocument>(query, serializerOptions).GetAwaiter().GetResult();
 
     public async Task<SearchResults> SearchAsync(VectorQuery query, CancellationToken cancellationToken = default)
     {
@@ -487,12 +364,6 @@ public sealed class SearchIndex
         cancellationToken.ThrowIfCancellationRequested();
         return results.Map<TDocument>(serializerOptions);
     }
-
-    public SearchResults Search(HybridSearchQuery query) =>
-        SearchAsync(query).GetAwaiter().GetResult();
-
-    public SearchResults<TDocument> Search<TDocument>(HybridSearchQuery query, JsonSerializerOptions? serializerOptions = null) =>
-        SearchAsync<TDocument>(query, serializerOptions).GetAwaiter().GetResult();
 
     public async Task<SearchResults> SearchAsync(HybridSearchQuery query, CancellationToken cancellationToken = default)
     {
@@ -893,9 +764,6 @@ public sealed class SearchIndex
             yield return batch.Map<TDocument>(serializerOptions);
         }
     }
-
-    public long Count(CountQuery query) =>
-        CountAsync(query).GetAwaiter().GetResult();
 
     public async Task<long> CountAsync(CountQuery query, CancellationToken cancellationToken = default)
     {

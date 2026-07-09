@@ -51,29 +51,14 @@ public sealed class SemanticRouter
 
     public RoutingConfig RoutingConfig => Options.RoutingConfig;
 
-    public bool Create(CreateIndexOptions? options = null) =>
-        CreateAsync(options).GetAwaiter().GetResult();
-
     public Task<bool> CreateAsync(CreateIndexOptions? options = null, CancellationToken cancellationToken = default) =>
         _index.CreateAsync(options, cancellationToken);
-
-    public bool Exists() =>
-        ExistsAsync().GetAwaiter().GetResult();
 
     public Task<bool> ExistsAsync(CancellationToken cancellationToken = default) =>
         _index.ExistsAsync(cancellationToken);
 
-    public void Drop(bool deleteDocuments = false) =>
-        DropAsync(deleteDocuments).GetAwaiter().GetResult();
-
     public Task DropAsync(bool deleteDocuments = false, CancellationToken cancellationToken = default) =>
         _index.DropAsync(deleteDocuments, cancellationToken);
-
-    public string AddRoute(string routeName, string reference, float[] embedding) =>
-        AddRouteAsync(routeName, reference, embedding).GetAwaiter().GetResult();
-
-    public string AddRoute(string routeName, string reference, ITextVectorizer vectorizer) =>
-        AddRouteAsync(routeName, reference, vectorizer).GetAwaiter().GetResult();
 
     public async Task<string> AddRouteAsync(
         string routeName,
@@ -108,12 +93,6 @@ public sealed class SemanticRouter
         cancellationToken.ThrowIfCancellationRequested();
         return await AddRouteAsync(routeName, reference, embedding, cancellationToken).ConfigureAwait(false);
     }
-
-    public IReadOnlyList<string> AddRoute(Route route, IReadOnlyList<float[]> embeddings) =>
-        AddRouteAsync(route, embeddings).GetAwaiter().GetResult();
-
-    public IReadOnlyList<string> AddRoute(Route route, ITextVectorizer vectorizer) =>
-        AddRouteAsync(route, vectorizer).GetAwaiter().GetResult();
 
     /// <summary>
     /// Stores a route's reference phrases using precomputed embeddings, persisting the optional per-route
@@ -168,12 +147,6 @@ public sealed class SemanticRouter
         cancellationToken.ThrowIfCancellationRequested();
         return await AddRouteAsync(route, embeddings, cancellationToken).ConfigureAwait(false);
     }
-
-    public IReadOnlyList<string> AddRouteReferences(string routeName, IReadOnlyList<string> references, IReadOnlyList<float[]> embeddings) =>
-        AddRouteReferencesAsync(routeName, references, embeddings).GetAwaiter().GetResult();
-
-    public IReadOnlyList<string> AddRouteReferences(string routeName, IReadOnlyList<string> references, ITextVectorizer vectorizer) =>
-        AddRouteReferencesAsync(routeName, references, vectorizer).GetAwaiter().GetResult();
 
     /// <summary>
     /// Adds reference phrases to an existing route using precomputed embeddings. Existing per-route threshold
@@ -233,9 +206,6 @@ public sealed class SemanticRouter
         return await AddRouteReferencesAsync(routeName, references, embeddings, cancellationToken).ConfigureAwait(false);
     }
 
-    public IReadOnlyList<RouteReference> GetRouteReferences(string routeName) =>
-        GetRouteReferencesAsync(routeName).GetAwaiter().GetResult();
-
     /// <summary>Returns the stored references for a route, or an empty list when the route has none.</summary>
     public async Task<IReadOnlyList<RouteReference>> GetRouteReferencesAsync(
         string routeName,
@@ -262,9 +232,6 @@ public sealed class SemanticRouter
 
         return references;
     }
-
-    public Route? GetRoute(string routeName) =>
-        GetRouteAsync(routeName).GetAwaiter().GetResult();
 
     /// <summary>
     /// Reconstructs a route from its stored references, including any persisted metadata and per-route
@@ -317,9 +284,6 @@ public sealed class SemanticRouter
             : new Route(normalizedRouteName, references, metadata, distanceThreshold);
     }
 
-    public long DeleteRouteReferences(string routeName, params string[] references) =>
-        DeleteRouteReferencesAsync(routeName, references).GetAwaiter().GetResult();
-
     /// <summary>Deletes specific references from a route. Returns the number of references actually removed.</summary>
     public async Task<long> DeleteRouteReferencesAsync(
         string routeName,
@@ -341,9 +305,6 @@ public sealed class SemanticRouter
         cancellationToken.ThrowIfCancellationRequested();
         return await _database.KeyDeleteAsync(keys).WaitAsync(cancellationToken).ConfigureAwait(false);
     }
-
-    public long DeleteRoute(string routeName) =>
-        DeleteRouteAsync(routeName).GetAwaiter().GetResult();
 
     /// <summary>Deletes every reference belonging to a route. Returns the number of references removed.</summary>
     public async Task<long> DeleteRouteAsync(string routeName, CancellationToken cancellationToken = default)
@@ -367,12 +328,6 @@ public sealed class SemanticRouter
         cancellationToken.ThrowIfCancellationRequested();
         return await _database.KeyDeleteAsync(keys).WaitAsync(cancellationToken).ConfigureAwait(false);
     }
-
-    public SemanticRouteMatch? Route(string input, float[] embedding) =>
-        RouteAsync(input, embedding).GetAwaiter().GetResult();
-
-    public SemanticRouteMatch? Route(string input, ITextVectorizer vectorizer) =>
-        RouteAsync(input, vectorizer).GetAwaiter().GetResult();
 
     public async Task<SemanticRouteMatch?> RouteAsync(
         string input,
@@ -412,20 +367,6 @@ public sealed class SemanticRouter
         cancellationToken.ThrowIfCancellationRequested();
         return await RouteAsync(normalizedInput, embedding, cancellationToken).ConfigureAwait(false);
     }
-
-    public IReadOnlyList<SemanticRouterMatch> RouteMany(
-        string input,
-        float[] embedding,
-        int? maxResults = null,
-        DistanceAggregationMethod? aggregationMethod = null) =>
-        RouteManyAsync(input, embedding, maxResults, aggregationMethod).GetAwaiter().GetResult();
-
-    public IReadOnlyList<SemanticRouterMatch> RouteMany(
-        string input,
-        ITextVectorizer vectorizer,
-        int? maxResults = null,
-        DistanceAggregationMethod? aggregationMethod = null) =>
-        RouteManyAsync(input, vectorizer, maxResults, aggregationMethod).GetAwaiter().GetResult();
 
     /// <summary>
     /// Classifies an input across all routes and returns up to <paramref name="maxResults" /> matches ordered
