@@ -1,3 +1,4 @@
+using System.Net;
 using System.Reflection;
 using RedisVL.Filters;
 using RedisVL.Indexes;
@@ -210,31 +211,56 @@ public sealed class SearchIndexAsyncTests
     }
 
     [Fact]
-    public async Task ClearAsync_ScansAndDeletesAllMatchingPrefixKeys()
+    public async Task ClearAsync_EnumeratesEveryMasterAndDeletesKeysIndividually()
     {
         var (database, recorder) = RecordingDatabaseProxy.CreatePair();
+
+        // Two masters holding different keys plus a replica that must be
+        // skipped so its mirrored keyspace is not double-counted.
+        var masterA = new FakeServerState { KeyProvider = _ => [(RedisKey)"movie:1", "movie:2"] };
+        var masterB = new FakeServerState { KeyProvider = _ => [(RedisKey)"movie:3"] };
+        var replica = new FakeServerState { IsReplica = true, KeyProvider = _ => [(RedisKey)"movie:1"] };
+        recorder.SetServers(masterA, masterB, replica);
+
         var schema = new SearchSchema(
-            new IndexDefinition("clear-idx", ["movie:", "archive:"], StorageType.Hash),
+            new IndexDefinition("clear-idx", "movie:", StorageType.Hash),
             [new TextFieldDefinition("title")]);
         var index = new SearchIndex(database, schema);
 
-        recorder.ExecuteAsyncResponses.Enqueue(CreateScanResult(1, ["movie:1", "movie:2"]));
-        recorder.ExecuteAsyncResponses.Enqueue(CreateScanResult(0, ["movie:3"]));
-        recorder.ExecuteAsyncResponses.Enqueue(CreateScanResult(0, ["archive:1"]));
+        var deletedCount = await index.ClearAsync();
 
-        var deletedCount = await index.ClearAsync(batchSize: 2);
+        Assert.Equal(3, deletedCount);
+        Assert.NotEmpty(masterA.KeysCalls);
+        Assert.NotEmpty(masterB.KeysCalls);
+        Assert.Empty(replica.KeysCalls);
 
-        Assert.Equal(4, deletedCount);
-        Assert.Equal(3, recorder.ExecuteAsyncCallCount);
+        // Every delete is single-key so a batch spanning multiple hash slots
+        // cannot raise CROSSSLOT on a cluster; the multi-key overload is unused.
+        Assert.Empty(recorder.KeyDeleteBatches);
         Assert.Equal(3, recorder.KeyDeleteAsyncCallCount);
         Assert.Equal(
-            ["movie:*", "movie:*", "archive:*"],
-            recorder.ExecuteAsyncCalls.Select(static call => call.Pattern).ToArray());
-        Assert.Equal(
-            ["movie:1,movie:2", "movie:3", "archive:1"],
-            recorder.KeyDeleteBatches
-                .Select(static batch => string.Join(',', batch.Select(static key => key.ToString())))
-                .ToArray());
+            ["movie:1", "movie:2", "movie:3"],
+            recorder.DeletedKeys.Select(static key => key.ToString()).Order().ToArray());
+    }
+
+    [Fact]
+    public async Task ClearAsync_EscapesGlobMetacharactersAndPassesBatchSizeAsPageSize()
+    {
+        var (database, recorder) = RecordingDatabaseProxy.CreatePair();
+        var master = new FakeServerState { KeyProvider = _ => [] };
+        recorder.SetServers(master);
+
+        var schema = new SearchSchema(
+            new IndexDefinition("clear-idx", "movie*[1]:", StorageType.Hash),
+            [new TextFieldDefinition("title")]);
+        var index = new SearchIndex(database, schema);
+
+        await index.ClearAsync(batchSize: 37);
+
+        var call = Assert.Single(master.KeysCalls);
+        Assert.Equal(@"movie\*\[1\]:*", call.Pattern.ToString());
+        Assert.Equal(37, call.PageSize);
+        Assert.Equal(0, recorder.KeyDeleteAsyncCallCount);
     }
 
     [Fact]
@@ -1144,13 +1170,6 @@ public sealed class SearchIndexAsyncTests
                 new TagFieldDefinition("genre")
             ]);
 
-    private static RedisResult CreateScanResult(long cursor, params string[] keys) =>
-        RedisResult.Create(
-            [
-                RedisResult.Create((RedisValue)cursor.ToString()),
-                RedisResult.Create(keys.Select(static key => RedisResult.Create((RedisValue)key)).ToArray())
-            ]);
-
     private static SearchSchema CreateVectorSchema(string token) =>
         new(
             new IndexDefinition($"vector-{token}", $"vector:{token}:", StorageType.Hash),
@@ -1418,12 +1437,19 @@ public sealed class SearchIndexAsyncTests
 
         public List<RedisKey[]> KeyDeleteBatches { get; } = [];
 
+        public List<RedisKey> DeletedKeys { get; } = [];
+
+        private IConnectionMultiplexer? _multiplexer;
+
         public static (IDatabase Database, RecordingDatabaseProxy Recorder) CreatePair()
         {
             var database = DispatchProxy.Create<IDatabase, RecordingDatabaseProxy>();
             var recorder = (RecordingDatabaseProxy)(object)database;
             return (database, recorder);
         }
+
+        public void SetServers(params FakeServerState[] servers) =>
+            _multiplexer = FakeConnectionMultiplexerProxy.Create(servers);
 
         protected override object? Invoke(MethodInfo? targetMethod, object?[]? args)
         {
@@ -1435,8 +1461,9 @@ public sealed class SearchIndexAsyncTests
                 nameof(IDatabase.HashGetAllAsync) => HandleHashGetAllAsync(args),
                 nameof(IDatabase.HashSetAsync) => HandleHashSetAsync(args),
                 nameof(IDatabase.KeyDeleteAsync) => HandleKeyDeleteAsync(args),
-                nameof(IDatabase.Multiplexer) => throw new NotSupportedException(),
-                nameof(IDatabase.Database) => 0,
+                "get_Multiplexer" => _multiplexer
+                    ?? throw new InvalidOperationException("Call SetServers before accessing Multiplexer."),
+                "get_Database" => 0,
                 _ => throw new NotSupportedException($"Method '{targetMethod.Name}' is not configured for this test proxy.")
             };
         }
@@ -1490,12 +1517,114 @@ public sealed class SearchIndexAsyncTests
             return Task.FromResult(true);
         }
 
-        private Task<long> HandleKeyDeleteAsync(object?[]? args)
+        private object HandleKeyDeleteAsync(object?[]? args)
         {
             KeyDeleteAsyncCallCount++;
-            var keys = (RedisKey[])args![0]!;
-            KeyDeleteBatches.Add(keys);
-            return Task.FromResult((long)keys.Length);
+
+            // The single-key overload is slot-safe on a cluster; the multi-key
+            // overload is only recorded so a regression back to it is visible.
+            if (args![0] is RedisKey[] batch)
+            {
+                KeyDeleteBatches.Add(batch);
+                return Task.FromResult((long)batch.Length);
+            }
+
+            DeletedKeys.Add((RedisKey)args[0]!);
+            return Task.FromResult(true);
+        }
+    }
+
+    private sealed class FakeServerState
+    {
+        public bool IsConnected { get; init; } = true;
+
+        public bool IsReplica { get; init; }
+
+        public ServerType ServerType { get; init; } = ServerType.Standalone;
+
+        public Func<RedisValue, IEnumerable<RedisKey>> KeyProvider { get; init; } = static _ => [];
+
+        public List<(int Database, RedisValue Pattern, int PageSize)> KeysCalls { get; } = [];
+    }
+
+    private class FakeConnectionMultiplexerProxy : DispatchProxy
+    {
+        private EndPoint[] _endpoints = [];
+        private Dictionary<EndPoint, IServer> _servers = new();
+
+        public static IConnectionMultiplexer Create(IReadOnlyList<FakeServerState> servers)
+        {
+            var multiplexer = DispatchProxy.Create<IConnectionMultiplexer, FakeConnectionMultiplexerProxy>();
+            var proxy = (FakeConnectionMultiplexerProxy)(object)multiplexer;
+
+            var endpoints = new EndPoint[servers.Count];
+            var map = new Dictionary<EndPoint, IServer>();
+            for (var i = 0; i < servers.Count; i++)
+            {
+                var endpoint = new DnsEndPoint("fake-node", i);
+                endpoints[i] = endpoint;
+                map[endpoint] = FakeServerProxy.Create(servers[i]);
+            }
+
+            proxy._endpoints = endpoints;
+            proxy._servers = map;
+            return multiplexer;
+        }
+
+        protected override object? Invoke(MethodInfo? targetMethod, object?[]? args)
+        {
+            ArgumentNullException.ThrowIfNull(targetMethod);
+
+            return targetMethod.Name switch
+            {
+                nameof(IConnectionMultiplexer.GetEndPoints) => _endpoints,
+                nameof(IConnectionMultiplexer.GetServer) => _servers[(EndPoint)args![0]!],
+                _ => throw new NotSupportedException($"IConnectionMultiplexer.{targetMethod.Name} is not configured for this test proxy.")
+            };
+        }
+    }
+
+    private class FakeServerProxy : DispatchProxy
+    {
+        private FakeServerState _state = new();
+
+        public static IServer Create(FakeServerState state)
+        {
+            var server = DispatchProxy.Create<IServer, FakeServerProxy>();
+            ((FakeServerProxy)(object)server)._state = state;
+            return server;
+        }
+
+        protected override object? Invoke(MethodInfo? targetMethod, object?[]? args)
+        {
+            ArgumentNullException.ThrowIfNull(targetMethod);
+
+            return targetMethod.Name switch
+            {
+                "get_IsConnected" => _state.IsConnected,
+                "get_IsReplica" => _state.IsReplica,
+                "get_ServerType" => _state.ServerType,
+                nameof(IServer.KeysAsync) => HandleKeysAsync(args),
+                _ => throw new NotSupportedException($"IServer.{targetMethod.Name} is not configured for this test proxy.")
+            };
+        }
+
+        private IAsyncEnumerable<RedisKey> HandleKeysAsync(object?[]? args)
+        {
+            var database = (int)args![0]!;
+            var pattern = (RedisValue)args[1]!;
+            var pageSize = (int)args[2]!;
+            _state.KeysCalls.Add((database, pattern, pageSize));
+            return ToAsyncEnumerable(_state.KeyProvider(pattern));
+        }
+
+        private static async IAsyncEnumerable<RedisKey> ToAsyncEnumerable(IEnumerable<RedisKey> keys)
+        {
+            await Task.CompletedTask;
+            foreach (var key in keys)
+            {
+                yield return key;
+            }
         }
     }
 }

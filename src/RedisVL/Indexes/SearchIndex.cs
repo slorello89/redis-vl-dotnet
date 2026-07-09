@@ -3,6 +3,7 @@ using RedisVL.Queries;
 using StackExchange.Redis;
 using System.Globalization;
 using System.Runtime.CompilerServices;
+using System.Text;
 using System.Text.Json;
 
 namespace RedisVL.Indexes;
@@ -118,6 +119,7 @@ public sealed class SearchIndex
     public async Task<long> ClearAsync(int batchSize = 1000, CancellationToken cancellationToken = default)
     {
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(batchSize);
+        cancellationToken.ThrowIfCancellationRequested();
 
         var deletedCount = 0L;
         foreach (var prefix in Schema.Index.Prefixes)
@@ -1169,50 +1171,95 @@ public sealed class SearchIndex
 
     private async Task<long> DeleteDocumentsByPrefixAsync(string prefix, int batchSize, CancellationToken cancellationToken)
     {
+        // The prefix is a literal, but SCAN MATCH takes a glob pattern, so any
+        // glob metacharacter in the prefix must be escaped or it would match
+        // (and delete) unrelated keys.
+        var pattern = (RedisValue)(GlobEscape(prefix) + "*");
         var deletedCount = 0L;
-        var cursor = 0L;
-        var pattern = $"{prefix}*";
+        var batch = new List<RedisKey>(batchSize);
 
-        do
+        // Enumerate every keyspace-owning endpoint. On a cluster each master
+        // owns a distinct set of slots, so a single-node SCAN would miss keys
+        // on other shards; IServer.KeysAsync scans one node at a time.
+        foreach (var server in GetKeyspaceServers())
         {
-            var (nextCursor, keys) = await ScanKeysAsync(cursor, pattern, batchSize, cancellationToken).ConfigureAwait(false);
-            if (keys.Length > 0)
+            cancellationToken.ThrowIfCancellationRequested();
+
+            await foreach (var key in server
+                .KeysAsync(_database.Database, pattern, pageSize: batchSize)
+                .WithCancellation(cancellationToken)
+                .ConfigureAwait(false))
             {
-                deletedCount += await _database.KeyDeleteAsync(keys).WaitAsync(cancellationToken).ConfigureAwait(false);
+                batch.Add(key);
+                if (batch.Count >= batchSize)
+                {
+                    deletedCount += await DeleteKeysAsync(batch, cancellationToken).ConfigureAwait(false);
+                    batch.Clear();
+                }
             }
 
-            cursor = nextCursor;
+            if (batch.Count > 0)
+            {
+                deletedCount += await DeleteKeysAsync(batch, cancellationToken).ConfigureAwait(false);
+                batch.Clear();
+            }
         }
-        while (cursor != 0);
 
         return deletedCount;
     }
 
-    private async Task<(long Cursor, RedisKey[] Keys)> ScanKeysAsync(
-        long cursor,
-        string pattern,
-        int batchSize,
-        CancellationToken cancellationToken)
+    private IEnumerable<IServer> GetKeyspaceServers()
     {
-        var result = await ExecuteAsync("SCAN", [cursor, "MATCH", pattern, "COUNT", batchSize], cancellationToken).ConfigureAwait(false);
-        var parts = (RedisResult[])result!;
-        if (parts.Length != 2)
+        var multiplexer = _database.Multiplexer;
+        foreach (var endpoint in multiplexer.GetEndPoints())
         {
-            throw new InvalidOperationException("Redis SCAN response must contain a cursor and key list.");
+            var server = multiplexer.GetServer(endpoint);
+
+            // Skip replicas (their keyspace mirrors a master, so scanning them
+            // double-counts) and endpoints that hold no keyspace or are down.
+            if (!server.IsConnected || server.IsReplica || server.ServerType == ServerType.Sentinel)
+            {
+                continue;
+            }
+
+            yield return server;
+        }
+    }
+
+    private async Task<long> DeleteKeysAsync(IReadOnlyList<RedisKey> keys, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        // Delete one key per command rather than a single multi-key DEL: on a
+        // cluster a batch spanning multiple hash slots would raise CROSSSLOT.
+        // The commands are pipelined over the multiplexer, so this remains a
+        // single round trip per batch.
+        var deletions = new Task<bool>[keys.Count];
+        for (var i = 0; i < keys.Count; i++)
+        {
+            deletions[i] = _database.KeyDeleteAsync(keys[i]);
         }
 
-        if (!long.TryParse(parts[0].ToString(), NumberStyles.None, CultureInfo.InvariantCulture, out var nextCursor))
+        var results = await Task.WhenAll(deletions).WaitAsync(cancellationToken).ConfigureAwait(false);
+        return results.Count(static deleted => deleted);
+    }
+
+    private static string GlobEscape(string value)
+    {
+        // Escape Redis glob-pattern metacharacters (\ * ? [ ]) so the value is
+        // matched literally by SCAN MATCH.
+        var builder = new StringBuilder(value.Length);
+        foreach (var character in value)
         {
-            throw new InvalidOperationException("Redis SCAN response cursor was not a valid integer.");
+            if (character is '\\' or '*' or '?' or '[' or ']')
+            {
+                builder.Append('\\');
+            }
+
+            builder.Append(character);
         }
 
-        var keys = ((RedisResult[])parts[1]!)
-            .Select(static entry => entry.ToString())
-            .Where(static entry => !string.IsNullOrWhiteSpace(entry))
-            .Select(static entry => (RedisKey)entry!)
-            .ToArray();
-
-        return (nextCursor, keys);
+        return builder.ToString();
     }
 
     private static bool IsUnknownIndexException(RedisServerException exception) =>
