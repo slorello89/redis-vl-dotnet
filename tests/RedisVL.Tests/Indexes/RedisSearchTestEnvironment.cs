@@ -7,6 +7,7 @@ namespace RedisVL.Tests.Indexes;
 internal static class RedisSearchTestEnvironment
 {
     public const string RedisUrlEnvironmentVariable = "REDIS_VL_REDIS_URL";
+    public const string RedisProtocolEnvironmentVariable = "REDIS_VL_REDIS_PROTOCOL";
 
     public static string? ConnectionString =>
         Environment.GetEnvironmentVariable(RedisUrlEnvironmentVariable);
@@ -16,8 +17,20 @@ internal static class RedisSearchTestEnvironment
             ? $"Set {RedisUrlEnvironmentVariable} to run Redis integration tests."
             : null;
 
+    public static ConfigurationOptions CreateOptions()
+    {
+        var options = ConfigurationOptions.Parse(ConnectionString!);
+        var protocol = Environment.GetEnvironmentVariable(RedisProtocolEnvironmentVariable)?.Trim();
+        if (!string.IsNullOrEmpty(protocol) && (protocol is "3" || protocol.Equals("resp3", StringComparison.OrdinalIgnoreCase)))
+        {
+            options.Protocol = RedisProtocol.Resp3;
+        }
+
+        return options;
+    }
+
     public static async Task<IConnectionMultiplexer> ConnectAsync() =>
-        await ConnectionMultiplexer.ConnectAsync(ConnectionString!);
+        await ConnectionMultiplexer.ConnectAsync(CreateOptions());
 
     public static async Task WaitForIndexDocumentCountAsync(
         SearchIndex index,

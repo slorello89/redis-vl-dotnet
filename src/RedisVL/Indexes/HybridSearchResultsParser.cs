@@ -4,13 +4,14 @@ using StackExchange.Redis;
 namespace RedisVL.Indexes;
 
 /// <summary>
-/// Parses the RESP2 reply of the <c>FT.HYBRID</c> command into <see cref="SearchResults" />.
+/// Parses the reply of the <c>FT.HYBRID</c> command into <see cref="SearchResults" />.
 /// </summary>
 /// <remarks>
-/// The reply is a map (rendered as an alternating key/value array over RESP2) with
-/// <c>total_results</c>, <c>results</c>, <c>warnings</c>, and <c>execution_time</c> entries. Each row
-/// in <c>results</c> is a flat field/value array that includes the document key
-/// (<see cref="HybridSearchQuery.KeyField" />) and fused score (<see cref="HybridSearchQuery.ScoreField" />).
+/// The reply is a map with <c>total_results</c>, <c>results</c>, <c>warnings</c>, and
+/// <c>execution_time</c> entries — an alternating key/value array over RESP2 and a native map over
+/// RESP3, both of which flatten to the same key/value pairs. Each row in <c>results</c> is a flat
+/// field/value collection that includes the document key (<see cref="HybridSearchQuery.KeyField" />)
+/// and fused score (<see cref="HybridSearchQuery.ScoreField" />).
 /// </remarks>
 internal static class HybridSearchResultsParser
 {
@@ -53,7 +54,9 @@ internal static class HybridSearchResultsParser
 
         foreach (var row in (RedisResult[])results!)
         {
-            var fields = SearchResultsParser.ParseValues(row, "Hybrid search result field name cannot be null.");
+            var fields = SearchResultsParser.ParseValues(
+                SearchReplyReader.ExtractRowFields(row),
+                "Hybrid search result field name cannot be null.");
 
             if (!fields.TryGetValue(HybridSearchQuery.KeyField, out var documentKey))
             {
