@@ -1,4 +1,5 @@
 using System.Linq.Expressions;
+using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text.Json;
@@ -94,18 +95,14 @@ public sealed class RedisVLCollection<TKey, TRecord> : VectorStoreCollection<TKe
         ArgumentNullException.ThrowIfNull(filter);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(top);
 
-        if (options?.OrderBy is not null)
-        {
-            throw new NotSupportedException(
-                "FilteredRecordRetrievalOptions.OrderBy is not supported by the RedisVL connector.");
-        }
-
+        var sortBy = ResolveSortBy(options);
         var includeVectors = options?.IncludeVectors ?? false;
         var skip = options?.Skip ?? 0;
         var query = new FilterQuery(
             _filterTranslator.Translate(filter),
             returnFields: [JsonRootField],
-            pagination: new QueryPagination(offset: skip, limit: top));
+            pagination: new QueryPagination(offset: skip, limit: top),
+            sortBy: sortBy);
 
         var results = await _index.SearchAsync(query, cancellationToken).ConfigureAwait(false);
         foreach (var document in results.Documents)
@@ -256,6 +253,56 @@ public sealed class RedisVLCollection<TKey, TRecord> : VectorStoreCollection<TKe
             throw new NotSupportedException(
                 "VectorSearchOptions.ScoreThreshold is not supported by the RedisVL connector.");
         }
+    }
+
+    // Maps FilteredRecordRetrievalOptions.OrderBy onto an FT.SEARCH SORTBY. FT.SEARCH sorts by a
+    // single field, so a multi-key OrderBy is rejected (aggregation would be required to honor it).
+    private SearchSortBy? ResolveSortBy(FilteredRecordRetrievalOptions<TRecord>? options)
+    {
+        var orderBy = options?.OrderBy;
+        if (orderBy is null)
+        {
+            return null;
+        }
+
+        var sortKeys = orderBy(new()).Values;
+        if (sortKeys.Count == 0)
+        {
+            return null;
+        }
+
+        if (sortKeys.Count > 1)
+        {
+            throw new NotSupportedException(
+                "The RedisVL connector supports ordering by a single property; FT.SEARCH accepts one SORTBY field.");
+        }
+
+        var sortKey = sortKeys[0];
+        var property = ResolveSortProperty(sortKey.PropertySelector);
+        return new SearchSortBy(property.JsonName, descending: !sortKey.Ascending);
+    }
+
+    private RedisVLProperty ResolveSortProperty(Expression<Func<TRecord, object?>> selector)
+    {
+        var body = selector.Body;
+        if (body is UnaryExpression { NodeType: ExpressionType.Convert or ExpressionType.ConvertChecked } convert)
+        {
+            body = convert.Operand;
+        }
+
+        if (body is MemberExpression { Member: PropertyInfo propertyInfo }
+            && _model.ByClrName.TryGetValue(propertyInfo.Name, out var property))
+        {
+            if (property.Kind is RedisVLFieldKind.Tag or RedisVLFieldKind.Text or RedisVLFieldKind.Numeric)
+            {
+                return property;
+            }
+
+            throw new NotSupportedException(
+                $"Ordering by property '{propertyInfo.Name}' is not supported; only indexed data fields can be sorted.");
+        }
+
+        throw new NotSupportedException("OrderBy must reference an indexed record property.");
     }
 
     // Resets vector properties to their default so a record materialized from the full JSON document

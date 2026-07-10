@@ -56,6 +56,30 @@ public sealed class SearchQueryCommandBuilderTests
     }
 
     [Fact]
+    public void BuildsFilterSearchArgumentsWithSortBy()
+    {
+        var schema = new SearchSchema(
+            new IndexDefinition("movies-idx", "movie:", StorageType.Hash),
+            [
+                new TagFieldDefinition("genre"),
+                new NumericFieldDefinition("year", sortable: true)
+            ]);
+        var query = new FilterQuery(
+            Filter.Tag("genre").Eq("crime"),
+            offset: 0,
+            limit: 10,
+            sortBy: new SearchSortBy("@year", descending: true));
+
+        var arguments = SearchQueryCommandBuilder.BuildFilterSearchArguments(schema, query);
+        var rendered = arguments.Select(RenderArgument).ToArray();
+
+        Assert.Equal("@genre:{crime}", rendered[1]);
+        Assert.Equal(
+            ["SORTBY", "year", "DESC", "LIMIT", "0", "10", "DIALECT", "2"],
+            rendered[2..]);
+    }
+
+    [Fact]
     public void BuildsCountArgumentsWithNoContent()
     {
         var schema = new SearchSchema(

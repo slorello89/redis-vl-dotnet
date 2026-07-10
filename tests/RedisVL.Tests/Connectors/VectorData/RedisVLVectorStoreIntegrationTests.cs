@@ -111,10 +111,45 @@ public sealed class RedisVLVectorStoreIntegrationTests
     }
 
     [RedisSearchIntegrationFact]
-    public async Task GetAsync_WithOrderBy_ThrowsNotSupported()
+    public async Task GetAsync_WithSingleKeyOrderBy_SortsResults()
     {
         await using var harness = await ConnectorTestHarness.CreateAsync($"vectordata-it-{Guid.NewGuid():N}");
-        var options = new FilteredRecordRetrievalOptions<ConnectorMovie> { OrderBy = o => o.Ascending(m => m.Year) };
+        var collection = harness.Collection;
+
+        await collection.UpsertAsync(SampleMovies());
+        await RedisSearchTestEnvironment.WaitForIndexDocumentCountAsync(harness.Index, 4);
+
+        var ascending = new List<int>();
+        await foreach (var movie in collection.GetAsync(
+                           m => m.Year > 0,
+                           top: 10,
+                           new FilteredRecordRetrievalOptions<ConnectorMovie> { OrderBy = o => o.Ascending(m => m.Year) }))
+        {
+            ascending.Add(movie.Year);
+        }
+
+        Assert.Equal([1995, 1995, 1999, 2016], ascending);
+
+        var descending = new List<int>();
+        await foreach (var movie in collection.GetAsync(
+                           m => m.Year > 0,
+                           top: 10,
+                           new FilteredRecordRetrievalOptions<ConnectorMovie> { OrderBy = o => o.Descending(m => m.Year) }))
+        {
+            descending.Add(movie.Year);
+        }
+
+        Assert.Equal([2016, 1999, 1995, 1995], descending);
+    }
+
+    [RedisSearchIntegrationFact]
+    public async Task GetAsync_WithMultiKeyOrderBy_ThrowsNotSupported()
+    {
+        await using var harness = await ConnectorTestHarness.CreateAsync($"vectordata-it-{Guid.NewGuid():N}");
+        var options = new FilteredRecordRetrievalOptions<ConnectorMovie>
+        {
+            OrderBy = o => o.Ascending(m => m.Genre).Descending(m => m.Year),
+        };
 
         await Assert.ThrowsAsync<NotSupportedException>(async () =>
         {
