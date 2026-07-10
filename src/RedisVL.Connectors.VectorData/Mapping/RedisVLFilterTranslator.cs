@@ -14,7 +14,6 @@ namespace RedisVL.Connectors.VectorData.Mapping;
 internal sealed class RedisVLFilterTranslator
 {
     private readonly RedisVLRecordModel _model;
-    private ParameterExpression? _recordParameter;
 
     public RedisVLFilterTranslator(RedisVLRecordModel model)
     {
@@ -25,33 +24,36 @@ internal sealed class RedisVLFilterTranslator
     {
         ArgumentNullException.ThrowIfNull(filter);
 
-        _recordParameter = filter.Parameters[0];
-        return Visit(filter.Body);
+        // The lambda's record parameter is threaded through the visit recursion rather than stored
+        // on the instance: a single translator is shared per collection (typically a DI singleton),
+        // so concurrent Translate calls must not race over shared mutable state.
+        var recordParameter = filter.Parameters[0];
+        return Visit(filter.Body, recordParameter);
     }
 
-    private FilterExpression Visit(Expression node) =>
+    private FilterExpression Visit(Expression node, ParameterExpression recordParameter) =>
         node switch
         {
-            BinaryExpression binary => VisitBinary(binary),
-            UnaryExpression { NodeType: ExpressionType.Not } not => Filter.Not(Visit(not.Operand)),
-            MethodCallExpression call => VisitMethodCall(call),
-            MemberExpression member when member.Type == typeof(bool) => MapBool(member, expected: true),
-            UnaryExpression { NodeType: ExpressionType.Convert } convert => Visit(convert.Operand),
+            BinaryExpression binary => VisitBinary(binary, recordParameter),
+            UnaryExpression { NodeType: ExpressionType.Not } not => Filter.Not(Visit(not.Operand, recordParameter)),
+            MethodCallExpression call => VisitMethodCall(call, recordParameter),
+            MemberExpression member when member.Type == typeof(bool) => MapBool(member, expected: true, recordParameter),
+            UnaryExpression { NodeType: ExpressionType.Convert } convert => Visit(convert.Operand, recordParameter),
             _ => throw Unsupported(node),
         };
 
-    private FilterExpression VisitBinary(BinaryExpression binary)
+    private FilterExpression VisitBinary(BinaryExpression binary, ParameterExpression recordParameter)
     {
         switch (binary.NodeType)
         {
             case ExpressionType.AndAlso:
-                return Filter.And(Visit(binary.Left), Visit(binary.Right));
+                return Filter.And(Visit(binary.Left, recordParameter), Visit(binary.Right, recordParameter));
             case ExpressionType.OrElse:
-                return Filter.Or(Visit(binary.Left), Visit(binary.Right));
+                return Filter.Or(Visit(binary.Left, recordParameter), Visit(binary.Right, recordParameter));
         }
 
         // Comparison: one side is a record member, the other a constant/captured value.
-        var (property, value, fieldOnLeft) = ResolveComparison(binary.Left, binary.Right);
+        var (property, value, fieldOnLeft) = ResolveComparison(binary.Left, binary.Right, recordParameter);
 
         return binary.NodeType switch
         {
@@ -65,7 +67,7 @@ internal sealed class RedisVLFilterTranslator
         };
     }
 
-    private FilterExpression VisitMethodCall(MethodCallExpression call)
+    private FilterExpression VisitMethodCall(MethodCallExpression call, ParameterExpression recordParameter)
     {
         // Collection membership: values.Contains(record.Field)  OR  record.TagField.Contains(value)
         if (call.Method.Name == "Contains")
@@ -81,14 +83,14 @@ internal sealed class RedisVLFilterTranslator
             source = UnwrapSpanConversion(source);
 
             // record.TagField.Contains(constant) -> membership in the tag set.
-            if (TryGetProperty(source, out var collectionProperty))
+            if (TryGetProperty(source, recordParameter, out var collectionProperty))
             {
                 var memberValue = Evaluate(item);
                 return Filter.Tag(collectionProperty.JsonName).Eq(FormatTag(memberValue));
             }
 
             // constants.Contains(record.Field) -> field IN (values).
-            if (TryGetProperty(item, out var property))
+            if (TryGetProperty(item, recordParameter, out var property))
             {
                 var values = Evaluate(source) as IEnumerable
                     ?? throw Unsupported(call);
@@ -99,21 +101,22 @@ internal sealed class RedisVLFilterTranslator
 
         if (call.Method.Name == "Equals" && call.Object is not null && call.Arguments.Count == 1)
         {
-            var (property, value, _) = ResolveComparison(call.Object, call.Arguments[0]);
+            var (property, value, _) = ResolveComparison(call.Object, call.Arguments[0], recordParameter);
             return MapEquality(property, value, negate: false);
         }
 
         throw Unsupported(call);
     }
 
-    private (RedisVLProperty Property, object? Value, bool FieldOnLeft) ResolveComparison(Expression left, Expression right)
+    private (RedisVLProperty Property, object? Value, bool FieldOnLeft) ResolveComparison(
+        Expression left, Expression right, ParameterExpression recordParameter)
     {
-        if (TryGetProperty(left, out var leftProperty))
+        if (TryGetProperty(left, recordParameter, out var leftProperty))
         {
             return (leftProperty, Evaluate(right), true);
         }
 
-        if (TryGetProperty(right, out var rightProperty))
+        if (TryGetProperty(right, recordParameter, out var rightProperty))
         {
             return (rightProperty, Evaluate(left), false);
         }
@@ -121,9 +124,9 @@ internal sealed class RedisVLFilterTranslator
         throw new NotSupportedException("Filter comparison must reference a record property on one side.");
     }
 
-    private FilterExpression MapBool(MemberExpression member, bool expected)
+    private FilterExpression MapBool(MemberExpression member, bool expected, ParameterExpression recordParameter)
     {
-        if (!TryGetProperty(member, out var property))
+        if (!TryGetProperty(member, recordParameter, out var property))
         {
             throw Unsupported(member);
         }
@@ -165,12 +168,12 @@ internal sealed class RedisVLFilterTranslator
         };
     }
 
-    private bool TryGetProperty(Expression expression, out RedisVLProperty property)
+    private bool TryGetProperty(Expression expression, ParameterExpression recordParameter, out RedisVLProperty property)
     {
         var node = Unwrap(expression);
         if (node is MemberExpression member
             && member.Expression is not null
-            && IsRecordParameter(member.Expression)
+            && IsRecordParameter(member.Expression, recordParameter)
             && member.Member is PropertyInfo propertyInfo
             && _model.ByClrName.TryGetValue(propertyInfo.Name, out var resolved))
         {
@@ -182,8 +185,8 @@ internal sealed class RedisVLFilterTranslator
         return false;
     }
 
-    private bool IsRecordParameter(Expression expression) =>
-        Unwrap(expression) is ParameterExpression parameter && parameter == _recordParameter;
+    private static bool IsRecordParameter(Expression expression, ParameterExpression recordParameter) =>
+        Unwrap(expression) is ParameterExpression parameter && parameter == recordParameter;
 
     private static Expression Unwrap(Expression expression) =>
         expression is UnaryExpression { NodeType: ExpressionType.Convert or ExpressionType.ConvertChecked } convert

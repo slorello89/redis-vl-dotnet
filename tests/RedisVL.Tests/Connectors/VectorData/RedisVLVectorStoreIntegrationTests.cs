@@ -79,6 +79,95 @@ public sealed class RedisVLVectorStoreIntegrationTests
     }
 
     [RedisSearchIntegrationFact]
+    public async Task SearchAsync_WithOldFilter_ThrowsNotSupported()
+    {
+        await using var harness = await ConnectorTestHarness.CreateAsync($"vectordata-it-{Guid.NewGuid():N}");
+        var query = new ReadOnlyMemory<float>([0.9f, 0.1f, 0.0f, 0.1f]);
+#pragma warning disable CS0618 // deliberately exercising rejection of the obsolete OldFilter option
+        var options = new VectorSearchOptions<ConnectorMovie> { OldFilter = new VectorSearchFilter() };
+#pragma warning restore CS0618
+
+        await Assert.ThrowsAsync<NotSupportedException>(async () =>
+        {
+            await foreach (var _ in harness.Collection.SearchAsync(query, top: 5, options))
+            {
+            }
+        });
+    }
+
+    [RedisSearchIntegrationFact]
+    public async Task SearchAsync_WithScoreThreshold_ThrowsNotSupported()
+    {
+        await using var harness = await ConnectorTestHarness.CreateAsync($"vectordata-it-{Guid.NewGuid():N}");
+        var query = new ReadOnlyMemory<float>([0.9f, 0.1f, 0.0f, 0.1f]);
+        var options = new VectorSearchOptions<ConnectorMovie> { ScoreThreshold = 0.5 };
+
+        await Assert.ThrowsAsync<NotSupportedException>(async () =>
+        {
+            await foreach (var _ in harness.Collection.SearchAsync(query, top: 5, options))
+            {
+            }
+        });
+    }
+
+    [RedisSearchIntegrationFact]
+    public async Task GetAsync_WithOrderBy_ThrowsNotSupported()
+    {
+        await using var harness = await ConnectorTestHarness.CreateAsync($"vectordata-it-{Guid.NewGuid():N}");
+        var options = new FilteredRecordRetrievalOptions<ConnectorMovie> { OrderBy = o => o.Ascending(m => m.Year) };
+
+        await Assert.ThrowsAsync<NotSupportedException>(async () =>
+        {
+            await foreach (var _ in harness.Collection.GetAsync(m => m.Genre == "scifi", top: 5, options))
+            {
+            }
+        });
+    }
+
+    [RedisSearchIntegrationFact]
+    public async Task SearchAsync_IncludeVectors_HonorsOption()
+    {
+        await using var harness = await ConnectorTestHarness.CreateAsync($"vectordata-it-{Guid.NewGuid():N}");
+        var collection = harness.Collection;
+
+        await collection.UpsertAsync(SampleMovies());
+        await RedisSearchTestEnvironment.WaitForIndexDocumentCountAsync(harness.Index, 4);
+
+        var query = new ReadOnlyMemory<float>([0.9f, 0.1f, 0.0f, 0.1f]);
+
+        // Default (IncludeVectors == false): the vector must not be materialized onto the record.
+        var omitted = await FirstRecordAsync(collection.SearchAsync(query, top: 1));
+        Assert.Equal(0, omitted.Embedding.Length);
+
+        // IncludeVectors == true: the stored vector is returned.
+        var included = await FirstRecordAsync(collection.SearchAsync(
+            query,
+            top: 1,
+            new VectorSearchOptions<ConnectorMovie> { IncludeVectors = true }));
+        Assert.Equal(4, included.Embedding.Length);
+    }
+
+    [RedisSearchIntegrationFact]
+    public async Task GetAsync_ByKey_IncludeVectors_HonorsOption()
+    {
+        await using var harness = await ConnectorTestHarness.CreateAsync($"vectordata-it-{Guid.NewGuid():N}");
+        var collection = harness.Collection;
+
+        await collection.UpsertAsync(SampleMovies());
+        await RedisSearchTestEnvironment.WaitForIndexDocumentCountAsync(harness.Index, 4);
+
+        var omitted = await collection.GetAsync("thematrix");
+        Assert.NotNull(omitted);
+        Assert.Equal(0, omitted!.Embedding.Length);
+
+        var included = await collection.GetAsync(
+            "thematrix",
+            new RecordRetrievalOptions { IncludeVectors = true });
+        Assert.NotNull(included);
+        Assert.Equal(4, included!.Embedding.Length);
+    }
+
+    [RedisSearchIntegrationFact]
     public async Task CollectionExists_TracksLifecycle()
     {
         var name = $"vectordata-it-{Guid.NewGuid():N}";
@@ -122,6 +211,17 @@ public sealed class RedisVLVectorStoreIntegrationTests
         Assert.Equal(
             ["Heat", "Se7en"],
             await TitlesAsync(collection, m => !(m.Genre == "scifi")));
+    }
+
+    private static async Task<ConnectorMovie> FirstRecordAsync(
+        IAsyncEnumerable<VectorSearchResult<ConnectorMovie>> results)
+    {
+        await foreach (var result in results)
+        {
+            return result.Record;
+        }
+
+        throw new InvalidOperationException("Expected at least one search result.");
     }
 
     private static async Task<string[]> TitlesAsync(

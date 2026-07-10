@@ -70,13 +70,19 @@ public sealed class RedisVLCollection<TKey, TRecord> : VectorStoreCollection<TKe
         }
     }
 
-    public override Task<TRecord?> GetAsync(
+    public override async Task<TRecord?> GetAsync(
         TKey key,
         RecordRetrievalOptions? options = null,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(key);
-        return _index.FetchJsonByKeyAsync<TRecord>(ToRedisKey(key), cancellationToken);
+        var record = await _index.FetchJsonByKeyAsync<TRecord>(ToRedisKey(key), cancellationToken).ConfigureAwait(false);
+        if (record is not null && !(options?.IncludeVectors ?? false))
+        {
+            ClearVectors(record);
+        }
+
+        return record;
     }
 
     public override async IAsyncEnumerable<TRecord> GetAsync(
@@ -88,6 +94,13 @@ public sealed class RedisVLCollection<TKey, TRecord> : VectorStoreCollection<TKe
         ArgumentNullException.ThrowIfNull(filter);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(top);
 
+        if (options?.OrderBy is not null)
+        {
+            throw new NotSupportedException(
+                "FilteredRecordRetrievalOptions.OrderBy is not supported by the RedisVL connector.");
+        }
+
+        var includeVectors = options?.IncludeVectors ?? false;
         var skip = options?.Skip ?? 0;
         var query = new FilterQuery(
             _filterTranslator.Translate(filter),
@@ -100,6 +113,11 @@ public sealed class RedisVLCollection<TKey, TRecord> : VectorStoreCollection<TKe
             var record = await MaterializeAsync(document, cancellationToken).ConfigureAwait(false);
             if (record is not null)
             {
+                if (!includeVectors)
+                {
+                    ClearVectors(record);
+                }
+
                 yield return record;
             }
         }
@@ -137,6 +155,8 @@ public sealed class RedisVLCollection<TKey, TRecord> : VectorStoreCollection<TKe
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(top);
 
         options ??= new VectorSearchOptions<TRecord>();
+        ValidateSearchOptions(options);
+
         var vectorProperty = _model.ResolveVector(GetVectorPropertyName(options.VectorProperty));
         var skip = options.Skip;
         var window = skip + top;
@@ -151,6 +171,11 @@ public sealed class RedisVLCollection<TKey, TRecord> : VectorStoreCollection<TKe
             if (record is null)
             {
                 continue;
+            }
+
+            if (!options.IncludeVectors)
+            {
+                ClearVectors(record);
             }
 
             double? score = document.TryGetValue(ScoreAlias, out var rawScore)
@@ -211,6 +236,45 @@ public sealed class RedisVLCollection<TKey, TRecord> : VectorStoreCollection<TKe
         }
 
         return await _index.FetchJsonByKeyAsync<TRecord>(document.Id, cancellationToken).ConfigureAwait(false);
+    }
+
+    // Rejects options the RedisVL connector cannot honor. Per MEVD connector convention these throw
+    // rather than being silently dropped — silently ignoring OldFilter, for example, would run an
+    // unfiltered search and leak records the caller intended to exclude.
+    private static void ValidateSearchOptions(VectorSearchOptions<TRecord> options)
+    {
+#pragma warning disable CS0618 // OldFilter is obsolete; we still must detect and reject it.
+        if (options.OldFilter is not null)
+        {
+            throw new NotSupportedException(
+                "VectorSearchOptions.OldFilter is not supported by the RedisVL connector; use Filter instead.");
+        }
+#pragma warning restore CS0618
+
+        if (options.ScoreThreshold is not null)
+        {
+            throw new NotSupportedException(
+                "VectorSearchOptions.ScoreThreshold is not supported by the RedisVL connector.");
+        }
+    }
+
+    // Resets vector properties to their default so a record materialized from the full JSON document
+    // does not carry vectors the caller asked to omit (IncludeVectors == false, the MEVD default).
+    private void ClearVectors(TRecord record)
+    {
+        foreach (var vector in _model.Vectors)
+        {
+            var property = vector.Property;
+            if (!property.CanWrite)
+            {
+                continue;
+            }
+
+            var reset = property.PropertyType.IsValueType
+                ? Activator.CreateInstance(property.PropertyType)
+                : null;
+            property.SetValue(record, reset);
+        }
     }
 
     private string ToRedisKey(TKey key) => $"{_keyPrefix}{key}";
