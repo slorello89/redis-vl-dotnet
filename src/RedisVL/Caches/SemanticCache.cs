@@ -4,6 +4,7 @@ using System.Text;
 using System.Text.Json;
 using RedisVL.Filters;
 using RedisVL.Indexes;
+using RedisVL.Internal;
 using RedisVL.Queries;
 using RedisVL.Schema;
 using RedisVL.Vectorizers;
@@ -160,8 +161,9 @@ public sealed class SemanticCache
     {
         ArgumentNullException.ThrowIfNull(requests);
 
+        // Validate every request before issuing any lookup so a malformed request fails the whole
+        // call rather than after some lookups have already run.
         var materialized = requests.ToList();
-        var hits = new List<SemanticCacheHit?>(materialized.Count);
         foreach (var request in materialized)
         {
             ArgumentNullException.ThrowIfNull(request);
@@ -169,11 +171,12 @@ public sealed class SemanticCache
             {
                 throw new ArgumentException("Each check request must provide an embedding when no vectorizer is supplied.", nameof(requests));
             }
-
-            hits.Add(await CheckAsync(request.Prompt, request.Embedding, request.Filter, cancellationToken).ConfigureAwait(false));
         }
 
-        return hits;
+        return await RedisBatch.RunAsync(
+            materialized,
+            (request, _, token) => CheckAsync(request.Prompt, request.Embedding!, request.Filter, token),
+            cancellationToken).ConfigureAwait(false);
     }
 
     public async Task<IReadOnlyList<SemanticCacheHit?>> CheckManyAsync(
@@ -194,13 +197,10 @@ public sealed class SemanticCache
         var embeddings = await vectorizer.VectorizeManyAsync(prompts, cancellationToken).ConfigureAwait(false);
         cancellationToken.ThrowIfCancellationRequested();
 
-        var hits = new List<SemanticCacheHit?>(materialized.Count);
-        for (var index = 0; index < materialized.Count; index++)
-        {
-            hits.Add(await CheckAsync(materialized[index].Prompt, embeddings[index], materialized[index].Filter, cancellationToken).ConfigureAwait(false));
-        }
-
-        return hits;
+        return await RedisBatch.RunAsync(
+            materialized,
+            (request, index, token) => CheckAsync(request.Prompt, embeddings[index], request.Filter, token),
+            cancellationToken).ConfigureAwait(false);
     }
 
     private async Task<IReadOnlyList<SemanticCacheHit>> SearchHitsAsync(
@@ -319,14 +319,20 @@ public sealed class SemanticCache
     /// Stores multiple prompt/response pairs. Each request must carry its own embedding; the returned key
     /// list is aligned to the input order.
     /// </summary>
+    /// <remarks>
+    /// Requests are validated up front, then the writes are pipelined (dispatched concurrently) rather
+    /// than awaited one at a time. The batch is not transactional: if a write fails, entries dispatched
+    /// alongside it may already have been stored and are not rolled back.
+    /// </remarks>
     public async Task<IReadOnlyList<string>> StoreManyAsync(
         IEnumerable<SemanticCacheStoreRequest> requests,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(requests);
 
+        // Validate every request before issuing any write so a malformed request fails the whole
+        // call rather than after some entries have already been stored.
         var materialized = requests.ToList();
-        var keys = new List<string>(materialized.Count);
         foreach (var request in materialized)
         {
             ArgumentNullException.ThrowIfNull(request);
@@ -334,11 +340,12 @@ public sealed class SemanticCache
             {
                 throw new ArgumentException("Each store request must provide an embedding when no vectorizer is supplied.", nameof(requests));
             }
-
-            keys.Add(await StoreAsync(request.Prompt, request.Response, request.Embedding, request.Metadata, request.FilterValues, cancellationToken).ConfigureAwait(false));
         }
 
-        return keys;
+        return await RedisBatch.RunAsync(
+            materialized,
+            (request, _, token) => StoreAsync(request.Prompt, request.Response, request.Embedding!, request.Metadata, request.FilterValues, token),
+            cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -363,14 +370,10 @@ public sealed class SemanticCache
         var embeddings = await vectorizer.VectorizeManyAsync(prompts, cancellationToken).ConfigureAwait(false);
         cancellationToken.ThrowIfCancellationRequested();
 
-        var keys = new List<string>(materialized.Count);
-        for (var index = 0; index < materialized.Count; index++)
-        {
-            var request = materialized[index];
-            keys.Add(await StoreAsync(request.Prompt, request.Response, embeddings[index], request.Metadata, request.FilterValues, cancellationToken).ConfigureAwait(false));
-        }
-
-        return keys;
+        return await RedisBatch.RunAsync(
+            materialized,
+            (request, index, token) => StoreAsync(request.Prompt, request.Response, embeddings[index], request.Metadata, request.FilterValues, token),
+            cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>

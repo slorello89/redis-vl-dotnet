@@ -14,6 +14,28 @@ All notable changes to this project are documented here. This project adheres to
   shape and handles both protocols, so no connection needs to be pinned to RESP2. A RESP3 leg was
   added to CI to lock this in (issue #43).
 
+### Performance
+
+- **Bulk and batch APIs now pipeline** — every bulk/batch path used to `await` one command per item,
+  paying a full network round trip before issuing the next (10k documents at 1 ms RTT ≈ 10 s). They
+  now dispatch commands in bounded batches and let StackExchange.Redis pipeline them over the
+  multiplexer, collapsing a batch to roughly a single round trip. Affected: `SearchIndex.LoadJsonAsync`
+  / `LoadHashAsync` (batch overloads) and `SearchAsync(MultiVectorQuery)`;
+  `SemanticCache.CheckManyAsync` / `StoreManyAsync`; every `EmbeddingsCache` `*Many` method;
+  `SemanticRouter.AddRouteAsync(Route, …)` / `AddRouteReferencesAsync`; and
+  `RedisVLCollection.UpsertAsync(IEnumerable<TRecord>)` (issue #44).
+- **Batch delete methods issue one round trip** — `EmbeddingsCache.DeleteManyAsync` /
+  `DeleteManyByKeyAsync` now pipeline single-key deletes (cluster-slot-safe, matching
+  `SearchIndex.ClearAsync`) instead of awaiting each delete serially.
+
+### Changed
+
+- **Batch write failure semantics** — because batch writes are now dispatched concurrently, the
+  `*Many` / bulk-load methods are no longer implicitly all-or-nothing on the first failure. Inputs are
+  validated up front (so a malformed request fails the whole call before any command is issued), but a
+  Redis-level failure mid-batch may leave siblings dispatched alongside it already applied; batches are
+  not transactional and are not rolled back. Results/keys remain aligned to input order (issue #44).
+
 ### Added
 
 - **`RedisVL.Vectorizers.Cohere`** — a Cohere v2 `embed`-backed `IBatchTextVectorizer`

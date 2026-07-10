@@ -5,6 +5,7 @@ using System.Text.Json;
 using RedisVL.Caches;
 using RedisVL.Filters;
 using RedisVL.Indexes;
+using RedisVL.Internal;
 using RedisVL.Queries;
 using RedisVL.Schema;
 using RedisVL.Vectorizers;
@@ -117,19 +118,16 @@ public sealed class SemanticRouter
         cancellationToken.ThrowIfCancellationRequested();
 
         var metadata = SerializeMetadata(route.Metadata);
-        var keys = new List<string>(route.References.Count);
-        for (var index = 0; index < route.References.Count; index++)
-        {
-            keys.Add(await WriteReferenceAsync(
+        return await RedisBatch.RunAsync(
+            route.References,
+            (reference, index, token) => WriteReferenceAsync(
                 route.Name,
-                route.References[index],
+                reference,
                 embeddings[index],
                 route.DistanceThreshold,
                 metadata,
-                cancellationToken).ConfigureAwait(false));
-        }
-
-        return keys;
+                token),
+            cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -176,19 +174,24 @@ public sealed class SemanticRouter
 
         cancellationToken.ThrowIfCancellationRequested();
 
-        var keys = new List<string>(references.Count);
+        // Normalize every reference up front so a blank reference fails the whole call before any
+        // write, then pipeline the HSET commands instead of awaiting one per reference.
+        var normalizedReferences = new string[references.Count];
         for (var index = 0; index < references.Count; index++)
         {
-            keys.Add(await WriteReferenceAsync(
+            normalizedReferences[index] = NormalizeReference(references[index]);
+        }
+
+        return await RedisBatch.RunAsync(
+            normalizedReferences,
+            (reference, index, token) => WriteReferenceAsync(
                 normalizedRouteName,
-                NormalizeReference(references[index]),
+                reference,
                 embeddings[index],
                 distanceThreshold: null,
                 metadata: null,
-                cancellationToken).ConfigureAwait(false));
-        }
-
-        return keys;
+                token),
+            cancellationToken).ConfigureAwait(false);
     }
 
     public async Task<IReadOnlyList<string>> AddRouteReferencesAsync(

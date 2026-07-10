@@ -1,3 +1,4 @@
+using RedisVL.Internal;
 using RedisVL.Schema;
 using RedisVL.Queries;
 using StackExchange.Redis;
@@ -131,17 +132,21 @@ public sealed class SearchIndex
         EnsureJsonStorage();
         ArgumentNullException.ThrowIfNull(documents);
 
-        var loadedKeys = new List<string>();
-        foreach (var document in documents)
+        // Resolve every key up front (pure CPU, no I/O) so a bad key fails the whole call before any
+        // document is written, then pipeline the JSON.SET commands instead of awaiting one per item.
+        var materialized = documents as IReadOnlyList<TDocument> ?? documents.ToList();
+        var keys = new string[materialized.Count];
+        for (var index = 0; index < materialized.Count; index++)
         {
-            cancellationToken.ThrowIfCancellationRequested();
-
-            var resolvedKey = DocumentKeyResolver.ResolveKeyForSelectors(Schema, document, keySelector, idSelector);
-            await SetJsonDocumentAsync(resolvedKey, document, cancellationToken).ConfigureAwait(false);
-            loadedKeys.Add(resolvedKey);
+            keys[index] = DocumentKeyResolver.ResolveKeyForSelectors(Schema, materialized[index], keySelector, idSelector);
         }
 
-        return loadedKeys;
+        await RedisBatch.RunAsync(
+            materialized,
+            (document, index, token) => SetJsonDocumentAsync(keys[index], document, token),
+            cancellationToken).ConfigureAwait(false);
+
+        return keys;
     }
 
     public async Task<TDocument?> FetchJsonByKeyAsync<TDocument>(string key, CancellationToken cancellationToken = default)
@@ -229,17 +234,21 @@ public sealed class SearchIndex
         EnsureHashStorage();
         ArgumentNullException.ThrowIfNull(documents);
 
-        var loadedKeys = new List<string>();
-        foreach (var document in documents)
+        // Resolve every key up front (pure CPU, no I/O) so a bad key fails the whole call before any
+        // document is written, then pipeline the HSET commands instead of awaiting one per item.
+        var materialized = documents as IReadOnlyList<TDocument> ?? documents.ToList();
+        var keys = new string[materialized.Count];
+        for (var index = 0; index < materialized.Count; index++)
         {
-            cancellationToken.ThrowIfCancellationRequested();
-
-            var resolvedKey = DocumentKeyResolver.ResolveKeyForSelectors(Schema, document, keySelector, idSelector);
-            await SetHashDocumentAsync(resolvedKey, document, cancellationToken).ConfigureAwait(false);
-            loadedKeys.Add(resolvedKey);
+            keys[index] = DocumentKeyResolver.ResolveKeyForSelectors(Schema, materialized[index], keySelector, idSelector);
         }
 
-        return loadedKeys;
+        await RedisBatch.RunAsync(
+            materialized,
+            (document, index, token) => SetHashDocumentAsync(keys[index], document, token),
+            cancellationToken).ConfigureAwait(false);
+
+        return keys;
     }
 
     public async Task<TDocument?> FetchHashByKeyAsync<TDocument>(string key, CancellationToken cancellationToken = default)
@@ -315,12 +324,14 @@ public sealed class SearchIndex
     {
         ArgumentNullException.ThrowIfNull(query);
 
-        var perVectorResults = new List<SearchResults>(query.Vectors.Count);
-        foreach (var arguments in SearchQueryCommandBuilder.BuildMultiVectorSearchArguments(Schema, query))
-        {
-            var result = await ExecuteAsync("FT.SEARCH", arguments, cancellationToken).ConfigureAwait(false);
-            perVectorResults.Add(SearchResultsParser.Parse(result));
-        }
+        // Each sub-vector is an independent FT.SEARCH; pipeline them instead of awaiting one before
+        // issuing the next. Results stay aligned to the sub-vector order for CombineMultiVectorResults.
+        var perVectorArguments = SearchQueryCommandBuilder.BuildMultiVectorSearchArguments(Schema, query);
+        var perVectorResults = await RedisBatch.RunAsync(
+            perVectorArguments,
+            async (arguments, _, token) =>
+                SearchResultsParser.Parse(await ExecuteAsync("FT.SEARCH", arguments, token).ConfigureAwait(false)),
+            cancellationToken).ConfigureAwait(false);
 
         return CombineMultiVectorResults(query, perVectorResults);
     }
