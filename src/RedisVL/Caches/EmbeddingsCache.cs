@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using RedisVL.Internal;
 using StackExchange.Redis;
 
 namespace RedisVL.Caches;
@@ -144,6 +145,12 @@ public sealed class EmbeddingsCache
         return true;
     }
 
+    /// <summary>Stores multiple embedding entries, returning results aligned to input order.</summary>
+    /// <remarks>
+    /// The writes are pipelined (dispatched concurrently) rather than awaited one at a time. The batch
+    /// is not transactional: if a write fails, entries dispatched alongside it may already have been
+    /// stored and are not rolled back.
+    /// </remarks>
     public async Task<IReadOnlyList<EmbeddingsCacheEntry>> SetManyAsync(
         IReadOnlyList<EmbeddingsCacheWriteRequest> entries,
         CancellationToken cancellationToken = default)
@@ -155,21 +162,16 @@ public sealed class EmbeddingsCache
             return [];
         }
 
-        var results = new EmbeddingsCacheEntry[entries.Count];
-        for (var index = 0; index < entries.Count; index++)
-        {
-            var entry = entries[index];
-            var normalizedModelName = entry.ModelName is null ? null : NormalizeModelName(entry.ModelName);
-            results[index] = await SetAsyncCore(
+        return await RedisBatch.RunAsync(
+            entries,
+            (entry, _, token) => SetAsyncCore(
                 entry.Input,
                 entry.Embedding,
-                normalizedModelName,
+                entry.ModelName is null ? null : NormalizeModelName(entry.ModelName),
                 entry.Metadata,
                 entry.TimeToLive,
-                cancellationToken).ConfigureAwait(false);
-        }
-
-        return results;
+                token),
+            cancellationToken).ConfigureAwait(false);
     }
 
     public Task<EmbeddingsCacheEntry?> GetAsync(string input, CancellationToken cancellationToken = default) =>
@@ -192,16 +194,12 @@ public sealed class EmbeddingsCache
             return [];
         }
 
-        var results = new EmbeddingsCacheEntry?[lookups.Count];
-        for (var index = 0; index < lookups.Count; index++)
-        {
-            var lookup = lookups[index];
-            results[index] = lookup.ModelName is null
-                ? await GetAsync(lookup.Input, cancellationToken).ConfigureAwait(false)
-                : await GetAsync(lookup.Input, lookup.ModelName, cancellationToken).ConfigureAwait(false);
-        }
-
-        return results;
+        return await RedisBatch.RunAsync(
+            lookups,
+            (lookup, _, token) => lookup.ModelName is null
+                ? GetAsync(lookup.Input, token)
+                : GetAsync(lookup.Input, lookup.ModelName, token),
+            cancellationToken).ConfigureAwait(false);
     }
 
     public Task<EmbeddingsCacheEntry?> GetByKeyAsync(string key, CancellationToken cancellationToken = default) =>
@@ -218,13 +216,10 @@ public sealed class EmbeddingsCache
             return [];
         }
 
-        var results = new EmbeddingsCacheEntry?[keys.Count];
-        for (var index = 0; index < keys.Count; index++)
-        {
-            results[index] = await GetByKeyAsync(keys[index], cancellationToken).ConfigureAwait(false);
-        }
-
-        return results;
+        return await RedisBatch.RunAsync(
+            keys,
+            (key, _, token) => GetByKeyAsync(key, token),
+            cancellationToken).ConfigureAwait(false);
     }
 
     public Task<EmbeddingsCacheEntry?> LookupAsync(string input, CancellationToken cancellationToken = default) =>
@@ -274,16 +269,12 @@ public sealed class EmbeddingsCache
             return [];
         }
 
-        var results = new bool[lookups.Count];
-        for (var index = 0; index < lookups.Count; index++)
-        {
-            var lookup = lookups[index];
-            results[index] = lookup.ModelName is null
-                ? await ExistsAsync(lookup.Input, cancellationToken).ConfigureAwait(false)
-                : await ExistsAsync(lookup.Input, lookup.ModelName, cancellationToken).ConfigureAwait(false);
-        }
-
-        return results;
+        return await RedisBatch.RunAsync(
+            lookups,
+            (lookup, _, token) => lookup.ModelName is null
+                ? ExistsAsync(lookup.Input, token)
+                : ExistsAsync(lookup.Input, lookup.ModelName, token),
+            cancellationToken).ConfigureAwait(false);
     }
 
     public Task<bool> ExistsByKeyAsync(string key, CancellationToken cancellationToken = default) =>
@@ -300,13 +291,10 @@ public sealed class EmbeddingsCache
             return [];
         }
 
-        var results = new bool[keys.Count];
-        for (var index = 0; index < keys.Count; index++)
-        {
-            results[index] = await ExistsByKeyAsync(keys[index], cancellationToken).ConfigureAwait(false);
-        }
-
-        return results;
+        return await RedisBatch.RunAsync(
+            keys,
+            (key, _, token) => ExistsByKeyAsync(key, token),
+            cancellationToken).ConfigureAwait(false);
     }
 
     public Task<bool> DeleteAsync(string input, CancellationToken cancellationToken = default) =>
@@ -329,20 +317,14 @@ public sealed class EmbeddingsCache
             return 0;
         }
 
-        var deletedCount = 0L;
-        for (var index = 0; index < lookups.Count; index++)
-        {
-            var lookup = lookups[index];
-            var deleted = lookup.ModelName is null
-                ? await DeleteAsync(lookup.Input, cancellationToken).ConfigureAwait(false)
-                : await DeleteAsync(lookup.Input, lookup.ModelName, cancellationToken).ConfigureAwait(false);
-            if (deleted)
-            {
-                deletedCount++;
-            }
-        }
+        var deletions = await RedisBatch.RunAsync(
+            lookups,
+            (lookup, _, token) => lookup.ModelName is null
+                ? DeleteAsync(lookup.Input, token)
+                : DeleteAsync(lookup.Input, lookup.ModelName, token),
+            cancellationToken).ConfigureAwait(false);
 
-        return deletedCount;
+        return deletions.Count(static deleted => deleted);
     }
 
     public Task<bool> DeleteByKeyAsync(string key, CancellationToken cancellationToken = default) =>
@@ -359,16 +341,15 @@ public sealed class EmbeddingsCache
             return 0;
         }
 
-        var deletedCount = 0L;
-        for (var index = 0; index < keys.Count; index++)
-        {
-            if (await DeleteByKeyAsync(keys[index], cancellationToken).ConfigureAwait(false))
-            {
-                deletedCount++;
-            }
-        }
+        // Delete one key per command rather than a single multi-key DEL: on a cluster a batch
+        // spanning multiple hash slots would raise CROSSSLOT. The commands are pipelined over the
+        // multiplexer, so this is still a single round trip, matching SearchIndex.ClearAsync.
+        var deletions = await RedisBatch.RunAsync(
+            keys,
+            (key, _, token) => DeleteByKeyAsync(key, token),
+            cancellationToken).ConfigureAwait(false);
 
-        return deletedCount;
+        return deletions.Count(static deleted => deleted);
     }
 
     internal RedisKey CreateKey(string input) => CreateKey(input, modelName: null);

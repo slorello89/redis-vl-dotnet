@@ -115,10 +115,13 @@ public sealed class RedisVLCollection<TKey, TRecord> : VectorStoreCollection<TKe
     public override async Task UpsertAsync(IEnumerable<TRecord> records, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(records);
-        foreach (var record in records)
-        {
-            await UpsertAsync(record, cancellationToken).ConfigureAwait(false);
-        }
+
+        // Delegate to the pipelined batch loader so records are dispatched concurrently over the
+        // multiplexer rather than awaited one round trip at a time.
+        await _index.LoadJsonAsync(
+            records,
+            keySelector: record => ToRedisKey(GetRecordKey(record)),
+            cancellationToken: cancellationToken).ConfigureAwait(false);
     }
 
     public override Task DeleteAsync(TKey key, CancellationToken cancellationToken = default)

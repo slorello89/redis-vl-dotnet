@@ -211,6 +211,34 @@ public sealed class SearchIndexAsyncTests
     }
 
     [Fact]
+    public async Task LoadHashAsync_PipelinesEveryDocumentBeforeAwaitingReplies()
+    {
+        var (database, recorder) = RecordingDatabaseProxy.CreatePair();
+        var index = new SearchIndex(database, CreateHashSchema("pipelined-load"));
+
+        // Hold every HSET open. Sequential awaiting would stall after the first document; a
+        // pipelined batch dispatches all of them before awaiting any reply.
+        var gate = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        recorder.OnHashSetAsync = (_, _) => gate.Task;
+
+        var documents = Enumerable.Range(0, 5)
+            .Select(i => new HashMovieDocument(i.ToString(), $"Title {i}", 1990 + i, "crime"))
+            .ToArray();
+
+        var loadTask = index.LoadHashAsync<HashMovieDocument>(documents);
+
+        Assert.Equal(documents.Length, recorder.HashSetAsyncCallCount);
+        Assert.False(loadTask.IsCompleted);
+
+        gate.SetResult(true);
+        var keys = await loadTask;
+
+        Assert.Equal(
+            documents.Select(document => $"{index.Schema.Index.Prefix}{document.Id}").ToArray(),
+            keys.ToArray());
+    }
+
+    [Fact]
     public async Task ClearAsync_EnumeratesEveryMasterAndDeletesKeysIndividually()
     {
         var (database, recorder) = RecordingDatabaseProxy.CreatePair();
