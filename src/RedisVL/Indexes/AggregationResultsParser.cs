@@ -12,6 +12,11 @@ internal static class AggregationResultsParser
             return new AggregationResults(0, []);
         }
 
+        if (SearchReplyReader.IsMapReply(result))
+        {
+            return ParseMapReply(result);
+        }
+
         var entries = (RedisResult[])result!;
         if (entries.Length == 0)
         {
@@ -27,5 +32,33 @@ internal static class AggregationResultsParser
         }
 
         return new AggregationResults(totalCount, rows);
+    }
+
+    // RESP3 FT.AGGREGATE replies are maps ({ total_results, results: [{ extra_attributes }, ...] })
+    // rather than the flat RESP2 array. See SearchReplyReader for the shape details.
+    private static AggregationResults ParseMapReply(RedisResult result)
+    {
+        var map = SearchReplyReader.ToMap(result);
+        var totalCount = SearchReplyReader.ReadTotalCount(map);
+        var rows = SearchReplyReader.ReadRows(map);
+
+        var resultRows = new List<AggregationResultRow>(rows.Length);
+        foreach (var row in rows)
+        {
+            var fields = SearchResultsParser.ParseValues(
+                SearchReplyReader.ExtractEnvelopedRowFields(row),
+                "Aggregation result field name cannot be null.");
+
+            // RESP3 aggregate replies can carry field-less rows (no extra_attributes); they hold no
+            // data and would break Rows.Count-based batch paging, so drop them.
+            if (fields.Count == 0)
+            {
+                continue;
+            }
+
+            resultRows.Add(new AggregationResultRow(fields));
+        }
+
+        return new AggregationResults(totalCount, resultRows);
     }
 }

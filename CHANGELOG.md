@@ -5,6 +5,15 @@ All notable changes to this project are documented here. This project adheres to
 
 ## [0.0.6] - Unreleased
 
+### Fixed
+
+- **RESP3 result parsing** — `FT.SEARCH`, `FT.AGGREGATE`, and `FT.HYBRID` replies are now parsed
+  correctly on connections negotiated over RESP3 (`ConfigurationOptions.Protocol =
+  RedisProtocol.Resp3`). Previously the parsers assumed the flat RESP2 reply shape and threw
+  `InvalidCastException` against the map-shaped RESP3 replies. The library now detects the reply
+  shape and handles both protocols, so no connection needs to be pinned to RESP2. A RESP3 leg was
+  added to CI to lock this in (issue #43).
+
 ### Added
 
 - **`RedisVL.Vectorizers.Cohere`** — a Cohere v2 `embed`-backed `IBatchTextVectorizer`

@@ -81,9 +81,14 @@ jobs:
         # Run each target framework's test host sequentially. The test project multi-targets
         # net8.0/net9.0/net10.0, and letting `dotnet test` run them concurrently against the single
         # shared Redis service makes the integration tests flake, so drive one TFM at a time.
+        #
+        # The suite runs twice: once over the default RESP2 protocol and once over RESP3
+        # (REDIS_VL_REDIS_PROTOCOL=3) so the result parsers are exercised against both reply shapes.
         run: |
-          for tfm in net8.0 net9.0 net10.0; do
-            echo "::group::Test $tfm"
-            dotnet test redis-vl-dotnet.sln --no-build --framework "$tfm" --verbosity normal
-            echo "::endgroup::"
+          for protocol in 2 3; do
+            for tfm in net8.0 net9.0 net10.0; do
+              echo "::group::Test $tfm (RESP$protocol)"
+              REDIS_VL_REDIS_PROTOCOL="$protocol" dotnet test redis-vl-dotnet.sln --no-build --framework "$tfm" --verbosity normal
+              echo "::endgroup::"
+            done
           done

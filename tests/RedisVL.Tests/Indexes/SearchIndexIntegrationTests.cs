@@ -1016,12 +1016,14 @@ public sealed class SearchIndexIntegrationTests
             var rawResults = await index.AggregateAsync(query);
             var typedResults = await index.AggregateAsync<GenreAggregationRow>(query);
 
-            Assert.Equal(2, rawResults.TotalCount);
+            // TotalCount (the FT.AGGREGATE leading count) is documented as unreliable and varies by
+            // protocol/version, so assert on the reliable returned-row count instead.
+            Assert.Equal(2, rawResults.Rows.Count);
             Assert.Equal(["crime", "science-fiction"], rawResults.Rows.Select(static row => row.Values["genre"].ToString()).ToArray());
             Assert.Equal(["2", "1"], rawResults.Rows.Select(static row => row.Values["movieCount"].ToString()).ToArray());
             Assert.Equal(["1988", "2016"], rawResults.Rows.Select(static row => row.Values["averageYear"].ToString()).ToArray());
 
-            Assert.Equal(2, typedResults.TotalCount);
+            Assert.Equal(2, typedResults.Rows.Count);
             Assert.Collection(
                 typedResults.Rows,
                 row =>
@@ -1084,7 +1086,8 @@ public sealed class SearchIndexIntegrationTests
 
             var results = await index.AggregateAsync(query);
 
-            Assert.Equal(2, results.TotalCount);
+            // Paging (offset 1, limit 1) must return the second group as its own page. TotalCount
+            // (the FT.AGGREGATE leading count) is documented as unreliable, so it is not asserted.
             var row = Assert.Single(results.Rows);
             Assert.Equal("science-fiction", row.Values["genre"]);
             Assert.Equal("1", row.Values["movieCount"]);
@@ -1197,11 +1200,13 @@ public sealed class SearchIndexIntegrationTests
             var rawResults = await index.AggregateAsync(query);
             var typedResults = await index.AggregateAsync<HybridAggregationRow>(query);
 
-            Assert.Equal(2, rawResults.TotalCount);
+            // TotalCount (the FT.AGGREGATE leading count) is documented as unreliable and varies by
+            // protocol/version, so assert on the reliable returned-row count instead.
+            Assert.Equal(2, rawResults.Rows.Count);
             Assert.Equal(["crime", "science-fiction"], rawResults.Rows.Select(static row => row.Values["genre"].ToString()).ToArray());
             Assert.Equal(["2", "1"], rawResults.Rows.Select(static row => row.Values["matchCount"].ToString()).ToArray());
 
-            Assert.Equal(2, typedResults.TotalCount);
+            Assert.Equal(2, typedResults.Rows.Count);
             Assert.Collection(
                 typedResults.Rows,
                 row =>
