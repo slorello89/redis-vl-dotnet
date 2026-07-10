@@ -286,8 +286,19 @@ internal sealed class BertTokenizerJsonPairTokenizer : IOnnxPairTokenizer
         };
     }
 
-    private static bool IsInvalidCodePoint(char character) =>
-        character == '\0' || character == '\uFFFD' || char.GetUnicodeCategory(character) == UnicodeCategory.Control;
+    private static bool IsInvalidCodePoint(char character)
+    {
+        // Tab, newline and carriage return are technically control characters but
+        // the BERT reference tokenizer treats them as whitespace, so they must
+        // survive clean_text and get normalized to a space below rather than being
+        // deleted (which would merge words across line breaks).
+        if (character is '\t' or '\n' or '\r')
+        {
+            return false;
+        }
+
+        return character == '\0' || character == '\uFFFD' || char.GetUnicodeCategory(character) == UnicodeCategory.Control;
+    }
 
     private static bool IsChineseCharacter(char character) =>
         character is >= '\u4E00' and <= '\u9FFF' or

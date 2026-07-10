@@ -44,6 +44,24 @@ public sealed class OnnxTextTokenizerTests
         Assert.Equal([0L, 0L, 0L, 0L], encoded.TokenTypeIds);
     }
 
+    [Theory]
+    [InlineData("hello\nworld")]
+    [InlineData("hello\tworld")]
+    [InlineData("hello\rworld")]
+    [InlineData("hello\r\nworld")]
+    public void Encode_TreatsTabsAndNewlinesAsWhitespace(string text)
+    {
+        using var fixture = TokenizerFixture.Create(TokenizerJson);
+        var tokenizer = new BertTokenizerJsonTextTokenizer(fixture.Path);
+
+        var encoded = tokenizer.Encode(text, maxSequenceLength: 16);
+
+        // \t, \n and \r must split words like a space (matching the BERT
+        // reference tokenizer) rather than being dropped as control characters,
+        // which would otherwise merge "hello" and "world" into one [UNK] token.
+        Assert.Equal([2L, 4L, 5L, 3L], encoded.InputIds);
+    }
+
     [Fact]
     public void Encode_MapsOutOfVocabularyWordsToUnknownToken()
     {
