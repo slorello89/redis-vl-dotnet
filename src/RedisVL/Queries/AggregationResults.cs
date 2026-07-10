@@ -18,11 +18,13 @@ public sealed class AggregationResults
     }
 
     /// <summary>
-    /// The leading element of the <c>FT.AGGREGATE</c> reply. For GROUPBY pipelines this is the
-    /// number of groups. For non-GROUPBY (LOAD/APPLY-only) pipelines Redis returns <c>1</c>
-    /// rather than the number of matching rows, so this value is not a reliable total row count
-    /// for those pipelines. Use <see cref="Rows"/>.<see cref="System.Collections.Generic.IReadOnlyList{T}.Count"/>
-    /// for the number of rows actually returned.
+    /// The count reported at the head of the <c>FT.AGGREGATE</c> reply (the leading array element
+    /// over RESP2, the <c>total_results</c> map entry over RESP3). This value is <b>not reliable</b>
+    /// and varies by pipeline, protocol, and Redis version: for non-GROUPBY (LOAD/APPLY-only)
+    /// pipelines Redis returns <c>1</c> rather than the matching-row count, and for GROUPBY pipelines
+    /// it may report either the number of groups or the number of matched input records. Use
+    /// <see cref="Rows"/>.<see cref="System.Collections.Generic.IReadOnlyList{T}.Count"/> for the
+    /// number of rows actually returned.
     /// </summary>
     public long TotalCount { get; }
 
@@ -70,11 +72,13 @@ public sealed class AggregationResults<TDocument>
     }
 
     /// <summary>
-    /// The leading element of the <c>FT.AGGREGATE</c> reply. For GROUPBY pipelines this is the
-    /// number of groups. For non-GROUPBY (LOAD/APPLY-only) pipelines Redis returns <c>1</c>
-    /// rather than the number of matching rows, so this value is not a reliable total row count
-    /// for those pipelines. Use <see cref="Rows"/>.<see cref="System.Collections.Generic.IReadOnlyList{T}.Count"/>
-    /// for the number of rows actually returned.
+    /// The count reported at the head of the <c>FT.AGGREGATE</c> reply (the leading array element
+    /// over RESP2, the <c>total_results</c> map entry over RESP3). This value is <b>not reliable</b>
+    /// and varies by pipeline, protocol, and Redis version: for non-GROUPBY (LOAD/APPLY-only)
+    /// pipelines Redis returns <c>1</c> rather than the matching-row count, and for GROUPBY pipelines
+    /// it may report either the number of groups or the number of matched input records. Use
+    /// <see cref="Rows"/>.<see cref="System.Collections.Generic.IReadOnlyList{T}.Count"/> for the
+    /// number of rows actually returned.
     /// </summary>
     public long TotalCount { get; }
 
