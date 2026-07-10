@@ -54,9 +54,10 @@ internal static class HybridSearchResultsParser
 
         foreach (var row in (RedisResult[])results!)
         {
-            var fields = SearchResultsParser.ParseValues(
-                SearchReplyReader.ExtractRowFields(row),
-                "Hybrid search result field name cannot be null.");
+            // FT.HYBRID rows are a flat field/value collection on both protocols — an array over
+            // RESP2 and a map (which flattens to the same key/value pairs) over RESP3 — so the row
+            // itself is the field list; there is no extra_attributes envelope to unwrap.
+            var fields = SearchResultsParser.ParseValues(row, "Hybrid search result field name cannot be null.");
 
             if (!fields.TryGetValue(HybridSearchQuery.KeyField, out var documentKey))
             {

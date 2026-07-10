@@ -61,14 +61,19 @@ internal static class SearchReplyReader
             : [];
 
     /// <summary>
-    /// Extracts the field/value payload from a result row. Under RESP3 the fields are nested under
-    /// an <c>extra_attributes</c> map; otherwise the row is already the flat field/value collection.
+    /// Extracts the field/value payload from a <c>FT.SEARCH</c>/<c>FT.AGGREGATE</c> result row. Under
+    /// RESP3 such a row is a map whose fields live under <c>extra_attributes</c>; its sibling keys
+    /// (<c>id</c>, <c>values</c>) are row metadata, not fields, so a row-map without
+    /// <c>extra_attributes</c> carries no fields. Over RESP2 the row is already the flat field/value
+    /// array. (<c>FT.HYBRID</c> rows use no envelope and are parsed directly, not via this method.)
     /// </summary>
-    public static RedisResult ExtractRowFields(RedisResult row)
+    public static RedisResult ExtractEnvelopedRowFields(RedisResult row)
     {
-        if (IsMapReply(row) && ToMap(row).TryGetValue(ExtraAttributesKey, out var attributes))
+        if (IsMapReply(row))
         {
-            return attributes;
+            return ToMap(row).TryGetValue(ExtraAttributesKey, out var attributes)
+                ? attributes
+                : RedisResult.Create(Array.Empty<RedisResult>());
         }
 
         return row;

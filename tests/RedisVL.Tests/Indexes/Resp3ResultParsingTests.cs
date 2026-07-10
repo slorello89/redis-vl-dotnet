@@ -73,6 +73,27 @@ public sealed class Resp3ResultParsingTests
     }
 
     [Fact]
+    public void AggregationResultsParser_SkipsResp3RowsWithoutFields()
+    {
+        // RESP3 aggregate replies can include field-less rows (a row map with no extra_attributes,
+        // only metadata like values). Those carry no data and must be dropped rather than parsed as
+        // rows whose sibling metadata keys masquerade as fields.
+        var reply = Map(
+            ("results", RedisResult.Create(
+            [
+                AggregateRow(("title", "hello world"), ("price", "10")),
+                Map(("values", RedisResult.Create(Array.Empty<RedisResult>()))),
+            ])),
+            ("total_results", RedisResult.Create(2)));
+
+        var results = AggregationResultsParser.Parse(reply);
+
+        var row = Assert.Single(results.Rows);
+        Assert.Equal("hello world", row.Values["title"].ToString());
+        Assert.False(row.Values.ContainsKey("values"));
+    }
+
+    [Fact]
     public void HybridSearchResultsParser_ParsesResp3MapReplyWithFlatRows()
     {
         // FT.HYBRID keeps flat field/value rows even under RESP3, but the top-level reply is a map.

@@ -45,9 +45,18 @@ internal static class AggregationResultsParser
         var resultRows = new List<AggregationResultRow>(rows.Length);
         foreach (var row in rows)
         {
-            var fields = SearchReplyReader.ExtractRowFields(row);
-            resultRows.Add(new AggregationResultRow(
-                SearchResultsParser.ParseValues(fields, "Aggregation result field name cannot be null.")));
+            var fields = SearchResultsParser.ParseValues(
+                SearchReplyReader.ExtractEnvelopedRowFields(row),
+                "Aggregation result field name cannot be null.");
+
+            // RESP3 aggregate replies can carry field-less rows (no extra_attributes); they hold no
+            // data and would break Rows.Count-based batch paging, so drop them.
+            if (fields.Count == 0)
+            {
+                continue;
+            }
+
+            resultRows.Add(new AggregationResultRow(fields));
         }
 
         return new AggregationResults(totalCount, resultRows);
