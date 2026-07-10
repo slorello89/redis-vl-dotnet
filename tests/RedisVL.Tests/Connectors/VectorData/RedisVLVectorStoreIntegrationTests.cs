@@ -96,18 +96,43 @@ public sealed class RedisVLVectorStoreIntegrationTests
     }
 
     [RedisSearchIntegrationFact]
-    public async Task SearchAsync_WithScoreThreshold_ThrowsNotSupported()
+    public async Task SearchAsync_WithScoreThreshold_FiltersByDistance()
     {
         await using var harness = await ConnectorTestHarness.CreateAsync($"vectordata-it-{Guid.NewGuid():N}");
-        var query = new ReadOnlyMemory<float>([0.9f, 0.1f, 0.0f, 0.1f]);
-        var options = new VectorSearchOptions<ConnectorMovie> { ScoreThreshold = 0.5 };
+        var collection = harness.Collection;
 
-        await Assert.ThrowsAsync<NotSupportedException>(async () =>
+        await collection.UpsertAsync(SampleMovies());
+        await RedisSearchTestEnvironment.WaitForIndexDocumentCountAsync(harness.Index, 4);
+
+        // The query vector is exactly The Matrix; the two sci-fi films sit at ~0 cosine distance
+        // while the crime films are far (~0.78). ConnectorMovie uses CosineDistance, so the score
+        // is the distance and the threshold is an upper bound on it.
+        var query = new ReadOnlyMemory<float>([0.9f, 0.1f, 0.0f, 0.1f]);
+
+        var near = new List<VectorSearchResult<ConnectorMovie>>();
+        await foreach (var result in collection.SearchAsync(
+                           query,
+                           top: 10,
+                           new VectorSearchOptions<ConnectorMovie> { ScoreThreshold = 0.1 }))
         {
-            await foreach (var _ in harness.Collection.SearchAsync(query, top: 5, options))
-            {
-            }
-        });
+            near.Add(result);
+        }
+
+        Assert.Equal(["scifi"], near.Select(r => r.Record.Genre).Distinct());
+        Assert.All(near, r => Assert.True(r.Score <= 0.1 + 1e-6, $"score {r.Score} exceeded threshold"));
+
+        // A threshold spanning the whole cosine-distance range keeps every document.
+        var all = new List<VectorSearchResult<ConnectorMovie>>();
+        await foreach (var result in collection.SearchAsync(
+                           query,
+                           top: 10,
+                           new VectorSearchOptions<ConnectorMovie> { ScoreThreshold = 2.0 }))
+        {
+            all.Add(result);
+        }
+
+        Assert.Equal(4, all.Count);
+        Assert.True(near.Count < all.Count, "the tighter threshold should return fewer results");
     }
 
     [RedisSearchIntegrationFact]

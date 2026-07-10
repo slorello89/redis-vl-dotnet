@@ -156,12 +156,18 @@ public sealed class RedisVLCollection<TKey, TRecord> : VectorStoreCollection<TKe
 
         var vectorProperty = _model.ResolveVector(GetVectorPropertyName(options.VectorProperty));
         var skip = options.Skip;
-        var window = skip + top;
-
         var filter = options.Filter is null ? null : _filterTranslator.Translate(options.Filter);
-        var query = BuildVectorQuery(searchValue, vectorProperty, window, skip, top, filter);
 
-        var results = await _index.SearchAsync(query, cancellationToken).ConfigureAwait(false);
+        // A ScoreThreshold becomes an FT.SEARCH VECTOR_RANGE query (return everything within a
+        // distance radius, nearest first); otherwise it is a plain KNN over skip + top candidates.
+        var results = options.ScoreThreshold is double threshold
+            ? await _index.SearchAsync(
+                BuildVectorRangeQuery(searchValue, vectorProperty, VectorScoreTranslation.ToRangeRadius(vectorProperty, threshold), skip, top, filter),
+                cancellationToken).ConfigureAwait(false)
+            : await _index.SearchAsync(
+                BuildVectorQuery(searchValue, vectorProperty, skip + top, skip, top, filter),
+                cancellationToken).ConfigureAwait(false);
+
         foreach (var document in results.Documents)
         {
             var record = await MaterializeAsync(document, cancellationToken).ConfigureAwait(false);
@@ -177,7 +183,7 @@ public sealed class RedisVLCollection<TKey, TRecord> : VectorStoreCollection<TKe
 
             double? score = document.TryGetValue(ScoreAlias, out var rawScore)
                 && double.TryParse(rawScore.ToString(), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var parsedScore)
-                ? parsedScore
+                ? VectorScoreTranslation.ToScore(vectorProperty, parsedScore)
                 : null;
 
             yield return new VectorSearchResult<TRecord>(record, score);
@@ -225,6 +231,22 @@ public sealed class RedisVLCollection<TKey, TRecord> : VectorStoreCollection<TKe
             : VectorQuery.FromFloat32(vectorProperty.JsonName, ToFloatArray(searchValue), window, filter, returnFields, ScoreAlias, pagination: pagination);
     }
 
+    private VectorRangeQuery BuildVectorRangeQuery(
+        object searchValue,
+        RedisVLProperty vectorProperty,
+        double distanceRadius,
+        int skip,
+        int top,
+        RedisVL.Filters.FilterExpression? filter)
+    {
+        var pagination = new QueryPagination(offset: skip, limit: top);
+        var returnFields = new[] { JsonRootField };
+
+        return vectorProperty.DataType == VectorDataType.Float64
+            ? VectorRangeQuery.FromFloat64(vectorProperty.JsonName, ToDoubleArray(searchValue), distanceRadius, filter, returnFields, ScoreAlias, pagination: pagination)
+            : VectorRangeQuery.FromFloat32(vectorProperty.JsonName, ToFloatArray(searchValue), distanceRadius, filter, returnFields, ScoreAlias, pagination: pagination);
+    }
+
     private async Task<TRecord?> MaterializeAsync(SearchDocument document, CancellationToken cancellationToken)
     {
         if (document.TryGetValue(JsonRootField, out var rawJson) && !rawJson.IsNullOrEmpty)
@@ -235,9 +257,9 @@ public sealed class RedisVLCollection<TKey, TRecord> : VectorStoreCollection<TKe
         return await _index.FetchJsonByKeyAsync<TRecord>(document.Id, cancellationToken).ConfigureAwait(false);
     }
 
-    // Rejects options the RedisVL connector cannot honor. Per MEVD connector convention these throw
-    // rather than being silently dropped — silently ignoring OldFilter, for example, would run an
-    // unfiltered search and leak records the caller intended to exclude.
+    // Rejects options the RedisVL connector cannot honor. Per MEVD connector convention this throws
+    // rather than silently dropping the option — silently ignoring OldFilter, for example, would run
+    // an unfiltered search and leak records the caller intended to exclude.
     private static void ValidateSearchOptions(VectorSearchOptions<TRecord> options)
     {
 #pragma warning disable CS0618 // OldFilter is obsolete; we still must detect and reject it.
@@ -247,12 +269,6 @@ public sealed class RedisVLCollection<TKey, TRecord> : VectorStoreCollection<TKe
                 "VectorSearchOptions.OldFilter is not supported by the RedisVL connector; use Filter instead.");
         }
 #pragma warning restore CS0618
-
-        if (options.ScoreThreshold is not null)
-        {
-            throw new NotSupportedException(
-                "VectorSearchOptions.ScoreThreshold is not supported by the RedisVL connector.");
-        }
     }
 
     // Maps FilteredRecordRetrievalOptions.OrderBy onto an FT.SEARCH SORTBY. FT.SEARCH sorts by a
