@@ -7,10 +7,10 @@
          install the packages, not just net9.0 (STS). Example apps opt out below and stay
          single-target (see examples/*.csproj) to keep the CI examples job lean. -->
     <TargetFrameworks Condition="!$(MSBuildProjectDirectory.Contains('examples'))">net8.0;net9.0;net10.0</TargetFrameworks>
-    <RepositoryUrl>https://github.com/redis/redis-vl-dotnet</RepositoryUrl>
+    <RepositoryUrl>https://github.com/redis-developer/redis-vl-dotnet</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <PublishRepositoryUrl>true</PublishRepositoryUrl>
-    <PackageProjectUrl>https://github.com/redis/redis-vl-dotnet</PackageProjectUrl>
+    <PackageProjectUrl>https://github.com/redis-developer/redis-vl-dotnet</PackageProjectUrl>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
