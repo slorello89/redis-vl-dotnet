@@ -13,6 +13,11 @@ using StackExchange.Redis;
 
 namespace RedisVL.Workflows;
 
+/// <summary>
+/// Classifies text against a set of named routes stored in Redis. Each route is represented by one or
+/// more reference phrases whose embeddings are indexed with RediSearch; an input is routed by finding the
+/// nearest references within the configured distance threshold.
+/// </summary>
 public sealed class SemanticRouter
 {
     private const string RouteThresholdFieldName = "routeThreshold";
@@ -29,6 +34,10 @@ public sealed class SemanticRouter
     private readonly SearchIndex _index;
     private readonly JsonSerializerOptions _serializerOptions;
 
+    /// <summary>Initializes a new <see cref="SemanticRouter" /> over the given database using the supplied options.</summary>
+    /// <param name="database">The Redis database used to store and search route references.</param>
+    /// <param name="options">The router configuration, including field names, thresholds, and the embedding attributes.</param>
+    /// <exception cref="ArgumentNullException"><paramref name="database" /> or <paramref name="options" /> is <see langword="null" />.</exception>
     public SemanticRouter(IDatabase database, SemanticRouterOptions options)
     {
         ArgumentNullException.ThrowIfNull(database);
@@ -48,25 +57,46 @@ public sealed class SemanticRouter
                 ]));
     }
 
+    /// <summary>Gets the options this router was configured with.</summary>
     public SemanticRouterOptions Options { get; }
 
+    /// <summary>Gets the router name, used to derive the index name and key prefix.</summary>
     public string Name => Options.Name;
 
+    /// <summary>Gets the optional key namespace that isolates this router's keys and index from others sharing a name.</summary>
     public string? KeyNamespace => Options.KeyNamespace;
 
+    /// <summary>Gets the default maximum routing distance a route reference must be within to match.</summary>
     public double DistanceThreshold => Options.DistanceThreshold;
 
+    /// <summary>Gets the multi-match routing configuration (max results and distance aggregation method).</summary>
     public RoutingConfig RoutingConfig => Options.RoutingConfig;
 
+    /// <summary>Creates the underlying RediSearch index backing this router.</summary>
+    /// <param name="options">Optional index creation options.</param>
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
+    /// <returns><see langword="true" /> if the index was created; otherwise <see langword="false" />.</returns>
     public Task<bool> CreateAsync(CreateIndexOptions? options = null, CancellationToken cancellationToken = default) =>
         _index.CreateAsync(options, cancellationToken);
 
+    /// <summary>Determines whether the underlying index already exists.</summary>
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
+    /// <returns><see langword="true" /> if the index exists; otherwise <see langword="false" />.</returns>
     public Task<bool> ExistsAsync(CancellationToken cancellationToken = default) =>
         _index.ExistsAsync(cancellationToken);
 
+    /// <summary>Drops the underlying index, optionally deleting the indexed route reference documents.</summary>
+    /// <param name="deleteDocuments">When <see langword="true" />, deletes the stored route references as well as the index.</param>
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
     public Task DropAsync(bool deleteDocuments = false, CancellationToken cancellationToken = default) =>
         _index.DropAsync(deleteDocuments, cancellationToken);
 
+    /// <summary>Adds a single reference phrase to a route using a precomputed embedding.</summary>
+    /// <param name="routeName">The name of the route the reference belongs to.</param>
+    /// <param name="reference">The reference phrase to store.</param>
+    /// <param name="embedding">The precomputed embedding of the reference.</param>
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
+    /// <returns>The Redis key under which the reference was stored.</returns>
     public async Task<string> AddRouteAsync(
         string routeName,
         string reference,
@@ -85,6 +115,12 @@ public sealed class SemanticRouter
             .ConfigureAwait(false);
     }
 
+    /// <summary>Adds a single reference phrase to a route, vectorizing it with <paramref name="vectorizer" />.</summary>
+    /// <param name="routeName">The name of the route the reference belongs to.</param>
+    /// <param name="reference">The reference phrase to store and vectorize.</param>
+    /// <param name="vectorizer">The vectorizer used to embed the reference.</param>
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
+    /// <returns>The Redis key under which the reference was stored.</returns>
     public async Task<string> AddRouteAsync(
         string routeName,
         string reference,
@@ -191,6 +227,15 @@ public sealed class SemanticRouter
             cancellationToken).ConfigureAwait(false);
     }
 
+    /// <summary>
+    /// Adds reference phrases to an existing route, vectorizing them in a single batch via
+    /// <paramref name="vectorizer" />. Existing per-route threshold and metadata are left unchanged.
+    /// </summary>
+    /// <param name="routeName">The name of the route to add references to.</param>
+    /// <param name="references">The reference phrases to store and vectorize.</param>
+    /// <param name="vectorizer">The vectorizer used to embed the references.</param>
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
+    /// <returns>The Redis keys under which the references were stored, aligned to <paramref name="references" />.</returns>
     public async Task<IReadOnlyList<string>> AddRouteReferencesAsync(
         string routeName,
         IReadOnlyList<string> references,
@@ -382,6 +427,14 @@ public sealed class SemanticRouter
         return null;
     }
 
+    /// <summary>
+    /// Classifies an input by vectorizing it with <paramref name="vectorizer" /> and returns the single nearest
+    /// route reference within the router's distance threshold.
+    /// </summary>
+    /// <param name="input">The text being routed.</param>
+    /// <param name="vectorizer">The vectorizer used to embed the input.</param>
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
+    /// <returns>The nearest matching route, or <see langword="null" /> when nothing falls within the threshold.</returns>
     public async Task<SemanticRouteMatch?> RouteAsync(
         string input,
         ITextVectorizer vectorizer,
@@ -434,6 +487,17 @@ public sealed class SemanticRouter
         return await AggregateMatchesAsync(results, method, effectiveMaxResults, cancellationToken).ConfigureAwait(false);
     }
 
+    /// <summary>
+    /// Classifies an input across all routes by vectorizing it with <paramref name="vectorizer" /> and returns up
+    /// to <paramref name="maxResults" /> matches ordered nearest-first. See the embedding overload for the
+    /// aggregation and thresholding semantics.
+    /// </summary>
+    /// <param name="input">The text being routed.</param>
+    /// <param name="vectorizer">The vectorizer used to embed the input.</param>
+    /// <param name="maxResults">The maximum number of routes to return, or <see langword="null" /> to use the router default.</param>
+    /// <param name="aggregationMethod">How per-route reference distances are combined, or <see langword="null" /> to use the router default.</param>
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
+    /// <returns>The matching routes ordered nearest-first, or an empty list when there is no match.</returns>
     public async Task<IReadOnlyList<SemanticRouterMatch>> RouteManyAsync(
         string input,
         ITextVectorizer vectorizer,
@@ -703,6 +767,11 @@ public sealed class SemanticRouter
     private sealed record SemanticRouteDocument(string RouteName, string Reference, double Distance);
 }
 
+/// <summary>The single nearest route matched by <see cref="SemanticRouter.RouteAsync(string, float[], System.Threading.CancellationToken)" />.</summary>
+/// <param name="Input">The input that was routed.</param>
+/// <param name="RouteName">The name of the matched route.</param>
+/// <param name="Reference">The reference phrase that produced the match.</param>
+/// <param name="Distance">The distance between the input and the matched reference.</param>
 public sealed record SemanticRouteMatch(string Input, string RouteName, string Reference, double Distance);
 
 /// <summary>A route matched by <see cref="SemanticRouter.RouteManyAsync(string, float[], int?, DistanceAggregationMethod?, System.Threading.CancellationToken)" />, carrying the aggregated distance.</summary>

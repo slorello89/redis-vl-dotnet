@@ -12,6 +12,10 @@ using StackExchange.Redis;
 
 namespace RedisVL.Caches;
 
+/// <summary>
+/// A semantic (embedding-similarity) cache for prompt/response pairs backed by a RediSearch vector index.
+/// Lookups return previously stored responses whose prompt embedding is within the configured distance threshold.
+/// </summary>
 public sealed class SemanticCache
 {
     private readonly IDatabase _database;
@@ -20,6 +24,10 @@ public sealed class SemanticCache
     private long _hitCount;
     private long _missCount;
 
+    /// <summary>Initializes a new <see cref="SemanticCache" /> over the given database and options.</summary>
+    /// <param name="database">The Redis database used for storage and search.</param>
+    /// <param name="options">The cache configuration, including schema, field names, and matching threshold.</param>
+    /// <exception cref="ArgumentNullException"><paramref name="database" /> or <paramref name="options" /> is <see langword="null" />.</exception>
     public SemanticCache(IDatabase database, SemanticCacheOptions options)
     {
         ArgumentNullException.ThrowIfNull(database);
@@ -31,14 +39,19 @@ public sealed class SemanticCache
         _index = new SearchIndex(database, CreateSchema(options));
     }
 
+    /// <summary>Gets the configuration this cache was created with.</summary>
     public SemanticCacheOptions Options { get; }
 
+    /// <summary>Gets the cache name (from <see cref="Options" />).</summary>
     public string Name => Options.Name;
 
+    /// <summary>Gets the optional key namespace (from <see cref="Options" />), or <see langword="null" /> when unset.</summary>
     public string? KeyNamespace => Options.KeyNamespace;
 
+    /// <summary>Gets the default entry expiry (from <see cref="Options" />), or <see langword="null" /> for no expiry.</summary>
     public TimeSpan? TimeToLive => Options.TimeToLive;
 
+    /// <summary>Gets the maximum vector distance for an entry to count as a match (from <see cref="Options" />).</summary>
     public double DistanceThreshold => Options.DistanceThreshold;
 
     /// <summary>
@@ -75,6 +88,11 @@ public sealed class SemanticCache
         Interlocked.Exchange(ref _missCount, 0);
     }
 
+    /// <summary>Creates the underlying search index for the cache.</summary>
+    /// <param name="options">Index creation options. When <see langword="null" />, defaults are used.</param>
+    /// <param name="cancellationToken">A token used to cancel the operation.</param>
+    /// <returns><see langword="true" /> if the index was created; <see langword="false" /> if it already existed and creation was skipped.</returns>
+    /// <exception cref="InvalidOperationException">An existing index schema is incompatible with the configured cache options.</exception>
     public async Task<bool> CreateAsync(CreateIndexOptions? options = null, CancellationToken cancellationToken = default)
     {
         options ??= new CreateIndexOptions();
@@ -87,12 +105,24 @@ public sealed class SemanticCache
         return await _index.CreateAsync(options, cancellationToken).ConfigureAwait(false);
     }
 
+    /// <summary>Determines whether the cache's underlying search index exists.</summary>
+    /// <param name="cancellationToken">A token used to cancel the operation.</param>
+    /// <returns><see langword="true" /> if the index exists; otherwise <see langword="false" />.</returns>
     public Task<bool> ExistsAsync(CancellationToken cancellationToken = default) =>
         _index.ExistsAsync(cancellationToken);
 
+    /// <summary>Drops the cache's underlying search index.</summary>
+    /// <param name="deleteDocuments">When <see langword="true" />, also deletes the cached hash entries; otherwise only the index is removed.</param>
+    /// <param name="cancellationToken">A token used to cancel the operation.</param>
     public Task DropAsync(bool deleteDocuments = false, CancellationToken cancellationToken = default) =>
         _index.DropAsync(deleteDocuments, cancellationToken);
 
+    /// <summary>Looks up the single nearest cached entry within the configured distance threshold using a precomputed embedding.</summary>
+    /// <param name="prompt">The prompt being looked up; validated but matching is performed on <paramref name="embedding" />.</param>
+    /// <param name="embedding">The precomputed query embedding.</param>
+    /// <param name="filter">An optional filter restricting candidates; requires configured filterable fields.</param>
+    /// <param name="cancellationToken">A token used to cancel the operation.</param>
+    /// <returns>The nearest matching entry, or <see langword="null" /> on a cache miss.</returns>
     public async Task<SemanticCacheHit?> CheckAsync(
         string prompt,
         float[] embedding,
@@ -104,6 +134,13 @@ public sealed class SemanticCache
         return hits.Count > 0 ? hits[0] : null;
     }
 
+    /// <summary>Looks up the single nearest cached entry within the configured distance threshold, vectorizing <paramref name="prompt" /> with <paramref name="vectorizer" />.</summary>
+    /// <param name="prompt">The prompt to embed and look up.</param>
+    /// <param name="vectorizer">The vectorizer used to embed <paramref name="prompt" />.</param>
+    /// <param name="filter">An optional filter restricting candidates; requires configured filterable fields.</param>
+    /// <param name="cancellationToken">A token used to cancel the operation.</param>
+    /// <returns>The nearest matching entry, or <see langword="null" /> on a cache miss.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="vectorizer" /> is <see langword="null" />.</exception>
     public async Task<SemanticCacheHit?> CheckAsync(
         string prompt,
         ITextVectorizer vectorizer,
@@ -137,6 +174,17 @@ public sealed class SemanticCache
         return await SearchHitsAsync(embedding, topK, filter, cancellationToken).ConfigureAwait(false);
     }
 
+    /// <summary>
+    /// Returns up to <paramref name="topK" /> cached entries within the configured distance threshold, ordered
+    /// nearest-first, vectorizing <paramref name="prompt" /> with <paramref name="vectorizer" />. An empty list indicates a cache miss.
+    /// </summary>
+    /// <param name="prompt">The prompt to embed and look up.</param>
+    /// <param name="vectorizer">The vectorizer used to embed <paramref name="prompt" />.</param>
+    /// <param name="topK">The maximum number of matches to return; must be greater than zero.</param>
+    /// <param name="filter">An optional filter restricting candidates; requires configured filterable fields.</param>
+    /// <param name="cancellationToken">A token used to cancel the operation.</param>
+    /// <exception cref="ArgumentNullException"><paramref name="vectorizer" /> is <see langword="null" />.</exception>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="topK" /> is less than or equal to zero.</exception>
     public async Task<IReadOnlyList<SemanticCacheHit>> CheckTopKAsync(
         string prompt,
         ITextVectorizer vectorizer,
@@ -179,6 +227,15 @@ public sealed class SemanticCache
             cancellationToken).ConfigureAwait(false);
     }
 
+    /// <summary>
+    /// Runs a batch of cache lookups, vectorizing every request prompt in a single batch via <paramref name="vectorizer" />.
+    /// The result list is aligned to the input order; a <see langword="null" /> element indicates a miss for the request
+    /// at that position. Any embedding supplied on a request is ignored.
+    /// </summary>
+    /// <param name="requests">The lookup requests to run.</param>
+    /// <param name="vectorizer">The vectorizer used to embed each request prompt.</param>
+    /// <param name="cancellationToken">A token used to cancel the operation.</param>
+    /// <exception cref="ArgumentNullException"><paramref name="requests" /> or <paramref name="vectorizer" /> is <see langword="null" />.</exception>
     public async Task<IReadOnlyList<SemanticCacheHit?>> CheckManyAsync(
         IEnumerable<SemanticCacheCheckRequest> requests,
         ITextVectorizer vectorizer,
@@ -255,6 +312,15 @@ public sealed class SemanticCache
         }
     }
 
+    /// <summary>Stores a prompt/response pair using a precomputed embedding, returning the Redis key it was stored under.</summary>
+    /// <param name="prompt">The prompt to cache; forms part of the entry's key identity.</param>
+    /// <param name="response">The response to cache for the prompt.</param>
+    /// <param name="embedding">The precomputed prompt embedding; must match the configured embedding dimensions.</param>
+    /// <param name="metadata">Optional metadata serialized and stored alongside the entry.</param>
+    /// <param name="filterValues">Optional values for configured filterable fields; folded into the entry's key identity.</param>
+    /// <param name="cancellationToken">A token used to cancel the operation.</param>
+    /// <returns>The Redis key the entry was stored under.</returns>
+    /// <exception cref="ArgumentException"><paramref name="embedding" /> length does not match the configured dimensions, or a filter value is invalid.</exception>
     public async Task<string> StoreAsync(
         string prompt,
         string response,
@@ -300,6 +366,15 @@ public sealed class SemanticCache
         return key!;
     }
 
+    /// <summary>Stores a prompt/response pair, vectorizing <paramref name="prompt" /> with <paramref name="vectorizer" />, returning the Redis key it was stored under.</summary>
+    /// <param name="prompt">The prompt to embed and cache; forms part of the entry's key identity.</param>
+    /// <param name="response">The response to cache for the prompt.</param>
+    /// <param name="vectorizer">The vectorizer used to embed <paramref name="prompt" />.</param>
+    /// <param name="metadata">Optional metadata serialized and stored alongside the entry.</param>
+    /// <param name="filterValues">Optional values for configured filterable fields; folded into the entry's key identity.</param>
+    /// <param name="cancellationToken">A token used to cancel the operation.</param>
+    /// <returns>The Redis key the entry was stored under.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="vectorizer" /> is <see langword="null" />.</exception>
     public async Task<string> StoreAsync(
         string prompt,
         string response,
@@ -717,6 +792,10 @@ public sealed class SemanticCache
     private sealed record SemanticCacheSearchDocument(string Prompt, string Response, double Distance, string? Metadata);
 }
 
+/// <summary>
+/// A cached entry returned from a semantic cache lookup: the stored prompt and response together with the
+/// vector <see cref="Distance" /> between the query embedding and the entry, and any stored metadata.
+/// </summary>
 public sealed record SemanticCacheHit(string Prompt, string Response, double Distance, string? Metadata = null);
 
 /// <summary>A single entry for a batch <c>StoreMany</c> call.</summary>

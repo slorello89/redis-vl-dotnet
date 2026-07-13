@@ -6,6 +6,9 @@ using RedisVL.Rerankers;
 
 namespace RedisVL.Rerankers.Cohere;
 
+/// <summary>
+/// An <see cref="ITextReranker"/> that reorders documents by relevance to a query using Cohere's rerank API.
+/// </summary>
 public sealed class CohereTextReranker : ITextReranker
 {
     private const string DefaultEndpoint = "https://api.cohere.com/v2/rerank";
@@ -17,6 +20,13 @@ public sealed class CohereTextReranker : ITextReranker
     private readonly string _model;
     private readonly CohereRerankerOptions _options;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="CohereTextReranker"/> class.
+    /// </summary>
+    /// <param name="model">The Cohere rerank model name (for example, <c>rerank-v3.5</c>).</param>
+    /// <param name="apiKey">The Cohere API key used as the bearer credential.</param>
+    /// <param name="options">Optional rerank options such as per-document token limits and priority.</param>
+    /// <param name="httpClient">An optional <see cref="HttpClient"/>; a new instance is created when not supplied.</param>
     public CohereTextReranker(
         string model,
         string apiKey,
@@ -29,12 +39,16 @@ public sealed class CohereTextReranker : ITextReranker
         _httpClient = httpClient ?? new HttpClient();
     }
 
+    /// <summary>Gets the <see cref="HttpClient"/> used to call the Cohere API.</summary>
     public HttpClient Client => _httpClient;
 
+    /// <summary>Gets the Cohere rerank model name.</summary>
     public string Model => _model;
 
+    /// <summary>Gets the rerank options applied to each request.</summary>
     public CohereRerankerOptions Options => _options;
 
+    /// <inheritdoc/>
     public async Task<IReadOnlyList<RerankResult>> RerankAsync(
         RerankRequest request,
         CancellationToken cancellationToken = default)
