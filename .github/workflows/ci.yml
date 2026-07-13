@@ -49,7 +49,9 @@ jobs:
       - examples
     services:
       redis:
-        image: redis:latest
+        # Pinned to the documented minimum (Redis 8.4+ for native FT.HYBRID) for reproducible CI
+        # evidence; `latest` drifts silently. Bump deliberately.
+        image: redis:8.4.0
         ports:
           - 6379:6379
         options: >-
@@ -84,11 +86,53 @@ jobs:
         #
         # The suite runs twice: once over the default RESP2 protocol and once over RESP3
         # (REDIS_VL_REDIS_PROTOCOL=3) so the result parsers are exercised against both reply shapes.
+        #
+        # Each run emits a TRX (for the execution-floor guard below) and collects code coverage.
         run: |
+          mkdir -p "${{ runner.temp }}/test-results"
           for protocol in 2 3; do
             for tfm in net8.0 net9.0 net10.0; do
               echo "::group::Test $tfm (RESP$protocol)"
-              REDIS_VL_REDIS_PROTOCOL="$protocol" dotnet test redis-vl-dotnet.sln --no-build --framework "$tfm" --verbosity normal
+              REDIS_VL_REDIS_PROTOCOL="$protocol" dotnet test redis-vl-dotnet.sln \
+                --no-build --framework "$tfm" --verbosity normal \
+                --collect "XPlat Code Coverage" \
+                --logger "trx;LogFileName=resp${protocol}-${tfm}.trx" \
+                --results-directory "${{ runner.temp }}/test-results"
               echo "::endgroup::"
             done
           done
+
+      - name: Enforce test execution floor
+        # A test run whose integration tests are all silently skipped (e.g. REDIS_VL_REDIS_URL unset)
+        # still exits 0, so a green build is not by itself evidence that the integration suite ran.
+        # `executed` in the TRX counters excludes skipped tests, so it drops sharply when the ~75
+        # integration tests skip (a healthy run executes ~460; a fully-skipped integration run ~386).
+        # Fail the build if any leg executed fewer than the floor. Bump the floor as the suite grows.
+        shell: bash
+        env:
+          MIN_EXECUTED_TESTS: "400"
+        run: |
+          shopt -s nullglob
+          trx_files=("${{ runner.temp }}"/test-results/*.trx)
+          if [ ${#trx_files[@]} -eq 0 ]; then
+            echo "::error::No TRX result files were produced; the test run did not complete." >&2
+            exit 1
+          fi
+          status=0
+          for trx in "${trx_files[@]}"; do
+            executed=$(grep -oE 'executed="[0-9]+"' "$trx" | head -1 | grep -oE '[0-9]+')
+            echo "$(basename "$trx"): executed=${executed:-0} (floor=$MIN_EXECUTED_TESTS)"
+            if [ -z "$executed" ] || [ "$executed" -lt "$MIN_EXECUTED_TESTS" ]; then
+              echo "::error::$(basename "$trx") executed ${executed:-0} tests, below the floor of $MIN_EXECUTED_TESTS. Integration tests may have been silently skipped." >&2
+              status=1
+            fi
+          done
+          exit $status
+
+      - name: Upload coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: ${{ runner.temp }}/test-results/**/coverage.cobertura.xml
+          if-no-files-found: error

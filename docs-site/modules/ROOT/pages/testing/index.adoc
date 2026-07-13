@@ -23,6 +23,81 @@ npm run examples:build
 
 This sweep restores and builds each `examples/*.csproj` entry so docs-linked samples fail fast when they drift from the current library surface.
 
+== Running the .NET test suite
+
+The unit and integration tests live in `tests/RedisVL.Tests`. Run them from the repository root:
+
+[source,bash]
+----
+dotnet test redis-vl-dotnet.sln
+----
+
+Pure unit tests (parsers, command builders, mappers) run with no external dependencies. The integration tests require a running Redis with the Query Engine (RediSearch) and are gated behind environment variables — when a variable is unset the corresponding tests are *skipped*, not failed, so `dotnet test` stays green even when nothing integration-level actually ran.
+
+=== Redis for integration tests
+
+Start a pinned Redis (matching CI) with the bundled compose file:
+
+[source,bash]
+----
+docker compose -f docker-compose.integration.yml up -d
+export REDIS_VL_REDIS_URL=localhost:6379
+dotnet test redis-vl-dotnet.sln
+----
+
+Native `FT.HYBRID` tests additionally require Redis 8.4+; against an older server they capability-skip (rather than fail) after probing the RediSearch module version.
+
+=== Environment variables
+
+[cols="1,3",options="header"]
+|===
+| Variable | Purpose
+
+| `REDIS_VL_REDIS_URL`
+| Connection string for the standalone Redis used by the search integration tests. Unset ⇒ all search integration tests skip.
+
+| `REDIS_VL_REDIS_PROTOCOL`
+| RESP protocol for integration tests (`2` or `3`). CI runs the suite under both so the result parsers are exercised against both reply shapes.
+
+| `REDIS_VL_REDIS_CLUSTER_NODES`
+| Comma-separated cluster endpoints for the Redis Cluster integration tests. Unset ⇒ cluster tests skip.
+
+| `REDIS_VL_REDIS_USER` / `REDIS_VL_REDIS_PASSWORD` / `REDIS_VL_REDIS_SSL`
+| Optional auth and TLS for the cluster connection.
+
+| `ONNX_VECTORIZER_MODEL_PATH` / `ONNX_VECTORIZER_TOKENIZER_PATH`
+| Local ONNX embedding model + tokenizer paths for the ONNX vectorizer smoke tests.
+
+| `ONNX_RERANKER_MODEL_PATH` / `ONNX_RERANKER_TOKENIZER_PATH`
+| Local ONNX cross-encoder model + tokenizer paths for the ONNX reranker smoke tests.
+
+| `OPENAI_API_KEY` / `OPENAI_EMBEDDING_MODEL`
+| Live OpenAI vectorizer smoke tests.
+
+| `COHERE_API_KEY` / `COHERE_EMBEDDING_MODEL` / `COHERE_RERANK_MODEL`
+| Live Cohere vectorizer and reranker smoke tests.
+
+| `HF_TOKEN` / `HF_EMBEDDING_MODEL`
+| Live Hugging Face vectorizer smoke tests.
+|===
+
+=== Useful invocations
+
+[source,bash]
+----
+# a single target framework
+dotnet test redis-vl-dotnet.sln --framework net9.0
+
+# a subset by name
+dotnet test tests/RedisVL.Tests/RedisVL.Tests.csproj --filter "FullyQualifiedName~Parser"
+
+# with a TRX report and code coverage (as CI does)
+dotnet test redis-vl-dotnet.sln \
+  --collect "XPlat Code Coverage" \
+  --logger "trx;LogFileName=results.trx" \
+  --results-directory ./test-results
+----
+
 == CI validation
 
 `.github/workflows/ci.yml` runs the same repository-root commands used locally:
@@ -32,6 +107,12 @@ This sweep restores and builds each `examples/*.csproj` entry so docs-linked sam
 
 Because Antora exits on broken navigation or missing page references, the docs validation job blocks CI on docs-site drift.
 Because the example sweep builds every sample project, CI also blocks merges when a documented example stops compiling.
+
+The `build-and-test` job additionally:
+
+* runs `dotnet test` across `net8.0`/`net9.0`/`net10.0` under both RESP2 and RESP3 against a pinned Redis service (`redis:8.4.0`), so evidence is reproducible;
+* enforces a *test execution floor* — each run emits a TRX and the build fails if any leg executed fewer than a minimum number of tests, so a green build with the integration suite silently skipped is caught;
+* collects code coverage (`XPlat Code Coverage`) and uploads it as a build artifact.
 
 == GitHub Actions publishing
 

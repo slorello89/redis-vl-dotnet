@@ -26,7 +26,10 @@ internal static class SearchResultsParser
         var totalCount = (long)entries[0];
         var documents = new List<SearchDocument>();
 
-        for (var index = 1; index < entries.Length; index += 2)
+        // Guard on index + 1 so a truncated reply (a trailing id with no field payload) is dropped
+        // rather than throwing IndexOutOfRangeException; well-formed replies have an odd length and
+        // are unaffected.
+        for (var index = 1; index + 1 < entries.Length; index += 2)
         {
             var id = entries[index].ToString() ?? throw new InvalidOperationException("Search result document id cannot be null.");
             var values = ParseValues(entries[index + 1], "Search result field name cannot be null.");
@@ -69,7 +72,9 @@ internal static class SearchResultsParser
 
         var entries = (RedisResult[])result!;
         var values = new Dictionary<string, RedisValue>(entries.Length / 2, StringComparer.Ordinal);
-        for (var index = 0; index < entries.Length; index += 2)
+        // Guard on index + 1 so a malformed field list with a dangling key (odd length) drops the
+        // dangling entry instead of throwing IndexOutOfRangeException — mirrors SearchReplyReader.ToMap.
+        for (var index = 0; index + 1 < entries.Length; index += 2)
         {
             var key = entries[index].ToString() ?? throw new InvalidOperationException(nullFieldNameMessage);
             values[key] = (RedisValue)entries[index + 1];

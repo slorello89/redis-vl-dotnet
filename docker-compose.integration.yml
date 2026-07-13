@@ -1,6 +1,8 @@
 services:
   redis:
-    image: redis:latest
+    # Pinned to the project's documented minimum (Redis 8.4+ for native FT.HYBRID) so integration
+    # evidence is reproducible and does not drift as `latest` moves. Bump deliberately.
+    image: redis:8.4.0
     ports:
       - "6379:6379"
     healthcheck:
