@@ -50,7 +50,12 @@ public sealed class VectorQuery
         TopK = topK;
         Filter = filter;
         ScoreAlias = FilterExpression.NormalizeFieldName(scoreAlias);
-        ReturnFields = NormalizeReturnFields(returnFields, ScoreAlias);
+
+        // When the caller does not specify return fields, leave the set empty so the builder omits
+        // RETURN entirely and the server returns every stored field (plus the yielded score). Emitting
+        // `RETURN 1 <scoreAlias>` here would make the obvious Search<T>(new VectorQuery(...)) happy
+        // path throw, because the mapper treats every non-nullable property as required.
+        ReturnFields = returnFields is null ? [] : NormalizeReturnFields(returnFields, ScoreAlias);
         RuntimeOptions = runtimeOptions;
         Pagination = pagination ?? new QueryPagination(limit: topK);
         Offset = Pagination.Offset;

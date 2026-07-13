@@ -72,11 +72,15 @@ public sealed class FilterExpressionTests
     }
 
     [Fact]
-    public void BuildsTagLikeFiltersPreservingWildcards()
+    public void BuildsTagLikeFiltersAsWildcardPatterns()
     {
-        Assert.Equal("@category:{tech*}", Filter.Tag("category").Like("tech*").ToQueryString());
-        Assert.Equal("@category:{tech*|*soft}", Filter.Tag("category").Like("tech*", "*soft").ToQueryString());
-        Assert.Equal("@category:{open\\ source*}", Filter.Tag("category").Like("open source*").ToQueryString());
+        // Rendered with the w'...' form so both `*` and `?` act as wildcards (plain {...} tag syntax
+        // takes `?` literally). Inside w'...' only the backslash and quote delimiter are escaped.
+        Assert.Equal("@category:{w'tech*'}", Filter.Tag("category").Like("tech*").ToQueryString());
+        Assert.Equal("@category:{w'tech*'|w'*soft'}", Filter.Tag("category").Like("tech*", "*soft").ToQueryString());
+        Assert.Equal("@category:{w'open source*'}", Filter.Tag("category").Like("open source*").ToQueryString());
+        Assert.Equal("@category:{w'v?.?'}", Filter.Tag("category").Like("v?.?").ToQueryString());
+        Assert.Equal("@category:{w'it\\'s*'}", Filter.Tag("category").Like("it's*").ToQueryString());
     }
 
     [Fact]

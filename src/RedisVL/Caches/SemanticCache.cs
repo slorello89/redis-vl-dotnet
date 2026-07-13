@@ -293,10 +293,18 @@ public sealed class SemanticCache : ISemanticCache
         var hits = new List<SemanticCacheHit>(results.Documents.Count);
         foreach (var document in results.Documents)
         {
-            if (TryMapSearchHit(document, out var hit))
+            if (!TryMapSearchHit(document, out var hit))
             {
-                hits.Add(hit);
+                // The document matched the vector query but is missing a required field (or has an
+                // unparseable distance). Silently dropping it would masquerade as a cache miss and
+                // let schema drift surface only as a degraded hit-rate, so fail loudly instead.
+                throw new InvalidOperationException(
+                    $"Cached document '{document.Id}' matched the query but could not be mapped: it is missing a " +
+                    $"required field ('{Options.PromptFieldName}', '{Options.ResponseFieldName}', or 'distance') or has " +
+                    "an unparseable distance. This usually indicates schema drift between the cache configuration and the stored data.");
             }
+
+            hits.Add(hit);
         }
 
         RecordLookup(hits.Count > 0);

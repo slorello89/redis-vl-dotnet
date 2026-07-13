@@ -212,16 +212,17 @@ internal static class SearchQueryCommandBuilder
             BuildVectorSearchQuery(schema, vectorField, query)
         };
         arguments.AddRange(BuildVectorParams(query.Vector, CollectKnnRuntimeParams(query.RuntimeOptions)));
-        arguments.AddRange(
-        [
-            "SORTBY",
-            query.ScoreAlias,
-            "ASC",
-            "RETURN",
-            query.ReturnFields.Count.ToString(CultureInfo.InvariantCulture)
-        ]);
+        arguments.AddRange(["SORTBY", query.ScoreAlias, "ASC"]);
 
-        arguments.AddRange(query.ReturnFields);
+        // An empty return set means "unspecified" — omit RETURN so the server returns all stored
+        // fields plus the yielded score, rather than narrowing to just the score alias.
+        if (query.ReturnFields.Count > 0)
+        {
+            arguments.Add("RETURN");
+            arguments.Add(query.ReturnFields.Count.ToString(CultureInfo.InvariantCulture));
+            arguments.AddRange(query.ReturnFields);
+        }
+
         AppendLimit(arguments, query.Offset, query.Limit);
         arguments.Add("DIALECT");
         arguments.Add("2");

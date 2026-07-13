@@ -124,26 +124,6 @@ public abstract class FilterExpression
             .Replace("'", "\\'", StringComparison.Ordinal);
     }
 
-    internal static string EscapeTagPattern(string value)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(value);
-
-        // Like EscapeTagValue, but preserve * and ? so they act as wildcards.
-        var builder = new StringBuilder(value.Length);
-        foreach (var character in value.Trim())
-        {
-            if (char.IsLetterOrDigit(character) || character is '_' or '*' or '?')
-            {
-                builder.Append(character);
-                continue;
-            }
-
-            builder.Append('\\');
-            builder.Append(character);
-        }
-
-        return builder.ToString();
-    }
 }
 
 internal sealed class TagFilterExpression(string fieldName, IReadOnlyList<string> values, bool preserveWildcards = false) : FilterExpression
@@ -154,8 +134,12 @@ internal sealed class TagFilterExpression(string fieldName, IReadOnlyList<string
 
     internal override string Render(bool grouped)
     {
-        Func<string, string> escape = _preserveWildcards ? EscapeTagPattern : EscapeTagValue;
-        var valueExpression = string.Join("|", _values.Select(escape));
+        // Plain `{...}` tag syntax only treats `*` as a (prefix) wildcard and takes `?` literally, so
+        // wildcard patterns are rendered with the `w'...'` form, which supports both `*` and `?`.
+        Func<string, string> render = _preserveWildcards
+            ? static value => $"w'{EscapeWildcardPattern(value)}'"
+            : EscapeTagValue;
+        var valueExpression = string.Join("|", _values.Select(render));
         return $"@{_fieldName}:{{{valueExpression}}}";
     }
 }
