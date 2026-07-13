@@ -188,6 +188,10 @@ internal static class SearchIndexCommandBuilder
         arguments.Add(ToRedisKeyword(field.Attributes.Algorithm));
         arguments.Add(attributeArguments.Count.ToString(CultureInfo.InvariantCulture));
         arguments.AddRange(attributeArguments);
+
+        // INDEXMISSING is a field-level flag that sits outside the counted
+        // algorithm attribute list.
+        AddFieldOption(arguments, "INDEXMISSING", field.IndexMissing);
     }
 
     private static void AddOptionalAttribute(List<object> arguments, string keyword, int value)

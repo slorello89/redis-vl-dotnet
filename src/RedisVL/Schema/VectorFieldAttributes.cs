@@ -72,7 +72,7 @@ public sealed record VectorFieldAttributes
 
         if (epsilon < 0d || double.IsNaN(epsilon) || double.IsInfinity(epsilon))
         {
-            throw new ArgumentOutOfRangeException(nameof(epsilon), epsilon, "Vector SVS-VAMANA epsilon must be a finite, non-negative value.");
+            throw new ArgumentOutOfRangeException(nameof(epsilon), epsilon, "Vector epsilon must be a finite, non-negative value.");
         }
 
         if (trainingThreshold < 0)
@@ -92,12 +92,20 @@ public sealed record VectorFieldAttributes
                 nameof(algorithm));
         }
 
+        // EPSILON is the range-query approximation factor, valid for HNSW and SVS-VAMANA
+        // but rejected by Redis for FLAT fields.
+        if (algorithm != VectorAlgorithm.Hnsw && algorithm != VectorAlgorithm.SvsVamana && epsilon > 0d)
+        {
+            throw new ArgumentException(
+                $"{DescribeAlgorithm(algorithm)} vector fields do not support the EPSILON range-query approximation factor.",
+                nameof(algorithm));
+        }
+
         if (algorithm != VectorAlgorithm.SvsVamana
             && (compression != VectorCompression.None
                 || constructionWindowSize > 0
                 || graphMaxDegree > 0
                 || searchWindowSize > 0
-                || epsilon > 0d
                 || trainingThreshold > 0
                 || reduce > 0))
         {
@@ -154,7 +162,7 @@ public sealed record VectorFieldAttributes
     /// <summary>SVS-VAMANA default search window size used at query time (<c>SEARCH_WINDOW_SIZE</c>).</summary>
     public int SearchWindowSize { get; }
 
-    /// <summary>SVS-VAMANA range-search approximation factor (<c>EPSILON</c>).</summary>
+    /// <summary>HNSW/SVS-VAMANA range-query approximation factor (<c>EPSILON</c>).</summary>
     public double Epsilon { get; }
 
     /// <summary>SVS-VAMANA number of vectors required before compression parameters are learned (<c>TRAINING_THRESHOLD</c>).</summary>

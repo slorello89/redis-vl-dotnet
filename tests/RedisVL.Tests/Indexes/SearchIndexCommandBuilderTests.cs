@@ -113,6 +113,39 @@ public sealed class SearchIndexCommandBuilderTests
     }
 
     [Fact]
+    public void BuildsHnswCreateArgumentsWithEpsilonAndIndexMissing()
+    {
+        var schema = new SearchSchema(
+            new IndexDefinition("docs-idx", "docs:", StorageType.Hash),
+            [
+                new VectorFieldDefinition(
+                    "embedding",
+                    new VectorFieldAttributes(
+                        VectorAlgorithm.Hnsw,
+                        VectorDataType.Float32,
+                        VectorDistanceMetric.Cosine,
+                        4,
+                        m: 8,
+                        efConstruction: 100,
+                        efRuntime: 50,
+                        epsilon: 0.05),
+                    indexMissing: true)
+            ]);
+
+        var arguments = SearchIndexCommandBuilder.BuildCreateArguments(schema);
+
+        Assert.Equal(
+            [
+                "docs-idx", "ON", "HASH", "PREFIX", "1", "docs:", "SCHEMA",
+                "embedding", "VECTOR", "HNSW", "14",
+                "TYPE", "FLOAT32", "DIM", "4", "DISTANCE_METRIC", "COSINE",
+                "M", "8", "EF_CONSTRUCTION", "100", "EF_RUNTIME", "50", "EPSILON", "0.05",
+                "INDEXMISSING"
+            ],
+            arguments.Select(static argument => argument.ToString()!).ToArray());
+    }
+
+    [Fact]
     public void BuildsCreateArgumentsWithMultiplePrefixes()
     {
         var schema = new SearchSchema(
@@ -233,7 +266,8 @@ public sealed class SearchIndexCommandBuilderTests
                 "location", "GEO", "INDEXMISSING", "SORTABLE", "NOINDEX",
                 "embedding", "VECTOR", "HNSW", "14",
                 "TYPE", "FLOAT32", "DIM", "3", "DISTANCE_METRIC", "COSINE",
-                "INITIAL_CAP", "1000", "M", "16", "EF_CONSTRUCTION", "200", "EF_RUNTIME", "10"
+                "INITIAL_CAP", "1000", "M", "16", "EF_CONSTRUCTION", "200", "EF_RUNTIME", "10",
+                "INDEXMISSING"
             ],
             arguments.Select(static argument => argument.ToString()!).ToArray());
     }
