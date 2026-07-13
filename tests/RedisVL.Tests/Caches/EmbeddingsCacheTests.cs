@@ -30,6 +30,25 @@ public sealed class EmbeddingsCacheTests
     }
 
     [Fact]
+    public async Task SetAsync_OverwritingWithoutMetadata_ClearsPreviouslyStoredMetadata()
+    {
+        var (database, recorder) = RecordingDatabaseProxy.CreatePair();
+        var cache = new EmbeddingsCache(database, new EmbeddingsCacheOptions("unit-cache", "tests"));
+
+        await cache.SetAsync("hello world", [1f, 2f, 3f], metadata: new { source = "faq" });
+        var withMetadata = await cache.GetAsync("hello world");
+        await cache.SetAsync("hello world", [4f, 5f, 6f]);
+        var afterOverwrite = await cache.GetAsync("hello world");
+
+        // A plain HSET would merge the new embedding over the old hash and leave the stale metadata
+        // behind; the overwrite must clear it so the entry never reports metadata it no longer has.
+        Assert.Equal("{\"source\":\"faq\"}", withMetadata!.Metadata);
+        Assert.Null(afterOverwrite!.Metadata);
+        Assert.Equal([4f, 5f, 6f], afterOverwrite.Embedding);
+        Assert.True(recorder.HashDeleteAsyncCallCount >= 1);
+    }
+
+    [Fact]
     public async Task SetAsync_ReturnsStoredEntryAndRedisKey()
     {
         var (database, recorder) = RecordingDatabaseProxy.CreatePair();
@@ -483,6 +502,10 @@ public sealed class EmbeddingsCacheTests
 
         public int KeyDeleteAsyncCallCount { get; private set; }
 
+        public int HashDeleteAsyncCallCount { get; private set; }
+
+        public int CreateTransactionCallCount { get; private set; }
+
         public RedisKey? LastKey { get; private set; }
 
         public HashEntry[]? LastHashEntries { get; private set; }
@@ -503,16 +526,28 @@ public sealed class EmbeddingsCacheTests
             return targetMethod.Name switch
             {
                 nameof(IDatabase.HashSetAsync) => HandleHashSetAsync(args),
+                nameof(IDatabase.HashDeleteAsync) => HandleHashDeleteAsync(args),
                 nameof(IDatabase.HashGetAllAsync) => HandleHashGetAllAsync(args),
                 nameof(IDatabase.KeyExpireAsync) => HandleKeyExpireAsync(args),
                 nameof(IDatabase.KeyExistsAsync) => HandleKeyExistsAsync(args),
                 nameof(IDatabase.KeyDeleteAsync) => HandleKeyDeleteAsync(args),
+                nameof(IDatabase.CreateTransaction) => CreateRecordingTransaction(),
                 nameof(IDatabase.Multiplexer) => throw new NotSupportedException(),
                 nameof(IDatabase.Database) => 0,
                 _ => throw new NotSupportedException($"Method '{targetMethod.Name}' is not configured for this test proxy.")
             };
         }
 
+        private ITransaction CreateRecordingTransaction()
+        {
+            CreateTransactionCallCount++;
+            var transaction = DispatchProxy.Create<ITransaction, RecordingTransactionProxy>();
+            ((RecordingTransactionProxy)(object)transaction).Parent = this;
+            return transaction;
+        }
+
+        // Models a real HSET, which merges the supplied fields into any existing hash rather than
+        // replacing it — this is what lets a stale optional field survive an overwrite.
         private Task<bool> HandleHashSetAsync(object?[]? args)
         {
             HashSetAsyncCallCount++;
@@ -522,8 +557,35 @@ public sealed class EmbeddingsCacheTests
 
             LastKey = key;
             LastHashEntries = value;
-            StoredValues[key] = value;
+
+            var merged = StoredValues.TryGetValue(key, out var existing)
+                ? existing.ToDictionary(entry => entry.Name, entry => entry.Value)
+                : [];
+            foreach (var entry in value)
+            {
+                merged[entry.Name] = entry.Value;
+            }
+
+            StoredValues[key] = merged.Select(pair => new HashEntry(pair.Key, pair.Value)).ToArray();
             return Task.FromResult(true);
+        }
+
+        private Task<long> HandleHashDeleteAsync(object?[]? args)
+        {
+            HashDeleteAsyncCallCount++;
+
+            var key = (RedisKey)args![0]!;
+            var fields = (RedisValue[])args[1]!;
+            LastKey = key;
+
+            if (!StoredValues.TryGetValue(key, out var existing))
+            {
+                return Task.FromResult(0L);
+            }
+
+            var remaining = existing.Where(entry => !fields.Contains(entry.Name)).ToArray();
+            StoredValues[key] = remaining;
+            return Task.FromResult((long)(existing.Length - remaining.Length));
         }
 
         private Task<HashEntry[]> HandleHashGetAllAsync(object?[]? args)
@@ -557,6 +619,28 @@ public sealed class EmbeddingsCacheTests
             var key = (RedisKey)args![0]!;
             LastKey = key;
             return Task.FromResult(StoredValues.Remove(key));
+        }
+
+        // Applies the commands queued inside a MULTI/EXEC against the parent recorder's store so a
+        // transaction's HSET/HDEL/EXPIRE are observed exactly like direct calls. Execution is not
+        // deferred because the production code never awaits the queued tasks before ExecuteAsync.
+        private class RecordingTransactionProxy : DispatchProxy
+        {
+            public RecordingDatabaseProxy Parent { get; set; } = null!;
+
+            protected override object? Invoke(MethodInfo? targetMethod, object?[]? args)
+            {
+                ArgumentNullException.ThrowIfNull(targetMethod);
+
+                return targetMethod.Name switch
+                {
+                    nameof(ITransaction.HashSetAsync) => Parent.HandleHashSetAsync(args),
+                    nameof(ITransaction.HashDeleteAsync) => Parent.HandleHashDeleteAsync(args),
+                    nameof(ITransaction.KeyExpireAsync) => Parent.HandleKeyExpireAsync(args),
+                    nameof(ITransaction.ExecuteAsync) => Task.FromResult(true),
+                    _ => throw new NotSupportedException($"Method '{targetMethod.Name}' is not configured for this transaction proxy.")
+                };
+            }
         }
     }
 }

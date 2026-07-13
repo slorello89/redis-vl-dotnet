@@ -194,4 +194,26 @@ public sealed class EmbeddingsCacheIntegrationTests
         Assert.Null(await cache.GetAsync("alpha", "model-a"));
         Assert.Null(await cache.GetByKeyAsync(stored[1].Key!));
     }
+
+    [RedisSearchIntegrationFact]
+    public async Task OverwritingEntryWithoutMetadataClearsPreviousMetadata()
+    {
+        await using var connection = await ConnectionMultiplexer.ConnectAsync(RedisSearchTestEnvironment.ConnectionString!);
+        var database = connection.GetDatabase();
+
+        var token = Guid.NewGuid().ToString("N");
+        var cache = new EmbeddingsCache(database, new EmbeddingsCacheOptions("integration-cache", token));
+
+        await cache.SetAsync("prompt", [1f, 2f, 3f], metadata: new { source = "faq" });
+        var withMetadata = await cache.GetAsync("prompt");
+
+        await cache.SetAsync("prompt", [4f, 5f, 6f]);
+        var afterOverwrite = await cache.GetAsync("prompt");
+
+        // A plain HSET would leave the earlier metadata merged onto the new embedding; the overwrite
+        // must clear it so the entry never reports metadata it no longer carries.
+        Assert.Equal("{\"source\":\"faq\"}", withMetadata!.Metadata);
+        Assert.Equal([4f, 5f, 6f], afterOverwrite!.Embedding);
+        Assert.Null(afterOverwrite.Metadata);
+    }
 }

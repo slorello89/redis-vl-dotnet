@@ -64,6 +64,36 @@ public sealed class SemanticRouterTests
     }
 
     [Fact]
+    public async Task AddRouteAsync_WithEmbeddingLengthNotMatchingDimensions_ThrowsAndDoesNotWrite()
+    {
+        var (database, recorder) = RecordingDatabaseProxy.CreatePair();
+        var router = new SemanticRouter(database, CreateOptions());
+
+        // The schema declares two dimensions; a three-value embedding would be silently rejected by
+        // RediSearch on write, so the add must fail loudly before dispatching any command.
+        await Assert.ThrowsAsync<ArgumentException>(() =>
+            router.AddRouteAsync("billing", "refund status", [1f, 2f, 3f]));
+        Assert.Equal(0, recorder.HashSetAsyncCallCount);
+        Assert.Empty(recorder.HashSetCalls);
+    }
+
+    [Fact]
+    public async Task AddRouteAsync_WithoutThresholdOrMetadata_ClearsBothOptionalFields()
+    {
+        var (database, recorder) = RecordingDatabaseProxy.CreatePair();
+        var router = new SemanticRouter(database, CreateOptions());
+
+        await router.AddRouteAsync("billing", "refund status", [1f, 0f]);
+
+        // Neither optional field is supplied, so both are deleted in the same transaction as the
+        // write to avoid a re-added reference keeping an earlier add's threshold or metadata.
+        Assert.Equal(1, recorder.CreateTransactionCallCount);
+        Assert.Equal(1, recorder.HashDeleteAsyncCallCount);
+        Assert.Contains(recorder.LastHashDeleteFields!, field => field == "routeThreshold");
+        Assert.Contains(recorder.LastHashDeleteFields!, field => field == "metadata");
+    }
+
+    [Fact]
     public async Task RouteAsync_WithCancelledToken_DoesNotExecuteRedisCommand()
     {
         var (database, recorder) = RecordingDatabaseProxy.CreatePair();
@@ -167,6 +197,8 @@ public sealed class SemanticRouterTests
 
         Assert.Equal(2, keys.Count);
         Assert.Equal(2, recorder.HashSetCalls.Count);
+        // Both optional fields are present on every reference, so nothing is cleared.
+        Assert.Equal(0, recorder.HashDeleteAsyncCallCount);
         foreach (var entries in recorder.HashSetCalls)
         {
             Assert.Contains(entries, entry => entry.Name == "routeName" && entry.Value == "billing");
@@ -313,7 +345,13 @@ public sealed class SemanticRouterTests
 
         public int HashSetAsyncCallCount { get; private set; }
 
+        public int HashDeleteAsyncCallCount { get; private set; }
+
+        public int CreateTransactionCallCount { get; private set; }
+
         public HashEntry[]? LastHashEntries { get; private set; }
+
+        public RedisValue[]? LastHashDeleteFields { get; private set; }
 
         public List<HashEntry[]> HashSetCalls { get; } = [];
 
@@ -334,11 +372,21 @@ public sealed class SemanticRouterTests
             {
                 nameof(IDatabase.ExecuteAsync) => HandleExecuteAsync(args),
                 nameof(IDatabase.HashSetAsync) => HandleHashSetAsync(args),
+                nameof(IDatabase.HashDeleteAsync) => HandleHashDeleteAsync(args),
                 nameof(IDatabase.KeyDeleteAsync) => HandleKeyDeleteAsync(args),
+                nameof(IDatabase.CreateTransaction) => CreateRecordingTransaction(),
                 nameof(IDatabase.Multiplexer) => throw new NotSupportedException(),
                 nameof(IDatabase.Database) => 0,
                 _ => throw new NotSupportedException($"Method '{targetMethod.Name}' is not configured for this test proxy.")
             };
+        }
+
+        private ITransaction CreateRecordingTransaction()
+        {
+            CreateTransactionCallCount++;
+            var transaction = DispatchProxy.Create<ITransaction, RecordingTransactionProxy>();
+            ((RecordingTransactionProxy)(object)transaction).Parent = this;
+            return transaction;
         }
 
         private Task<RedisResult> HandleExecuteAsync(object?[]? args)
@@ -358,6 +406,13 @@ public sealed class SemanticRouterTests
             return Task.FromResult(true);
         }
 
+        private Task<long> HandleHashDeleteAsync(object?[]? args)
+        {
+            HashDeleteAsyncCallCount++;
+            LastHashDeleteFields = (RedisValue[])args![1]!;
+            return Task.FromResult((long)LastHashDeleteFields.Length);
+        }
+
         private Task<long> HandleKeyDeleteAsync(object?[]? args)
         {
             if (args![0] is RedisKey[] keys)
@@ -368,6 +423,27 @@ public sealed class SemanticRouterTests
 
             DeletedKeys.Add((RedisKey)args[0]!);
             return Task.FromResult(1L);
+        }
+
+        // Records the commands queued inside a MULTI/EXEC onto the parent recorder so a
+        // transaction's HSET/HDEL are observed the same way as direct calls. Execution is not
+        // deferred because the production code never awaits the queued tasks before ExecuteAsync.
+        private class RecordingTransactionProxy : DispatchProxy
+        {
+            public RecordingDatabaseProxy Parent { get; set; } = null!;
+
+            protected override object? Invoke(MethodInfo? targetMethod, object?[]? args)
+            {
+                ArgumentNullException.ThrowIfNull(targetMethod);
+
+                return targetMethod.Name switch
+                {
+                    nameof(ITransaction.HashSetAsync) => Parent.HandleHashSetAsync(args),
+                    nameof(ITransaction.HashDeleteAsync) => Parent.HandleHashDeleteAsync(args),
+                    nameof(ITransaction.ExecuteAsync) => Task.FromResult(true),
+                    _ => throw new NotSupportedException($"Method '{targetMethod.Name}' is not configured for this transaction proxy.")
+                };
+            }
         }
     }
 }

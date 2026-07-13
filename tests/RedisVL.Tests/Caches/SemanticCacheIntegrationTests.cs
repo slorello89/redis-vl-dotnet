@@ -3,6 +3,7 @@ using RedisVL.Filters;
 using RedisVL.Indexes;
 using RedisVL.Schema;
 using RedisVL.Tests.Indexes;
+using StackExchange.Redis;
 
 namespace RedisVL.Tests.Caches;
 
@@ -338,6 +339,106 @@ public sealed class SemanticCacheIntegrationTests
                 await cache.DropAsync(deleteDocuments: true);
             }
         }
+    }
+
+    [RedisSearchIntegrationFact]
+    public async Task StoreOverwritingWithoutMetadataClearsPreviousMetadata()
+    {
+        await using var connection = await RedisSearchTestEnvironment.ConnectAsync();
+        var database = connection.GetDatabase();
+
+        var token = Guid.NewGuid().ToString("N");
+        var cache = new SemanticCache(database, CreateOptions(token, 0.25d));
+
+        try
+        {
+            await cache.CreateAsync();
+            await cache.StoreAsync(
+                "prompt-a",
+                "first response",
+                [1f, 0f],
+                metadata: new { source = "faq" },
+                filterValues: TeamAFilterValues);
+            await RedisSearchTestEnvironment.WaitForAsync(
+                async () =>
+                {
+                    var hit = await cache.CheckAsync("prompt-a", [1f, 0f], Filter.Tag("tenant").Eq("team-a"));
+                    return hit?.Metadata is not null;
+                });
+
+            // Re-store the same derived key (same prompt and filter values) with no metadata.
+            await cache.StoreAsync(
+                "prompt-a",
+                "second response",
+                [1f, 0f],
+                filterValues: TeamAFilterValues);
+            await RedisSearchTestEnvironment.WaitForAsync(
+                async () =>
+                {
+                    var hit = await cache.CheckAsync("prompt-a", [1f, 0f], Filter.Tag("tenant").Eq("team-a"));
+                    return hit?.Response == "second response";
+                });
+
+            var refreshed = await cache.CheckAsync("prompt-a", [1f, 0f], Filter.Tag("tenant").Eq("team-a"));
+            Assert.Equal("second response", refreshed!.Response);
+            // The earlier metadata must not survive the overwrite paired with the new response.
+            Assert.Null(refreshed.Metadata);
+        }
+        finally
+        {
+            if (await cache.ExistsAsync())
+            {
+                await cache.DropAsync(deleteDocuments: true);
+            }
+        }
+    }
+
+    [RedisSearchIntegrationFact]
+    public async Task StoreRejectsEmbeddingWhoseLengthDoesNotMatchSchema()
+    {
+        await using var connection = await RedisSearchTestEnvironment.ConnectAsync();
+        var database = connection.GetDatabase();
+
+        var token = Guid.NewGuid().ToString("N");
+        var cache = new SemanticCache(database, CreateOptions(token, 0.25d));
+
+        try
+        {
+            await cache.CreateAsync();
+
+            // The schema declares two dimensions. A mismatched embedding used to write a hash that
+            // RediSearch silently failed to index; it must now be rejected before any write.
+            await Assert.ThrowsAsync<ArgumentException>(() =>
+                cache.StoreAsync("prompt-a", "response", [1f, 0f, 0f], filterValues: TeamAFilterValues));
+
+            var indexName = string.IsNullOrEmpty(cache.KeyNamespace)
+                ? $"semantic-cache:{cache.Name}"
+                : $"semantic-cache:{cache.Name}:{cache.KeyNamespace}";
+            var info = await database.ExecuteAsync("FT.INFO", indexName);
+            Assert.Equal("0", ReadInfoField(info, "hash_indexing_failures"));
+            Assert.Equal("0", ReadInfoField(info, "num_docs"));
+        }
+        finally
+        {
+            if (await cache.ExistsAsync())
+            {
+                await cache.DropAsync(deleteDocuments: true);
+            }
+        }
+    }
+
+    private static string? ReadInfoField(RedisResult info, string field)
+    {
+        var entries = (RedisResult[])info!;
+        for (var index = 0; index + 1 < entries.Length; index += 2)
+        {
+            if (string.Equals(entries[index].ToString(), field, StringComparison.Ordinal))
+            {
+                return entries[index + 1].ToString();
+            }
+        }
+
+        return null;
     }
 
     private static SemanticCacheOptions CreateOptions(
