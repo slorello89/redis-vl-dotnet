@@ -14,8 +14,9 @@ public sealed class SearchResults
     /// </summary>
     /// <param name="totalCount">The total number of documents matching the query; cannot be negative.</param>
     /// <param name="documents">The documents returned for the current page.</param>
+    /// <param name="warnings">Server-emitted warnings for this query, or <see langword="null"/> for none.</param>
     /// <exception cref="ArgumentOutOfRangeException"><paramref name="totalCount"/> is negative.</exception>
-    public SearchResults(long totalCount, IReadOnlyList<SearchDocument> documents)
+    public SearchResults(long totalCount, IReadOnlyList<SearchDocument> documents, IReadOnlyList<string>? warnings = null)
     {
         if (totalCount < 0)
         {
@@ -25,6 +26,7 @@ public sealed class SearchResults
         ArgumentNullException.ThrowIfNull(documents);
         TotalCount = totalCount;
         Documents = documents;
+        Warnings = warnings ?? [];
     }
 
     /// <summary>The total number of documents matching the query, which may exceed the number returned.</summary>
@@ -32,6 +34,12 @@ public sealed class SearchResults
 
     /// <summary>The documents returned for the current page.</summary>
     public IReadOnlyList<SearchDocument> Documents { get; }
+
+    /// <summary>
+    /// Warnings the server emitted for this query (for example when <c>FT.HYBRID</c> degrades a branch);
+    /// empty when the server reported none.
+    /// </summary>
+    public IReadOnlyList<string> Warnings { get; }
 
     /// <summary>
     /// Projects each returned document onto <typeparamref name="TDocument"/>.
@@ -42,7 +50,7 @@ public sealed class SearchResults
     public SearchResults<TDocument> Map<TDocument>(JsonSerializerOptions? serializerOptions = null)
     {
         var mappedDocuments = Documents.Select(document => document.Map<TDocument>(serializerOptions)).ToArray();
-        return new SearchResults<TDocument>(TotalCount, mappedDocuments);
+        return new SearchResults<TDocument>(TotalCount, mappedDocuments, Warnings);
     }
 }
 
@@ -106,8 +114,9 @@ public sealed class SearchResults<TDocument>
     /// </summary>
     /// <param name="totalCount">The total number of documents matching the query; cannot be negative.</param>
     /// <param name="documents">The mapped documents returned for the current page.</param>
+    /// <param name="warnings">Server-emitted warnings for this query, or <see langword="null"/> for none.</param>
     /// <exception cref="ArgumentOutOfRangeException"><paramref name="totalCount"/> is negative.</exception>
-    public SearchResults(long totalCount, IReadOnlyList<TDocument> documents)
+    public SearchResults(long totalCount, IReadOnlyList<TDocument> documents, IReadOnlyList<string>? warnings = null)
     {
         if (totalCount < 0)
         {
@@ -117,6 +126,7 @@ public sealed class SearchResults<TDocument>
         ArgumentNullException.ThrowIfNull(documents);
         TotalCount = totalCount;
         Documents = documents;
+        Warnings = warnings ?? [];
     }
 
     /// <summary>The total number of documents matching the query, which may exceed the number returned.</summary>
@@ -124,4 +134,10 @@ public sealed class SearchResults<TDocument>
 
     /// <summary>The mapped documents returned for the current page.</summary>
     public IReadOnlyList<TDocument> Documents { get; }
+
+    /// <summary>
+    /// Warnings the server emitted for this query (for example when <c>FT.HYBRID</c> degrades a branch);
+    /// empty when the server reported none.
+    /// </summary>
+    public IReadOnlyList<string> Warnings { get; }
 }

@@ -1288,6 +1288,53 @@ public sealed class SearchIndexIntegrationTests
     }
 
     [RedisSearchIntegrationFact]
+    public async Task TypedVectorSearchWithoutReturnFieldsMapsStoredFields()
+    {
+        await using var connection = await RedisSearchTestEnvironment.ConnectAsync();
+        var database = connection.GetDatabase();
+
+        var token = Guid.NewGuid().ToString("N");
+        var schema = new SearchSchema(
+            new IndexDefinition($"vector-typed-idx-{token}", $"vector-typed:{token}:", StorageType.Hash),
+            [
+                new TagFieldDefinition("genre"),
+                new TextFieldDefinition("title"),
+                new VectorFieldDefinition(
+                    "embedding",
+                    new VectorFieldAttributes(
+                        VectorAlgorithm.Flat,
+                        VectorDataType.Float32,
+                        VectorDistanceMetric.Cosine,
+                        2))
+            ]);
+        var index = new SearchIndex(database, schema);
+
+        try
+        {
+            await index.CreateAsync();
+            await SeedHashDocumentsAsync(database, schema, SearchIndexSeedData.VectorMovies);
+            await RedisSearchTestEnvironment.WaitForIndexDocumentCountAsync(index, SearchIndexSeedData.VectorMovies.Count);
+
+            // No return fields specified: the query used to emit `RETURN 1 vector_distance`, so mapping
+            // a POCO with non-nullable properties threw. It must now return all stored fields so the
+            // obvious typed happy path just works.
+            var results = await index.SearchAsync<VectorMovieRow>(
+                VectorQuery.FromFloat32("embedding", [1f, 0f], 2));
+
+            Assert.Equal(2, results.Documents.Count);
+            Assert.All(results.Documents, static row => Assert.False(string.IsNullOrEmpty(row.Title)));
+            Assert.Contains(results.Documents, static row => row.Title == "Heat");
+        }
+        finally
+        {
+            if (await index.ExistsAsync())
+            {
+                await index.DropAsync(deleteDocuments: true);
+            }
+        }
+    }
+
+    [RedisSearchIntegrationFact]
     public async Task ExecutesVectorQueriesWithCompoundFilters()
     {
         await using var connection = await RedisSearchTestEnvironment.ConnectAsync();
@@ -1852,6 +1899,43 @@ public sealed class SearchIndexIntegrationTests
         }
     }
 
+    [RedisSearchIntegrationFact]
+    public async Task TagLikeMatchesSingleCharacterWildcard()
+    {
+        await using var connection = await RedisSearchTestEnvironment.ConnectAsync();
+        var database = connection.GetDatabase();
+
+        var token = Guid.NewGuid().ToString("N");
+        var schema = new SearchSchema(
+            new IndexDefinition($"tag-like-idx-{token}", $"tag-like:{token}:", StorageType.Hash),
+            [new TagFieldDefinition("sku")]);
+        var index = new SearchIndex(database, schema);
+
+        try
+        {
+            await index.CreateAsync();
+            await database.HashSetAsync($"{schema.Index.Prefix}1", [new HashEntry("sku", "ab1")]);
+            await database.HashSetAsync($"{schema.Index.Prefix}2", [new HashEntry("sku", "ab2")]);
+            await database.HashSetAsync($"{schema.Index.Prefix}3", [new HashEntry("sku", "abcd")]);
+            await RedisSearchTestEnvironment.WaitForIndexDocumentCountAsync(index, 3);
+
+            // `?` matches exactly one character only through the w'...' form Like now emits: the two
+            // three-character SKUs match and the four-character one does not. The old plain-{...}
+            // rendering treated `?` literally and silently matched nothing.
+            var results = await index.SearchAsync(new FilterQuery(Filter.Tag("sku").Like("ab?")));
+
+            Assert.Equal(2, results.Documents.Count);
+            Assert.DoesNotContain(results.Documents, static document => document.Values["sku"] == "abcd");
+        }
+        finally
+        {
+            if (await index.ExistsAsync())
+            {
+                await index.DropAsync(deleteDocuments: true);
+            }
+        }
+    }
+
     private sealed record JsonMovieDocument(string Id, string Title, int Year, string Genre);
 
     private sealed record JsonMovieEnvelope(string ExternalId, string Title, int Year, string Genre);
@@ -1869,6 +1953,8 @@ public sealed class SearchIndexIntegrationTests
     private sealed record HybridAggregationRow(string Genre, int MatchCount, double AvgDistance);
 
     private sealed record HybridSearchRow(string Id, string Title);
+
+    private sealed record VectorMovieRow(string Id, string Title, string Genre);
 
     private static IReadOnlyDictionary<string, string> ToFlatStringDictionary(RedisResult result)
     {

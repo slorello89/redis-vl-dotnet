@@ -15,6 +15,16 @@ All notable changes to this project are documented here. This project adheres to
 
 ### Fixed
 
+- **More pre-release audit edge cases** — a second batch of small correctness fixes from the audit
+  (issue #54): a default `VectorQuery` (no `returnFields`) now omits `RETURN` so the server returns
+  all stored fields plus the yielded score — the obvious `SearchAsync<T>(new VectorQuery(...))` happy
+  path no longer throws on a typed document's non-nullable properties; `Filter.Tag(...).Like(...)`
+  now renders patterns with the `w'...'` form so `?` acts as a single-character wildcard (plain
+  `{...}` tag syntax takes `?` literally and silently matched nothing); `SemanticCache` now throws a
+  descriptive error when a matched document cannot be mapped (schema drift) instead of silently
+  counting it as a miss; `RedisConnectionFactory.ConnectClusterAsync` disposes the multiplexer if a
+  cancelled connect later succeeds, rather than leaking it; and `SearchResults` now exposes a
+  `Warnings` collection populated from the `FT.HYBRID` reply (previously discarded).
 - **Query-construction and validation edge cases** — a batch of small correctness fixes from the
   pre-release audit (issue #54): `Filter.Text(...).Match`/`Prefix` now escape `*` so an exact-term
   match stays literal instead of silently becoming a prefix wildcard and `Prefix("foo*")` no longer

@@ -330,6 +330,51 @@ public sealed class SearchQueryCommandBuilderTests
     };
 
     [Fact]
+    public void DefaultVectorQueryOmitsReturnSoAllFieldsComeBack()
+    {
+        var schema = VectorSchema();
+        var query = VectorQuery.FromFloat32("embedding", [1f, 2f], 2);
+
+        var tokens = SearchQueryCommandBuilder.BuildVectorSearchArguments(schema, query)
+            .Select(static argument => argument.ToString())
+            .ToArray();
+
+        // No RETURN → the server returns every stored field plus the yielded score, so the typed
+        // happy path can map a POCO instead of throwing on a missing required field.
+        Assert.Empty(query.ReturnFields);
+        Assert.DoesNotContain("RETURN", tokens);
+        // SORTBY on the score alias is still emitted so results stay ordered by distance.
+        Assert.Contains("SORTBY", tokens);
+    }
+
+    [Fact]
+    public void ExplicitVectorQueryReturnFieldsStillEmitReturn()
+    {
+        var schema = VectorSchema();
+        var query = VectorQuery.FromFloat32("embedding", [1f, 2f], 2, returnFields: ["title"], scoreAlias: "distance");
+
+        var tokens = SearchQueryCommandBuilder.BuildVectorSearchArguments(schema, query)
+            .Select(static argument => argument.ToString())
+            .ToArray();
+
+        Assert.Equal(["title", "distance"], query.ReturnFields);
+        Assert.Contains("RETURN", tokens);
+    }
+
+    private static SearchSchema VectorSchema() => new(
+        new IndexDefinition("movies-idx", "movie:", StorageType.Hash),
+        [
+            new TextFieldDefinition("title"),
+            new VectorFieldDefinition(
+                "embedding",
+                new VectorFieldAttributes(
+                    VectorAlgorithm.Flat,
+                    VectorDataType.Float32,
+                    VectorDistanceMetric.Cosine,
+                    2))
+        ]);
+
+    [Fact]
     public void BuildsMultiVectorSearchArgumentsWithStableAliases()
     {
         var schema = new SearchSchema(

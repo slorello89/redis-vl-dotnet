@@ -25,6 +25,7 @@ internal static class HybridSearchResultsParser
         var entries = (RedisResult[])result!;
         long totalCount = 0;
         var documents = new List<SearchDocument>();
+        var warnings = new List<string>();
 
         for (var index = 0; index + 1 < entries.Length; index += 2)
         {
@@ -39,10 +40,30 @@ internal static class HybridSearchResultsParser
                 case "results":
                     documents.AddRange(ParseRows(value));
                     break;
+                case "warnings":
+                    warnings.AddRange(ParseWarnings(value));
+                    break;
             }
         }
 
-        return new SearchResults(totalCount, documents);
+        return new SearchResults(totalCount, documents, warnings);
+    }
+
+    private static IEnumerable<string> ParseWarnings(RedisResult warnings)
+    {
+        if (warnings.IsNull || warnings.Resp2Type != ResultType.Array)
+        {
+            yield break;
+        }
+
+        foreach (var warning in (RedisResult[])warnings!)
+        {
+            var text = warning.ToString();
+            if (!string.IsNullOrEmpty(text))
+            {
+                yield return text;
+            }
+        }
     }
 
     private static IEnumerable<SearchDocument> ParseRows(RedisResult results)

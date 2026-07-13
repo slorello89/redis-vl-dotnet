@@ -427,6 +427,39 @@ public sealed class SemanticCacheIntegrationTests
         }
     }
 
+    [RedisSearchIntegrationFact]
+    public async Task CheckThrowsWhenMatchedDocumentIsMissingRequiredField()
+    {
+        await using var connection = await RedisSearchTestEnvironment.ConnectAsync();
+        var database = connection.GetDatabase();
+
+        var token = Guid.NewGuid().ToString("N");
+        var cache = new SemanticCache(database, CreateOptions(token, 0.25d));
+
+        try
+        {
+            await cache.CreateAsync();
+            var key = await cache.StoreAsync("prompt-a", "cached-a", [1f, 0f], filterValues: TeamAFilterValues);
+            await RedisSearchTestEnvironment.WaitForAsync(
+                async () => await cache.CheckAsync("prompt-a", [1f, 0f], Filter.Tag("tenant").Eq("team-a")) is not null);
+
+            // Simulate schema drift / external tampering: drop a required field from the stored hash.
+            // The document still matches the vector query, so it is returned but cannot be mapped —
+            // that must surface as an error rather than being swallowed as a cache miss.
+            await database.HashDeleteAsync(key, "response");
+
+            await Assert.ThrowsAsync<InvalidOperationException>(
+                async () => await cache.CheckAsync("prompt-a", [1f, 0f], Filter.Tag("tenant").Eq("team-a")));
+        }
+        finally
+        {
+            if (await cache.ExistsAsync())
+            {
+                await cache.DropAsync(deleteDocuments: true);
+            }
+        }
+    }
+
     private static string? ReadInfoField(RedisResult info, string field)
     {
         var entries = (RedisResult[])info!;

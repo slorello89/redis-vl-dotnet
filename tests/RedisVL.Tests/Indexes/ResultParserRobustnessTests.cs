@@ -177,6 +177,34 @@ public sealed class ResultParserRobustnessTests
         Assert.False(document.Values.ContainsKey("orphan"));
     }
 
+    [Fact]
+    public void HybridSearchResultsParser_SurfacesWarnings()
+    {
+        var reply = Arr(
+            Str("total_results"), Int(1),
+            Str("results"), Arr(
+                Arr(Str(HybridSearchQuery.KeyField), Str("doc:1"), Str("title"), Str("hello world"))),
+            Str("warnings"), Arr(Str("Timeout limit was reached")));
+
+        var results = HybridSearchResultsParser.Parse(reply);
+
+        Assert.Single(results.Documents);
+        Assert.Equal(["Timeout limit was reached"], results.Warnings);
+    }
+
+    [Fact]
+    public void HybridSearchResultsParser_NoWarnings_ReturnsEmptyWarnings()
+    {
+        var reply = Arr(
+            Str("total_results"), Int(1),
+            Str("results"), Arr(
+                Arr(Str(HybridSearchQuery.KeyField), Str("doc:1"))));
+
+        var results = HybridSearchResultsParser.Parse(reply);
+
+        Assert.Empty(results.Warnings);
+    }
+
     private static RedisResult Str(string value) => RedisResult.Create((RedisValue)value);
 
     private static RedisResult Int(long value) => RedisResult.Create(value);

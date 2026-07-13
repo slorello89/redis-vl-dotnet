@@ -71,7 +71,32 @@ public static class RedisConnectionFactory
         cancellationToken.ThrowIfCancellationRequested();
 
         var options = CreateClusterOptions(seedNodes, configure);
-        return await ConnectionMultiplexer.ConnectAsync(options).WaitAsync(cancellationToken).ConfigureAwait(false);
+        var connectTask = ConnectionMultiplexer.ConnectAsync(options);
+        try
+        {
+            return await connectTask.WaitAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            // WaitAsync stops awaiting on cancellation but cannot cancel the underlying connect,
+            // which may still succeed and produce a live multiplexer nobody holds. Dispose it when
+            // (if) it completes so the connection does not leak.
+            _ = DisposeWhenCompletedAsync(connectTask);
+            throw;
+        }
+    }
+
+    private static async Task DisposeWhenCompletedAsync(Task<ConnectionMultiplexer> connectTask)
+    {
+        try
+        {
+            var multiplexer = await connectTask.ConfigureAwait(false);
+            await multiplexer.DisposeAsync().ConfigureAwait(false);
+        }
+        catch
+        {
+            // The abandoned connect ultimately failed; there is nothing to dispose.
+        }
     }
 
     private static IReadOnlyList<string> SplitNodes(string nodes) =>
