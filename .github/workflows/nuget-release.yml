@@ -16,7 +16,9 @@ jobs:
 
     services:
       redis:
-        image: redis:latest
+        # Pinned to the documented minimum (Redis 8.4+ for native FT.HYBRID) so release-gating tests
+        # run against a fixed, reproducible server rather than a drifting `latest`. Bump deliberately.
+        image: redis:8.4.0
         ports:
           - 6379:6379
         options: >-
@@ -49,12 +51,42 @@ jobs:
       - name: Test solution
         # Run each target framework's test host sequentially (the test project multi-targets
         # net8.0/net9.0/net10.0); concurrent runs against the shared Redis service flake.
+        # Emit a TRX per leg so the execution-floor guard below can confirm the integration suite ran.
         run: |
+          mkdir -p "${{ runner.temp }}/test-results"
           for tfm in net8.0 net9.0 net10.0; do
             echo "::group::Test $tfm"
-            dotnet test redis-vl-dotnet.sln --configuration Release --no-build --framework "$tfm" --verbosity normal
+            dotnet test redis-vl-dotnet.sln --configuration Release --no-build --framework "$tfm" \
+              --verbosity normal \
+              --logger "trx;LogFileName=${tfm}.trx" \
+              --results-directory "${{ runner.temp }}/test-results"
             echo "::endgroup::"
           done
+
+      - name: Enforce test execution floor
+        # Gate the release on the integration suite actually running. `executed` (TRX counters)
+        # excludes skipped tests, so it collapses if the ~75 integration tests silently skip
+        # (e.g. a broken Redis service). A green-but-skipped run must not ship a release.
+        shell: bash
+        env:
+          MIN_EXECUTED_TESTS: "400"
+        run: |
+          shopt -s nullglob
+          trx_files=("${{ runner.temp }}"/test-results/*.trx)
+          if [ ${#trx_files[@]} -eq 0 ]; then
+            echo "::error::No TRX result files were produced; the test run did not complete." >&2
+            exit 1
+          fi
+          status=0
+          for trx in "${trx_files[@]}"; do
+            executed=$(grep -oE 'executed="[0-9]+"' "$trx" | head -1 | grep -oE '[0-9]+')
+            echo "$(basename "$trx"): executed=${executed:-0} (floor=$MIN_EXECUTED_TESTS)"
+            if [ -z "$executed" ] || [ "$executed" -lt "$MIN_EXECUTED_TESTS" ]; then
+              echo "::error::$(basename "$trx") executed ${executed:-0} tests, below the floor of $MIN_EXECUTED_TESTS. Integration tests may have been silently skipped." >&2
+              status=1
+            fi
+          done
+          exit $status
 
       - name: Pack publishable projects
         # Packs every project with <IsPackable>true</IsPackable> (see Directory.Build.props),

@@ -1124,8 +1124,12 @@ public sealed class SearchIndexAsyncTests
         Assert.Equal(["product:1", "product:3"], results.Documents.Select(static document => document.Id).ToArray());
         Assert.Equal("Runner", results.Documents[0].Values["title"]);
         Assert.Equal("Boot", results.Documents[1].Values["title"]);
-        Assert.Equal("0.095000000000000001", results.Documents[0].Values["combined_distance"]);
-        Assert.Equal("0.22999999999999998", results.Documents[1].Values["combined_distance"]);
+        // Compare the fused score numerically with tolerance rather than against an exact
+        // double->string round-trip: 0.7*0.05 + 0.3*0.20 = 0.095 and 0.7*0.20 + 0.3*0.30 = 0.23.
+        // The literal string form ("0.095000000000000001") is an artifact of IEEE-754 formatting and
+        // would break on any harmless change to how the fused distance is rendered.
+        Assert.Equal(0.095, (double)results.Documents[0].Values["combined_distance"], precision: 6);
+        Assert.Equal(0.23, (double)results.Documents[1].Values["combined_distance"], precision: 6);
         Assert.All(
             recorder.ExecuteAsyncCalls,
             static call => Assert.Equal(

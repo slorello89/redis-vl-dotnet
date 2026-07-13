@@ -1907,7 +1907,7 @@ public sealed class SearchIndexIntegrationTests
         yield return result.ToString()!;
     }
 
-    [RedisSearchIntegrationFact]
+    [RedisNativeHybridSearchIntegrationFact]
     public async Task ExecutesNativeHybridSearchQueriesWithLinearFusion()
     {
         await using var connection = await RedisSearchTestEnvironment.ConnectAsync();
@@ -1989,7 +1989,7 @@ public sealed class SearchIndexIntegrationTests
         }
     }
 
-    [RedisSearchIntegrationFact]
+    [RedisNativeHybridSearchIntegrationFact]
     public async Task ExecutesNativeHybridSearchQueriesWithVectorPreFilter()
     {
         await using var connection = await RedisSearchTestEnvironment.ConnectAsync();
