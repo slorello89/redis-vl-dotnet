@@ -5,11 +5,20 @@ using RedisVL.Vectorizers;
 
 namespace RedisVL.Vectorizers.OpenAI;
 
+/// <summary>
+/// An <see cref="IBatchTextVectorizer"/> that generates text embeddings using OpenAI's embeddings API.
+/// </summary>
 public sealed class OpenAiTextVectorizer : IBatchTextVectorizer
 {
     private readonly EmbeddingClient _client;
     private readonly OpenAiVectorizerOptions _options;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="OpenAiTextVectorizer"/> class using a preconfigured
+    /// OpenAI <see cref="EmbeddingClient"/>.
+    /// </summary>
+    /// <param name="client">The OpenAI embedding client used to generate embeddings.</param>
+    /// <param name="options">Optional embedding options such as dimensions and end-user identifier.</param>
     public OpenAiTextVectorizer(EmbeddingClient client, OpenAiVectorizerOptions? options = null)
     {
         ArgumentNullException.ThrowIfNull(client);
@@ -18,11 +27,24 @@ public sealed class OpenAiTextVectorizer : IBatchTextVectorizer
         _options = options ?? new OpenAiVectorizerOptions();
     }
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="OpenAiTextVectorizer"/> class using a model name and API key.
+    /// </summary>
+    /// <param name="model">The OpenAI embedding model name (for example, <c>text-embedding-3-small</c>).</param>
+    /// <param name="apiKey">The OpenAI API key.</param>
+    /// <param name="options">Optional embedding options such as dimensions and end-user identifier.</param>
     public OpenAiTextVectorizer(string model, string apiKey, OpenAiVectorizerOptions? options = null)
         : this(new EmbeddingClient(model, apiKey), options)
     {
     }
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="OpenAiTextVectorizer"/> class using a model name and credential.
+    /// </summary>
+    /// <param name="model">The OpenAI embedding model name (for example, <c>text-embedding-3-small</c>).</param>
+    /// <param name="credential">The credential used to authenticate with OpenAI.</param>
+    /// <param name="clientOptions">Optional OpenAI client options (for example, a custom endpoint).</param>
+    /// <param name="options">Optional embedding options such as dimensions and end-user identifier.</param>
     public OpenAiTextVectorizer(
         string model,
         ApiKeyCredential credential,
@@ -32,10 +54,13 @@ public sealed class OpenAiTextVectorizer : IBatchTextVectorizer
     {
     }
 
+    /// <summary>Gets the underlying OpenAI <see cref="EmbeddingClient"/>.</summary>
     public EmbeddingClient Client => _client;
 
+    /// <summary>Gets the embedding options applied to each request.</summary>
     public OpenAiVectorizerOptions Options => _options;
 
+    /// <inheritdoc/>
     public async Task<float[]> VectorizeAsync(string input, CancellationToken cancellationToken = default)
     {
         ValidateInput(input);
@@ -48,6 +73,7 @@ public sealed class OpenAiTextVectorizer : IBatchTextVectorizer
         return response.Value.ToFloats().ToArray();
     }
 
+    /// <inheritdoc/>
     public async Task<IReadOnlyList<float[]>> VectorizeAsync(
         IReadOnlyList<string> inputs,
         CancellationToken cancellationToken = default)

@@ -13,11 +13,17 @@ public sealed class RedisVLVectorStore : VectorStore
 {
     private readonly IDatabase _database;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="RedisVLVectorStore"/> class.
+    /// </summary>
+    /// <param name="database">The StackExchange.Redis database backing the store.</param>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="database"/> is <c>null</c>.</exception>
     public RedisVLVectorStore(IDatabase database)
     {
         _database = database ?? throw new ArgumentNullException(nameof(database));
     }
 
+    /// <inheritdoc/>
     public override VectorStoreCollection<TKey, TRecord> GetCollection<TKey, TRecord>(
         string name,
         VectorStoreCollectionDefinition? definition = null) =>
@@ -26,12 +32,15 @@ public sealed class RedisVLVectorStore : VectorStore
             name,
             new RedisVLCollectionOptions { Definition = definition });
 
+    /// <inheritdoc/>
+    /// <exception cref="NotSupportedException">Always thrown; dynamic collections are not supported.</exception>
     public override VectorStoreCollection<object, Dictionary<string, object?>> GetDynamicCollection(
         string name,
         VectorStoreCollectionDefinition definition) =>
         throw new NotSupportedException(
             "The RedisVL vector-data connector does not support dynamic (Dictionary-based) collections. Use GetCollection<TKey, TRecord>.");
 
+    /// <inheritdoc/>
     public override async IAsyncEnumerable<string> ListCollectionNamesAsync(
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
@@ -42,6 +51,7 @@ public sealed class RedisVLVectorStore : VectorStore
         }
     }
 
+    /// <inheritdoc/>
     public override async Task<bool> CollectionExistsAsync(string name, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
@@ -49,6 +59,7 @@ public sealed class RedisVLVectorStore : VectorStore
         return indexes.Any(index => string.Equals(index.Name, name, StringComparison.Ordinal));
     }
 
+    /// <inheritdoc/>
     public override async Task EnsureCollectionDeletedAsync(string name, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
@@ -62,6 +73,7 @@ public sealed class RedisVLVectorStore : VectorStore
         await index.DropAsync(deleteDocuments: true, cancellationToken).ConfigureAwait(false);
     }
 
+    /// <inheritdoc/>
     public override object? GetService(Type serviceType, object? serviceKey = null)
     {
         ArgumentNullException.ThrowIfNull(serviceType);

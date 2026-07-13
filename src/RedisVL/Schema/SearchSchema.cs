@@ -6,8 +6,18 @@ using YamlDotNet.Serialization.NamingConventions;
 
 namespace RedisVL.Schema;
 
+/// <summary>
+/// Represents a complete search index schema, pairing an <see cref="IndexDefinition"/> with the
+/// collection of <see cref="FieldDefinition"/> fields used to build an <c>FT.CREATE</c> command.
+/// </summary>
 public sealed record SearchSchema
 {
+    /// <summary>
+    /// Initializes a new <see cref="SearchSchema"/> from an index definition and its fields.
+    /// </summary>
+    /// <param name="index">The index-level configuration.</param>
+    /// <param name="fields">The fields that make up the index.</param>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="index"/> or <paramref name="fields"/> is <see langword="null"/>.</exception>
     public SearchSchema(IndexDefinition index, IEnumerable<FieldDefinition> fields)
     {
         ArgumentNullException.ThrowIfNull(index);
@@ -17,10 +27,18 @@ public sealed record SearchSchema
         Fields = new ReadOnlyCollection<FieldDefinition>(fields.ToList());
     }
 
+    /// <summary>The index-level configuration.</summary>
     public IndexDefinition Index { get; }
 
+    /// <summary>The fields that make up the index.</summary>
     public IReadOnlyList<FieldDefinition> Fields { get; }
 
+    /// <summary>
+    /// Parses a <see cref="SearchSchema"/> from a YAML schema document.
+    /// </summary>
+    /// <param name="yaml">The YAML schema content.</param>
+    /// <returns>The parsed <see cref="SearchSchema"/>.</returns>
+    /// <exception cref="ArgumentException">Thrown when the YAML is blank, malformed, or missing required values.</exception>
     public static SearchSchema FromYaml(string yaml)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(yaml);
@@ -48,6 +66,12 @@ public sealed record SearchSchema
         return document.ToSearchSchema();
     }
 
+    /// <summary>
+    /// Reads a YAML schema document from a file and parses it into a <see cref="SearchSchema"/>.
+    /// </summary>
+    /// <param name="path">The path to the YAML schema file.</param>
+    /// <returns>The parsed <see cref="SearchSchema"/>.</returns>
+    /// <exception cref="ArgumentException">Thrown when the path is blank, or the file content is malformed or missing required values.</exception>
     public static SearchSchema FromYamlFile(string path)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(path);

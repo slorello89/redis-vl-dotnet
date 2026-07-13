@@ -1,7 +1,18 @@
 namespace RedisVL.Vectorizers;
 
+/// <summary>
+/// Extension methods for <see cref="ITextVectorizer"/>.
+/// </summary>
 public static class TextVectorizerExtensions
 {
+    /// <summary>
+    /// Embeds multiple inputs, using a single batched request when the vectorizer implements
+    /// <see cref="IBatchTextVectorizer"/> and falling back to sequential per-input calls otherwise.
+    /// </summary>
+    /// <param name="vectorizer">The vectorizer to use.</param>
+    /// <param name="inputs">The texts to embed.</param>
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
+    /// <returns>A list of embedding vectors, one per input, in the same order as <paramref name="inputs"/>.</returns>
     public static async Task<IReadOnlyList<float[]>> VectorizeManyAsync(
         this ITextVectorizer vectorizer,
         IReadOnlyList<string> inputs,

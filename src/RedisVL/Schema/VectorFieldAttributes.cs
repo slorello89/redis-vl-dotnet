@@ -1,7 +1,33 @@
 namespace RedisVL.Schema;
 
+/// <summary>
+/// Holds the algorithm and tuning parameters of a vector field, such as the indexing algorithm,
+/// element data type, distance metric, and dimensionality emitted in the <c>FT.CREATE</c> <c>VECTOR</c> block.
+/// </summary>
 public sealed record VectorFieldAttributes
 {
+    /// <summary>
+    /// Initializes a new <see cref="VectorFieldAttributes"/> and validates that the supplied parameters
+    /// are consistent with the chosen <paramref name="algorithm"/>.
+    /// </summary>
+    /// <param name="algorithm">The vector indexing algorithm (<c>FLAT</c>, <c>HNSW</c>, or <c>SVS-VAMANA</c>).</param>
+    /// <param name="dataType">The numeric type of each vector element.</param>
+    /// <param name="distanceMetric">The distance metric used to compare vectors.</param>
+    /// <param name="dimensions">The number of dimensions per vector; must be greater than zero.</param>
+    /// <param name="initialCapacity">The initial index capacity (<c>INITIAL_CAP</c>), or zero for the default.</param>
+    /// <param name="blockSize">The FLAT block size (<c>BLOCK_SIZE</c>), or zero for the default.</param>
+    /// <param name="m">The HNSW maximum edges per node (<c>M</c>), or zero for the default.</param>
+    /// <param name="efConstruction">The HNSW build-time candidate list size (<c>EF_CONSTRUCTION</c>), or zero for the default.</param>
+    /// <param name="efRuntime">The HNSW query-time candidate list size (<c>EF_RUNTIME</c>), or zero for the default.</param>
+    /// <param name="compression">The SVS-VAMANA vector compression algorithm.</param>
+    /// <param name="constructionWindowSize">The SVS-VAMANA build-time search window size (<c>CONSTRUCTION_WINDOW_SIZE</c>).</param>
+    /// <param name="graphMaxDegree">The SVS-VAMANA maximum edges per graph node (<c>GRAPH_MAX_DEGREE</c>).</param>
+    /// <param name="searchWindowSize">The SVS-VAMANA query-time search window size (<c>SEARCH_WINDOW_SIZE</c>).</param>
+    /// <param name="epsilon">The SVS-VAMANA range-search approximation factor (<c>EPSILON</c>).</param>
+    /// <param name="trainingThreshold">The SVS-VAMANA vector count before compression is trained (<c>TRAINING_THRESHOLD</c>).</param>
+    /// <param name="reduce">The SVS-VAMANA reduced dimension count for LeanVec compression (<c>REDUCE</c>).</param>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown when an enum value is undefined or a numeric parameter is out of range.</exception>
+    /// <exception cref="ArgumentException">Thrown when a parameter is not supported by the selected <paramref name="algorithm"/>.</exception>
     public VectorFieldAttributes(
         VectorAlgorithm algorithm,
         VectorDataType dataType,
@@ -124,22 +150,31 @@ public sealed record VectorFieldAttributes
         Reduce = reduce;
     }
 
+    /// <summary>The vector indexing algorithm (<c>FLAT</c>, <c>HNSW</c>, or <c>SVS-VAMANA</c>).</summary>
     public VectorAlgorithm Algorithm { get; }
 
+    /// <summary>The numeric type of each vector element.</summary>
     public VectorDataType DataType { get; }
 
+    /// <summary>The distance metric used to compare vectors.</summary>
     public VectorDistanceMetric DistanceMetric { get; }
 
+    /// <summary>The number of dimensions per vector.</summary>
     public int Dimensions { get; }
 
+    /// <summary>The initial index capacity (<c>INITIAL_CAP</c>); zero for the server default.</summary>
     public int InitialCapacity { get; }
 
+    /// <summary>The FLAT block size (<c>BLOCK_SIZE</c>); zero for the server default.</summary>
     public int BlockSize { get; }
 
+    /// <summary>The HNSW maximum number of edges per node (<c>M</c>); zero for the server default.</summary>
     public int M { get; }
 
+    /// <summary>The HNSW build-time candidate list size (<c>EF_CONSTRUCTION</c>); zero for the server default.</summary>
     public int EfConstruction { get; }
 
+    /// <summary>The HNSW query-time candidate list size (<c>EF_RUNTIME</c>); zero for the server default.</summary>
     public int EfRuntime { get; }
 
     /// <summary>SVS-VAMANA vector compression algorithm. Defaults to <see cref="VectorCompression.None"/>.</summary>

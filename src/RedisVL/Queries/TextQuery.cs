@@ -3,8 +3,22 @@ using RedisVL.Filters;
 
 namespace RedisVL.Queries;
 
+/// <summary>
+/// A full-text query over an <c>FT.SEARCH</c> index, optionally spreading its terms across multiple fields
+/// with per-field weights to bias relevance scoring.
+/// </summary>
 public sealed class TextQuery
 {
+    /// <summary>
+    /// Initializes a new <see cref="TextQuery"/>.
+    /// </summary>
+    /// <param name="text">The search text; must be non-empty.</param>
+    /// <param name="returnFields">The fields to return for each match; when <see langword="null"/> all fields are returned.</param>
+    /// <param name="offset">The number of leading results to skip.</param>
+    /// <param name="limit">The maximum number of results to return.</param>
+    /// <param name="pagination">Optional pagination window; overrides <paramref name="offset"/> and <paramref name="limit"/> when supplied.</param>
+    /// <param name="fieldWeights">Optional per-field search weights; each weight must be greater than zero.</param>
+    /// <exception cref="ArgumentException">A weight in <paramref name="fieldWeights"/> is not greater than zero.</exception>
     public TextQuery(
         string text,
         IEnumerable<string>? returnFields = null,
@@ -23,14 +37,19 @@ public sealed class TextQuery
         FieldWeights = NormalizeFieldWeights(fieldWeights);
     }
 
+    /// <summary>The trimmed search text supplied by the caller.</summary>
     public string Text { get; }
 
+    /// <summary>The number of leading results to skip.</summary>
     public int Offset { get; }
 
+    /// <summary>The maximum number of results to return.</summary>
     public int Limit { get; }
 
+    /// <summary>The pagination window applied to the results.</summary>
     public QueryPagination Pagination { get; }
 
+    /// <summary>The fields returned for each matching document.</summary>
     public IReadOnlyList<string> ReturnFields { get; }
 
     /// <summary>

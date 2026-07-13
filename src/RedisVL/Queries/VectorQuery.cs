@@ -3,8 +3,25 @@ using RedisVL.Filters;
 
 namespace RedisVL.Queries;
 
+/// <summary>
+/// A K-nearest-neighbors query that ranks documents by their distance to the query vector on a single
+/// vector field, optionally narrowed by a pre-filter (<c>KNN</c> with <c>FT.SEARCH</c>).
+/// </summary>
 public sealed class VectorQuery
 {
+    /// <summary>
+    /// Initializes a new <see cref="VectorQuery"/>.
+    /// </summary>
+    /// <param name="fieldName">The name of the vector field to search.</param>
+    /// <param name="vector">The raw query vector bytes; must be non-empty.</param>
+    /// <param name="topK">The number of nearest neighbors to retrieve; must be greater than zero.</param>
+    /// <param name="filter">An optional pre-filter that narrows the candidate set before scoring.</param>
+    /// <param name="returnFields">The fields to return for each match; when <see langword="null"/> all fields are returned.</param>
+    /// <param name="scoreAlias">The alias under which the vector distance is projected.</param>
+    /// <param name="runtimeOptions">Optional query-time index tuning parameters.</param>
+    /// <param name="pagination">Optional pagination window; defaults to a limit of <paramref name="topK"/>.</param>
+    /// <exception cref="ArgumentException"><paramref name="vector"/> is empty, or the pagination window exceeds <paramref name="topK"/>.</exception>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="topK"/> is not greater than zero.</exception>
     public VectorQuery(
         string fieldName,
         byte[] vector,
@@ -42,26 +59,46 @@ public sealed class VectorQuery
         ValidatePaginationWindow(TopK, Pagination, nameof(topK));
     }
 
+    /// <summary>The name of the vector field being searched.</summary>
     public string FieldName { get; }
 
+    /// <summary>The raw query vector bytes.</summary>
     public byte[] Vector { get; }
 
+    /// <summary>The number of nearest neighbors to retrieve.</summary>
     public int TopK { get; }
 
+    /// <summary>The number of leading results to skip.</summary>
     public int Offset { get; }
 
+    /// <summary>The maximum number of results to return.</summary>
     public int Limit { get; }
 
+    /// <summary>An optional pre-filter applied before vector scoring, or <see langword="null"/> for none.</summary>
     public FilterExpression? Filter { get; }
 
+    /// <summary>The alias under which the vector distance is projected.</summary>
     public string ScoreAlias { get; }
 
+    /// <summary>The fields returned for each matching document.</summary>
     public IReadOnlyList<string> ReturnFields { get; }
 
+    /// <summary>Optional query-time index tuning parameters, or <see langword="null"/> to use index defaults.</summary>
     public VectorKnnRuntimeOptions? RuntimeOptions { get; }
 
+    /// <summary>The pagination window applied to the results.</summary>
     public QueryPagination Pagination { get; }
 
+    /// <summary>Creates a vector query from a single-precision (<c>FLOAT32</c>) vector.</summary>
+    /// <param name="fieldName">The name of the vector field to search.</param>
+    /// <param name="vector">The query vector as 32-bit floats.</param>
+    /// <param name="topK">The number of nearest neighbors to retrieve.</param>
+    /// <param name="filter">An optional pre-filter that narrows the candidate set.</param>
+    /// <param name="returnFields">The fields to return for each match.</param>
+    /// <param name="scoreAlias">The alias under which the vector distance is projected.</param>
+    /// <param name="runtimeOptions">Optional query-time index tuning parameters.</param>
+    /// <param name="pagination">Optional pagination window.</param>
+    /// <returns>A new <see cref="VectorQuery"/>.</returns>
     public static VectorQuery FromFloat32(
         string fieldName,
         float[] vector,
@@ -73,6 +110,16 @@ public sealed class VectorQuery
         QueryPagination? pagination = null) =>
         new(fieldName, MemoryMarshal.AsBytes<float>(vector.AsSpan()).ToArray(), topK, filter, returnFields, scoreAlias, runtimeOptions, pagination);
 
+    /// <summary>Creates a vector query from a double-precision (<c>FLOAT64</c>) vector.</summary>
+    /// <param name="fieldName">The name of the vector field to search.</param>
+    /// <param name="vector">The query vector as 64-bit floats.</param>
+    /// <param name="topK">The number of nearest neighbors to retrieve.</param>
+    /// <param name="filter">An optional pre-filter that narrows the candidate set.</param>
+    /// <param name="returnFields">The fields to return for each match.</param>
+    /// <param name="scoreAlias">The alias under which the vector distance is projected.</param>
+    /// <param name="runtimeOptions">Optional query-time index tuning parameters.</param>
+    /// <param name="pagination">Optional pagination window.</param>
+    /// <returns>A new <see cref="VectorQuery"/>.</returns>
     public static VectorQuery FromFloat64(
         string fieldName,
         double[] vector,
