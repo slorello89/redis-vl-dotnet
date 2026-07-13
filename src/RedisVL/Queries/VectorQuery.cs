@@ -1,4 +1,3 @@
-using System.Runtime.InteropServices;
 using RedisVL.Filters;
 
 namespace RedisVL.Queries;
@@ -47,7 +46,7 @@ public sealed class VectorQuery
         }
 
         FieldName = FilterExpression.NormalizeFieldName(fieldName);
-        Vector = vector.ToArray();
+        _vector = vector.ToArray();
         TopK = topK;
         Filter = filter;
         ScoreAlias = FilterExpression.NormalizeFieldName(scoreAlias);
@@ -59,11 +58,13 @@ public sealed class VectorQuery
         ValidatePaginationWindow(TopK, Pagination, nameof(topK));
     }
 
+    private readonly byte[] _vector;
+
     /// <summary>The name of the vector field being searched.</summary>
     public string FieldName { get; }
 
-    /// <summary>The raw query vector bytes.</summary>
-    public byte[] Vector { get; }
+    /// <summary>The raw query vector bytes. Each read returns a fresh copy so the query's state cannot be mutated.</summary>
+    public byte[] Vector => _vector.ToArray();
 
     /// <summary>The number of nearest neighbors to retrieve.</summary>
     public int TopK { get; }
@@ -108,7 +109,7 @@ public sealed class VectorQuery
         string scoreAlias = "vector_distance",
         VectorKnnRuntimeOptions? runtimeOptions = null,
         QueryPagination? pagination = null) =>
-        new(fieldName, MemoryMarshal.AsBytes<float>(vector.AsSpan()).ToArray(), topK, filter, returnFields, scoreAlias, runtimeOptions, pagination);
+        new(fieldName, VectorEncoding.ToBytes(vector), topK, filter, returnFields, scoreAlias, runtimeOptions, pagination);
 
     /// <summary>Creates a vector query from a double-precision (<c>FLOAT64</c>) vector.</summary>
     /// <param name="fieldName">The name of the vector field to search.</param>
@@ -129,7 +130,7 @@ public sealed class VectorQuery
         string scoreAlias = "vector_distance",
         VectorKnnRuntimeOptions? runtimeOptions = null,
         QueryPagination? pagination = null) =>
-        new(fieldName, MemoryMarshal.AsBytes<double>(vector.AsSpan()).ToArray(), topK, filter, returnFields, scoreAlias, runtimeOptions, pagination);
+        new(fieldName, VectorEncoding.ToBytes(vector), topK, filter, returnFields, scoreAlias, runtimeOptions, pagination);
 
     private static IReadOnlyList<string> NormalizeReturnFields(IEnumerable<string>? returnFields, string scoreAlias) =>
         QueryReturnFieldHelper.NormalizeReturnFields(returnFields, scoreAlias);

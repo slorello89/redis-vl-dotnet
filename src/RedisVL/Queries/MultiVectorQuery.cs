@@ -1,4 +1,3 @@
-using System.Runtime.InteropServices;
 using RedisVL.Filters;
 
 namespace RedisVL.Queries;
@@ -127,15 +126,17 @@ public sealed class MultiVectorInput
         }
 
         FieldName = FilterExpression.NormalizeFieldName(fieldName);
-        Vector = vector.ToArray();
+        _vector = vector.ToArray();
         Weight = weight;
     }
+
+    private readonly byte[] _vector;
 
     /// <summary>The name of the vector field this input is scored against.</summary>
     public string FieldName { get; }
 
-    /// <summary>The raw query vector bytes.</summary>
-    public byte[] Vector { get; }
+    /// <summary>The raw query vector bytes. Each read returns a fresh copy so the input's state cannot be mutated.</summary>
+    public byte[] Vector => _vector.ToArray();
 
     /// <summary>The weight applied to this field's distance contribution.</summary>
     public double Weight { get; }
@@ -146,7 +147,7 @@ public sealed class MultiVectorInput
     /// <param name="weight">The positive, finite weight applied to this field's distance contribution.</param>
     /// <returns>A new <see cref="MultiVectorInput"/>.</returns>
     public static MultiVectorInput FromFloat32(string fieldName, float[] vector, double weight = 1d) =>
-        new(fieldName, MemoryMarshal.AsBytes<float>(vector.AsSpan()).ToArray(), weight);
+        new(fieldName, VectorEncoding.ToBytes(vector), weight);
 
     /// <summary>Creates an input from a double-precision (<c>FLOAT64</c>) vector.</summary>
     /// <param name="fieldName">The name of the vector field to score against.</param>
@@ -154,5 +155,5 @@ public sealed class MultiVectorInput
     /// <param name="weight">The positive, finite weight applied to this field's distance contribution.</param>
     /// <returns>A new <see cref="MultiVectorInput"/>.</returns>
     public static MultiVectorInput FromFloat64(string fieldName, double[] vector, double weight = 1d) =>
-        new(fieldName, MemoryMarshal.AsBytes<double>(vector.AsSpan()).ToArray(), weight);
+        new(fieldName, VectorEncoding.ToBytes(vector), weight);
 }

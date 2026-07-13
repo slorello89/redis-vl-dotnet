@@ -18,7 +18,7 @@ public sealed class AggregationApply
         ArgumentException.ThrowIfNullOrWhiteSpace(alias);
 
         Expression = expression.Trim();
-        Alias = alias.TrimStart('@').Trim();
+        Alias = alias.Trim().TrimStart('@');
     }
 
     /// <summary>

@@ -1,4 +1,3 @@
-using System.Runtime.InteropServices;
 using RedisVL.Filters;
 
 namespace RedisVL.Queries;
@@ -67,7 +66,7 @@ public sealed class AggregateHybridQuery
 
         TextFilter = textFilter;
         VectorFieldName = FilterExpression.NormalizeFieldName(vectorFieldName);
-        Vector = vector.ToArray();
+        _vector = vector.ToArray();
         TopK = topK;
         Filter = filter;
         LoadFields = NormalizeFields(loadFields);
@@ -84,11 +83,13 @@ public sealed class AggregateHybridQuery
     /// <summary>The text filter that supplies the required text predicate.</summary>
     public FilterExpression TextFilter { get; }
 
+    private readonly byte[] _vector;
+
     /// <summary>The name of the vector field searched with <c>KNN</c>.</summary>
     public string VectorFieldName { get; }
 
-    /// <summary>The raw query vector bytes.</summary>
-    public byte[] Vector { get; }
+    /// <summary>The raw query vector bytes. Each read returns a fresh copy so the query's state cannot be mutated.</summary>
+    public byte[] Vector => _vector.ToArray();
 
     /// <summary>The number of nearest neighbors to retrieve.</summary>
     public int TopK { get; }
@@ -159,7 +160,7 @@ public sealed class AggregateHybridQuery
         new(
             textFilter,
             vectorFieldName,
-            MemoryMarshal.AsBytes<float>(vector.AsSpan()).ToArray(),
+            VectorEncoding.ToBytes(vector),
             topK,
             filter,
             loadFields,
@@ -206,7 +207,7 @@ public sealed class AggregateHybridQuery
         new(
             textFilter,
             vectorFieldName,
-            MemoryMarshal.AsBytes<double>(vector.AsSpan()).ToArray(),
+            VectorEncoding.ToBytes(vector),
             topK,
             filter,
             loadFields,

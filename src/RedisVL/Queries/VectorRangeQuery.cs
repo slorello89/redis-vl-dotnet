@@ -1,4 +1,3 @@
-using System.Runtime.InteropServices;
 using RedisVL.Filters;
 
 namespace RedisVL.Queries;
@@ -14,7 +13,7 @@ public sealed class VectorRangeQuery
     /// </summary>
     /// <param name="fieldName">The name of the vector field to search.</param>
     /// <param name="vector">The raw query vector bytes; must be non-empty.</param>
-    /// <param name="distanceThreshold">The maximum vector distance a document may have to be returned; must be greater than zero.</param>
+    /// <param name="distanceThreshold">The maximum vector distance a document may have to be returned; must be zero or greater. A value of zero matches only exact duplicates.</param>
     /// <param name="filter">An optional pre-filter that narrows the candidate set.</param>
     /// <param name="returnFields">The fields to return for each match; when <see langword="null"/> all fields are returned.</param>
     /// <param name="scoreAlias">The alias under which the vector distance is projected.</param>
@@ -23,7 +22,7 @@ public sealed class VectorRangeQuery
     /// <param name="runtimeOptions">Optional query-time index tuning parameters.</param>
     /// <param name="pagination">Optional pagination window; overrides <paramref name="offset"/> and <paramref name="limit"/> when supplied.</param>
     /// <exception cref="ArgumentException"><paramref name="vector"/> is empty.</exception>
-    /// <exception cref="ArgumentOutOfRangeException"><paramref name="distanceThreshold"/> is not greater than zero.</exception>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="distanceThreshold"/> is negative or <see cref="double.NaN"/>.</exception>
     public VectorRangeQuery(
         string fieldName,
         byte[] vector,
@@ -45,13 +44,13 @@ public sealed class VectorRangeQuery
             throw new ArgumentException("Vector input must contain at least one byte.", nameof(vector));
         }
 
-        if (distanceThreshold <= 0)
+        if (double.IsNaN(distanceThreshold) || distanceThreshold < 0)
         {
-            throw new ArgumentOutOfRangeException(nameof(distanceThreshold), distanceThreshold, "Distance threshold must be greater than zero.");
+            throw new ArgumentOutOfRangeException(nameof(distanceThreshold), distanceThreshold, "Distance threshold must be zero or greater.");
         }
 
         FieldName = FilterExpression.NormalizeFieldName(fieldName);
-        Vector = vector.ToArray();
+        _vector = vector.ToArray();
         DistanceThreshold = distanceThreshold;
         Filter = filter;
         ScoreAlias = FilterExpression.NormalizeFieldName(scoreAlias);
@@ -62,11 +61,13 @@ public sealed class VectorRangeQuery
         RuntimeOptions = runtimeOptions;
     }
 
+    private readonly byte[] _vector;
+
     /// <summary>The name of the vector field being searched.</summary>
     public string FieldName { get; }
 
-    /// <summary>The raw query vector bytes.</summary>
-    public byte[] Vector { get; }
+    /// <summary>The raw query vector bytes. Each read returns a fresh copy so the query's state cannot be mutated.</summary>
+    public byte[] Vector => _vector.ToArray();
 
     /// <summary>The maximum vector distance a document may have to be included in the results.</summary>
     public double DistanceThreshold { get; }
@@ -115,7 +116,7 @@ public sealed class VectorRangeQuery
         int limit = 10,
         VectorRangeRuntimeOptions? runtimeOptions = null,
         QueryPagination? pagination = null) =>
-        new(fieldName, MemoryMarshal.AsBytes<float>(vector.AsSpan()).ToArray(), distanceThreshold, filter, returnFields, scoreAlias, offset, limit, runtimeOptions, pagination);
+        new(fieldName, VectorEncoding.ToBytes(vector), distanceThreshold, filter, returnFields, scoreAlias, offset, limit, runtimeOptions, pagination);
 
     /// <summary>Creates a vector range query from a double-precision (<c>FLOAT64</c>) vector.</summary>
     /// <param name="fieldName">The name of the vector field to search.</param>
@@ -140,5 +141,5 @@ public sealed class VectorRangeQuery
         int limit = 10,
         VectorRangeRuntimeOptions? runtimeOptions = null,
         QueryPagination? pagination = null) =>
-        new(fieldName, MemoryMarshal.AsBytes<double>(vector.AsSpan()).ToArray(), distanceThreshold, filter, returnFields, scoreAlias, offset, limit, runtimeOptions, pagination);
+        new(fieldName, VectorEncoding.ToBytes(vector), distanceThreshold, filter, returnFields, scoreAlias, offset, limit, runtimeOptions, pagination);
 }

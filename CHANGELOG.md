@@ -15,6 +15,16 @@ All notable changes to this project are documented here. This project adheres to
 
 ### Fixed
 
+- **Query-construction and validation edge cases** — a batch of small correctness fixes from the
+  pre-release audit (issue #54): `Filter.Text(...).Match`/`Prefix` now escape `*` so an exact-term
+  match stays literal instead of silently becoming a prefix wildcard and `Prefix("foo*")` no longer
+  emits the invalid `foo**`; `Filter.Numeric(...).Between`/`Eq` reject `NaN` bounds up front instead
+  of failing at the server; `VectorRangeQuery` now accepts a `distanceThreshold` of `0` (a valid
+  exact-duplicate radius) and rejects only negative or `NaN` thresholds; the `FromFloat32`/`FromFloat64`
+  factories on every query type throw `ArgumentNullException` (not `ArgumentException`) on a null
+  vector; the `Vector` getter on every query type returns a defensive copy so callers cannot mutate
+  query state; and the `alias` passed to `AggregationApply`/`AggregationReducer` is trimmed before its
+  leading `@` is stripped, so `" @score"` normalizes to `score`.
 - **Schema model: HNSW `EPSILON` and vector `INDEXMISSING`** — `VectorFieldAttributes` no longer
   rejects a positive `epsilon` for HNSW fields; `EPSILON` is a documented HNSW/SVS-VAMANA range-query
   approximation factor and is still rejected for FLAT (matching Redis). `FT.CREATE` now emits the

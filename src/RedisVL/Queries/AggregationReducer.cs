@@ -25,7 +25,7 @@ public sealed class AggregationReducer
         ArgumentException.ThrowIfNullOrWhiteSpace(alias);
 
         FunctionName = functionName.Trim().ToUpperInvariant();
-        Alias = alias.TrimStart('@').Trim();
+        Alias = alias.Trim().TrimStart('@');
         Arguments = arguments?.ToArray() ?? [];
     }
 

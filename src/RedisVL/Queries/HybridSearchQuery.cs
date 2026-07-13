@@ -1,4 +1,3 @@
-using System.Runtime.InteropServices;
 using RedisVL.Filters;
 
 namespace RedisVL.Queries;
@@ -65,7 +64,7 @@ public sealed class HybridSearchQuery
 
         TextQuery = textQuery;
         VectorFieldName = FilterExpression.NormalizeFieldName(vectorFieldName);
-        Vector = vector.ToArray();
+        _vector = vector.ToArray();
         TopK = topK;
         Combination = combination;
         VectorFilter = vectorFilter;
@@ -79,11 +78,13 @@ public sealed class HybridSearchQuery
     /// <summary>Gets the text predicate evaluated by the <c>SEARCH</c> branch.</summary>
     public FilterExpression TextQuery { get; }
 
+    private readonly byte[] _vector;
+
     /// <summary>Gets the vector field evaluated by the <c>VSIM</c> branch.</summary>
     public string VectorFieldName { get; }
 
-    /// <summary>Gets the query vector, encoded as bytes.</summary>
-    public byte[] Vector { get; }
+    /// <summary>Gets the query vector, encoded as bytes. Each read returns a fresh copy so the query's state cannot be mutated.</summary>
+    public byte[] Vector => _vector.ToArray();
 
     /// <summary>Gets the number of nearest neighbours requested from the vector branch.</summary>
     public int TopK { get; }
@@ -123,7 +124,7 @@ public sealed class HybridSearchQuery
         new(
             textQuery,
             vectorFieldName,
-            MemoryMarshal.AsBytes<float>(vector.AsSpan()).ToArray(),
+            VectorEncoding.ToBytes(vector),
             topK,
             combination,
             vectorFilter,
@@ -145,7 +146,7 @@ public sealed class HybridSearchQuery
         new(
             textQuery,
             vectorFieldName,
-            MemoryMarshal.AsBytes<double>(vector.AsSpan()).ToArray(),
+            VectorEncoding.ToBytes(vector),
             topK,
             combination,
             vectorFilter,
