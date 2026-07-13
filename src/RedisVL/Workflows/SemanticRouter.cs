@@ -24,6 +24,12 @@ public sealed class SemanticRouter
     private const string MetadataFieldName = "metadata";
     private const string DistanceAlias = "distance";
 
+    // Per-route config (threshold, metadata) lives in a dedicated key rather than being denormalized
+    // onto every reference. This infix keeps a route's config key distinct from its reference keys
+    // (which are bare SHA-256 hex hashes) so the two never collide, while sharing the index prefix so
+    // FT.DROPINDEX DD and ClearAsync clean them up alongside references.
+    private const string ConfigKeyInfix = "__config__";
+
     private readonly IDatabase _database;
     private readonly SearchIndex _index;
     private readonly JsonSerializerOptions _serializerOptions;
@@ -103,13 +109,10 @@ public sealed class SemanticRouter
 
         cancellationToken.ThrowIfCancellationRequested();
 
-        return await WriteReferenceAsync(
-            normalizedRouteName,
-            normalizedReference,
-            embedding,
-            distanceThreshold: null,
-            metadata: null,
-            cancellationToken).ConfigureAwait(false);
+        // A bare reference add carries no route-level config, so it only writes the reference and
+        // leaves any existing per-route threshold/metadata untouched.
+        return await WriteReferenceAsync(normalizedRouteName, normalizedReference, embedding, cancellationToken)
+            .ConfigureAwait(false);
     }
 
     /// <summary>Adds a single reference phrase to a route, vectorizing it with <paramref name="vectorizer" />.</summary>
@@ -133,8 +136,8 @@ public sealed class SemanticRouter
 
     /// <summary>
     /// Stores a route's reference phrases using precomputed embeddings, persisting the optional per-route
-    /// distance threshold and metadata on each reference. The returned key list is aligned to
-    /// <see cref="Route.References" />.
+    /// distance threshold and metadata under a dedicated route-config key (not on each reference). The
+    /// returned key list is aligned to <see cref="Route.References" />.
     /// </summary>
     public async Task<IReadOnlyList<string>> AddRouteAsync(
         Route route,
@@ -153,16 +156,15 @@ public sealed class SemanticRouter
 
         cancellationToken.ThrowIfCancellationRequested();
 
-        var metadata = SerializeMetadata(route.Metadata);
+        // Persist the route-level config once, before the references, so a query that races the write
+        // never sees references indexed under the router default while the stricter per-route threshold
+        // is still pending. Rewriting a route replaces its config wholesale.
+        await WriteRouteConfigAsync(route.Name, route.DistanceThreshold, SerializeMetadata(route.Metadata), cancellationToken)
+            .ConfigureAwait(false);
+
         return await RedisBatch.RunAsync(
             route.References,
-            (reference, index, token) => WriteReferenceAsync(
-                route.Name,
-                reference,
-                embeddings[index],
-                route.DistanceThreshold,
-                metadata,
-                token),
+            (reference, index, token) => WriteReferenceAsync(route.Name, reference, embeddings[index], token),
             cancellationToken).ConfigureAwait(false);
     }
 
@@ -183,8 +185,9 @@ public sealed class SemanticRouter
     }
 
     /// <summary>
-    /// Adds reference phrases to an existing route using precomputed embeddings. Existing per-route threshold
-    /// and metadata are left unchanged. The returned key list is aligned to <paramref name="references" />.
+    /// Adds reference phrases to an existing route using precomputed embeddings. The route's per-route
+    /// threshold and metadata (stored under a dedicated route-config key) are left unchanged. The returned
+    /// key list is aligned to <paramref name="references" />.
     /// </summary>
     public async Task<IReadOnlyList<string>> AddRouteReferencesAsync(
         string routeName,
@@ -220,13 +223,7 @@ public sealed class SemanticRouter
 
         return await RedisBatch.RunAsync(
             normalizedReferences,
-            (reference, index, token) => WriteReferenceAsync(
-                normalizedRouteName,
-                reference,
-                embeddings[index],
-                distanceThreshold: null,
-                metadata: null,
-                token),
+            (reference, index, token) => WriteReferenceAsync(normalizedRouteName, reference, embeddings[index], token),
             cancellationToken).ConfigureAwait(false);
     }
 
@@ -283,7 +280,8 @@ public sealed class SemanticRouter
 
     /// <summary>
     /// Reconstructs a route from its stored references, including any persisted metadata and per-route
-    /// threshold. Returns <see langword="null" /> when the route has no references.
+    /// threshold (read from the dedicated route-config key). Returns <see langword="null" /> when the route
+    /// has no references.
     /// </summary>
     public async Task<Route?> GetRouteAsync(string routeName, CancellationToken cancellationToken = default)
     {
@@ -293,7 +291,7 @@ public sealed class SemanticRouter
         var results = await _index.SearchAsync(
             new FilterQuery(
                 Filter.Tag(Options.RouteNameFieldName).Eq(normalizedRouteName),
-                returnFields: [Options.ReferenceFieldName, RouteThresholdFieldName, MetadataFieldName],
+                returnFields: [Options.ReferenceFieldName],
                 limit: RoutingConfig.MaxReferenceCandidates),
             cancellationToken).ConfigureAwait(false);
 
@@ -303,33 +301,21 @@ public sealed class SemanticRouter
         }
 
         var references = new List<string>(results.Documents.Count);
-        double? distanceThreshold = null;
-        IReadOnlyDictionary<string, object?>? metadata = null;
         foreach (var document in results.Documents)
         {
             if (document.TryGetValue(Options.ReferenceFieldName, out var reference))
             {
                 references.Add(reference.ToString()!);
             }
-
-            if (distanceThreshold is null &&
-                document.TryGetValue(RouteThresholdFieldName, out var thresholdValue) &&
-                double.TryParse(thresholdValue.ToString(), NumberStyles.Float, CultureInfo.InvariantCulture, out var parsedThreshold))
-            {
-                distanceThreshold = parsedThreshold;
-            }
-
-            if (metadata is null &&
-                document.TryGetValue(MetadataFieldName, out var metadataValue) &&
-                !metadataValue.IsNull)
-            {
-                metadata = DeserializeMetadata(metadataValue.ToString());
-            }
         }
 
-        return references.Count == 0
-            ? null
-            : new Route(normalizedRouteName, references, metadata, distanceThreshold);
+        if (references.Count == 0)
+        {
+            return null;
+        }
+
+        var (distanceThreshold, metadata) = await LoadRouteConfigAsync(normalizedRouteName, cancellationToken).ConfigureAwait(false);
+        return new Route(normalizedRouteName, references, metadata, distanceThreshold);
     }
 
     /// <summary>Deletes specific references from a route. Returns the number of references actually removed.</summary>
@@ -354,7 +340,10 @@ public sealed class SemanticRouter
         return await _database.KeyDeleteAsync(keys).WaitAsync(cancellationToken).ConfigureAwait(false);
     }
 
-    /// <summary>Deletes every reference belonging to a route. Returns the number of references removed.</summary>
+    /// <summary>
+    /// Deletes every reference belonging to a route, along with its per-route config. Returns the number of
+    /// references removed.
+    /// </summary>
     public async Task<long> DeleteRouteAsync(string routeName, CancellationToken cancellationToken = default)
     {
         var normalizedRouteName = NormalizeRouteName(routeName);
@@ -367,24 +356,33 @@ public sealed class SemanticRouter
                 limit: RoutingConfig.MaxReferenceCandidates),
             cancellationToken).ConfigureAwait(false);
 
+        // Always drop the config key so a future route reusing this name cannot inherit a stale threshold
+        // or metadata, even when the route currently has no references. The config delete is not counted in
+        // the returned total, which reports references removed.
+        var configKey = CreateConfigKey(normalizedRouteName);
         if (results.Documents.Count == 0)
         {
+            await _database.KeyDeleteAsync(configKey).WaitAsync(cancellationToken).ConfigureAwait(false);
             return 0;
         }
 
         var keys = results.Documents.Select(document => (RedisKey)document.Id).ToArray();
         cancellationToken.ThrowIfCancellationRequested();
-        return await _database.KeyDeleteAsync(keys).WaitAsync(cancellationToken).ConfigureAwait(false);
+        var removed = await _database.KeyDeleteAsync(keys).WaitAsync(cancellationToken).ConfigureAwait(false);
+        await _database.KeyDeleteAsync(configKey).WaitAsync(cancellationToken).ConfigureAwait(false);
+        return removed;
     }
 
     /// <summary>
-    /// Classifies an input using a precomputed embedding and returns the single nearest route reference within
-    /// the router's distance threshold.
+    /// Classifies an input and returns the single nearest reference whose route accepts it, or
+    /// <see langword="null" /> for a miss. A reference is accepted only when its distance is within its
+    /// route's effective threshold (the per-route threshold when set, otherwise the router default, capped
+    /// by the router default) — resolved identically to
+    /// <see cref="RouteManyAsync(string, float[], int?, DistanceAggregationMethod?, System.Threading.CancellationToken)" />
+    /// so the two never disagree on whether a route is in range. Because a nearer reference may belong to a
+    /// route whose stricter threshold rejects it, the returned reference is not necessarily the globally
+    /// nearest one.
     /// </summary>
-    /// <param name="input">The text being routed. Retained on the returned match for reference.</param>
-    /// <param name="embedding">The precomputed embedding of the input.</param>
-    /// <param name="cancellationToken">A token to cancel the operation.</param>
-    /// <returns>The nearest matching route, or <see langword="null" /> when nothing falls within the threshold.</returns>
     public async Task<SemanticRouteMatch?> RouteAsync(
         string input,
         float[] embedding,
@@ -402,13 +400,31 @@ public sealed class SemanticRouter
                 DistanceThreshold,
                 returnFields: [Options.RouteNameFieldName, Options.ReferenceFieldName],
                 scoreAlias: DistanceAlias,
-                limit: 1),
+                limit: RoutingConfig.MaxReferenceCandidates),
             cancellationToken: cancellationToken).ConfigureAwait(false);
 
-        var match = results.Documents.FirstOrDefault();
-        return match is null
-            ? null
-            : new SemanticRouteMatch(normalizedInput, match.RouteName, match.Reference, match.Distance);
+        if (results.Documents.Count == 0)
+        {
+            return null;
+        }
+
+        // Candidates arrive nearest-first (SORTBY distance ASC). Resolve each candidate route's threshold
+        // once, then walk in order and return the first reference its route accepts.
+        var routeNames = results.Documents
+            .Select(document => document.RouteName)
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+        var thresholds = await LoadRouteThresholdsAsync(routeNames, cancellationToken).ConfigureAwait(false);
+
+        foreach (var match in results.Documents)
+        {
+            if (match.Distance <= thresholds[match.RouteName])
+            {
+                return new SemanticRouteMatch(normalizedInput, match.RouteName, match.Reference, match.Distance);
+            }
+        }
+
+        return null;
     }
 
     /// <summary>
@@ -463,12 +479,12 @@ public sealed class SemanticRouter
                 Options.EmbeddingFieldName,
                 embedding,
                 DistanceThreshold,
-                returnFields: [Options.RouteNameFieldName, RouteThresholdFieldName],
+                returnFields: [Options.RouteNameFieldName],
                 scoreAlias: DistanceAlias,
                 limit: RoutingConfig.MaxReferenceCandidates),
             cancellationToken: cancellationToken).ConfigureAwait(false);
 
-        return AggregateMatches(results, method, effectiveMaxResults);
+        return await AggregateMatchesAsync(results, method, effectiveMaxResults, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -497,12 +513,14 @@ public sealed class SemanticRouter
         return await RouteManyAsync(normalizedInput, embedding, maxResults, aggregationMethod, cancellationToken).ConfigureAwait(false);
     }
 
-    private IReadOnlyList<SemanticRouterMatch> AggregateMatches(
+    private async Task<IReadOnlyList<SemanticRouterMatch>> AggregateMatchesAsync(
         SearchResults results,
         DistanceAggregationMethod method,
-        int maxResults)
+        int maxResults,
+        CancellationToken cancellationToken)
     {
         var groups = new Dictionary<string, RouteAccumulator>(StringComparer.Ordinal);
+        var routeOrder = new List<string>();
         foreach (var document in results.Documents)
         {
             if (!document.TryGetValue(Options.RouteNameFieldName, out var routeNameValue) ||
@@ -515,18 +533,26 @@ public sealed class SemanticRouter
             var routeName = routeNameValue.ToString()!;
             if (!groups.TryGetValue(routeName, out var accumulator))
             {
-                accumulator = new RouteAccumulator(ResolveRouteThreshold(document));
+                accumulator = new RouteAccumulator();
                 groups[routeName] = accumulator;
+                routeOrder.Add(routeName);
             }
 
             accumulator.Add(distance);
         }
 
+        if (groups.Count == 0)
+        {
+            return [];
+        }
+
+        var thresholds = await LoadRouteThresholdsAsync(routeOrder, cancellationToken).ConfigureAwait(false);
+
         var matches = new List<SemanticRouterMatch>(groups.Count);
         foreach (var (routeName, accumulator) in groups)
         {
             var aggregated = accumulator.Aggregate(method);
-            if (aggregated <= accumulator.Threshold)
+            if (aggregated <= thresholds[routeName])
             {
                 matches.Add(new SemanticRouterMatch(routeName, aggregated));
             }
@@ -536,78 +562,113 @@ public sealed class SemanticRouter
         return matches.Count <= maxResults ? matches : matches.GetRange(0, maxResults);
     }
 
-    private double ResolveRouteThreshold(SearchDocument document)
+    /// <summary>
+    /// Reads the effective distance threshold for each route from its config key. The effective threshold is
+    /// the per-route threshold capped by the router default, or the router default when no per-route threshold
+    /// is stored. Every read is pipelined so a route set costs roughly one round trip.
+    /// </summary>
+    private async Task<Dictionary<string, double>> LoadRouteThresholdsAsync(
+        IReadOnlyList<string> routeNames,
+        CancellationToken cancellationToken)
     {
-        if (document.TryGetValue(RouteThresholdFieldName, out var thresholdValue) &&
-            double.TryParse(thresholdValue.ToString(), NumberStyles.Float, CultureInfo.InvariantCulture, out var threshold))
+        var thresholds = new Dictionary<string, double>(routeNames.Count, StringComparer.Ordinal);
+        if (routeNames.Count == 0)
         {
-            return Math.Min(threshold, DistanceThreshold);
+            return thresholds;
         }
 
-        return DistanceThreshold;
+        var values = await RedisBatch.RunAsync(
+            routeNames,
+            (routeName, _, token) => _database
+                .HashGetAsync(CreateConfigKey(routeName), RouteThresholdFieldName)
+                .WaitAsync(token),
+            cancellationToken).ConfigureAwait(false);
+
+        for (var index = 0; index < routeNames.Count; index++)
+        {
+            thresholds[routeNames[index]] = ResolveEffectiveThreshold(values[index]);
+        }
+
+        return thresholds;
+    }
+
+    private double ResolveEffectiveThreshold(RedisValue thresholdValue) =>
+        !thresholdValue.IsNull &&
+        double.TryParse(thresholdValue.ToString(), NumberStyles.Float, CultureInfo.InvariantCulture, out var threshold)
+            ? Math.Min(threshold, DistanceThreshold)
+            : DistanceThreshold;
+
+    private async Task<(double? DistanceThreshold, IReadOnlyDictionary<string, object?>? Metadata)> LoadRouteConfigAsync(
+        string routeName,
+        CancellationToken cancellationToken)
+    {
+        var values = await _database
+            .HashGetAsync(CreateConfigKey(routeName), [RouteThresholdFieldName, MetadataFieldName])
+            .WaitAsync(cancellationToken).ConfigureAwait(false);
+
+        double? distanceThreshold = null;
+        if (!values[0].IsNull &&
+            double.TryParse(values[0].ToString(), NumberStyles.Float, CultureInfo.InvariantCulture, out var parsedThreshold))
+        {
+            distanceThreshold = parsedThreshold;
+        }
+
+        var metadata = values[1].IsNull ? null : DeserializeMetadata(values[1].ToString());
+        return (distanceThreshold, metadata);
     }
 
     private async Task<string> WriteReferenceAsync(
         string routeName,
         string reference,
         float[] embedding,
-        double? distanceThreshold,
-        string? metadata,
         CancellationToken cancellationToken)
     {
         ValidateEmbedding(embedding);
 
         var key = CreateKey(routeName, reference);
-        var entries = new List<HashEntry>
+        var entries = new HashEntry[]
         {
             new(Options.RouteNameFieldName, routeName),
             new(Options.ReferenceFieldName, reference),
             new(Options.EmbeddingFieldName, EmbeddingsCache.EncodeFloat32(embedding))
         };
 
-        // The per-reference threshold and metadata are optional. Track the ones this write omits so
-        // they are cleared rather than left behind: re-adding a reference without a threshold must
-        // not keep an earlier reference's threshold silently live.
-        var fieldsToClear = new List<RedisValue>(2);
+        await _database.HashSetAsync(key, entries).WaitAsync(cancellationToken).ConfigureAwait(false);
+        return key!;
+    }
+
+    private async Task WriteRouteConfigAsync(
+        string routeName,
+        double? distanceThreshold,
+        string? metadata,
+        CancellationToken cancellationToken)
+    {
+        var key = CreateConfigKey(routeName);
+
+        var entries = new List<HashEntry>(2);
         if (distanceThreshold is double threshold)
         {
             entries.Add(new HashEntry(RouteThresholdFieldName, threshold.ToString("G", CultureInfo.InvariantCulture)));
-        }
-        else
-        {
-            fieldsToClear.Add(RouteThresholdFieldName);
         }
 
         if (metadata is not null)
         {
             entries.Add(new HashEntry(MetadataFieldName, metadata));
         }
-        else
-        {
-            fieldsToClear.Add(MetadataFieldName);
-        }
 
-        await WriteReferenceEntriesAsync(key, entries, fieldsToClear, cancellationToken).ConfigureAwait(false);
-        return key!;
-    }
-
-    private async Task WriteReferenceEntriesAsync(
-        RedisKey key,
-        IReadOnlyList<HashEntry> entries,
-        IReadOnlyList<RedisValue> fieldsToClear,
-        CancellationToken cancellationToken)
-    {
-        // Bundle the write and the stale-field cleanup into a single MULTI/EXEC so a reference can
-        // never be left with a previous add's threshold or metadata. References carry no TTL.
-        if (fieldsToClear.Count == 0)
+        // A route with neither an explicit threshold nor metadata has nothing to persist: delete any config
+        // left by a previous add so re-adding a route without a threshold does not silently keep the old one.
+        if (entries.Count == 0)
         {
-            await _database.HashSetAsync(key, entries.ToArray()).WaitAsync(cancellationToken).ConfigureAwait(false);
+            await _database.KeyDeleteAsync(key).WaitAsync(cancellationToken).ConfigureAwait(false);
             return;
         }
 
+        // Replace the config wholesale (DEL + HSET) inside one MULTI/EXEC so a dropped threshold or metadata
+        // never lingers and a concurrent reader never observes the key mid-rewrite. Config keys carry no TTL.
         var transaction = _database.CreateTransaction();
+        _ = transaction.KeyDeleteAsync(key);
         _ = transaction.HashSetAsync(key, entries.ToArray());
-        _ = transaction.HashDeleteAsync(key, fieldsToClear.ToArray());
         await transaction.ExecuteAsync().WaitAsync(cancellationToken).ConfigureAwait(false);
     }
 
@@ -630,6 +691,12 @@ public sealed class SemanticRouter
     {
         var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes($"{routeName}\n{reference}"))).ToLowerInvariant();
         return $"{CreateKeyPrefix(Options)}{hash}";
+    }
+
+    internal RedisKey CreateConfigKey(string routeName)
+    {
+        var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(routeName))).ToLowerInvariant();
+        return $"{CreateKeyPrefix(Options)}{ConfigKeyInfix}:{hash}";
     }
 
     private string? SerializeMetadata(IReadOnlyDictionary<string, object?>? metadata) =>
@@ -673,13 +740,11 @@ public sealed class SemanticRouter
         return reference;
     }
 
-    private sealed class RouteAccumulator(double threshold)
+    private sealed class RouteAccumulator
     {
         private double _sum;
         private double _min = double.PositiveInfinity;
         private int _count;
-
-        public double Threshold { get; } = threshold;
 
         public void Add(double distance)
         {
