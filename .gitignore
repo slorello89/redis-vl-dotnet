@@ -8,3 +8,5 @@ obj/
 node_modules/
 build/
 models
+artifacts/
+.DS_Store
