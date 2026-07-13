@@ -408,21 +408,17 @@ public sealed class EmbeddingsCache
             new(EmbeddingFieldName, EncodeFloat32(embedding))
         };
 
+        // Metadata is the only optional field, so clear it when this write carries none to avoid an
+        // HSET-merge leaving a previous entry's metadata attached to the new embedding.
         var metadataPayload = SerializeMetadata(metadata);
+        RedisValue[] fieldsToClear = metadataPayload is null ? [MetadataFieldName] : [];
         if (metadataPayload is not null)
         {
             entries.Add(new HashEntry(MetadataFieldName, metadataPayload));
         }
 
         var key = CreateKey(normalizedInput, modelName);
-        await _database.HashSetAsync(key, entries.ToArray()).WaitAsync(cancellationToken).ConfigureAwait(false);
-
-        var effectiveTimeToLive = timeToLive ?? TimeToLive;
-        if (effectiveTimeToLive.HasValue)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            await _database.KeyExpireAsync(key, effectiveTimeToLive).WaitAsync(cancellationToken).ConfigureAwait(false);
-        }
+        await WriteEntriesAsync(key, entries, fieldsToClear, timeToLive ?? TimeToLive, cancellationToken).ConfigureAwait(false);
 
         return new EmbeddingsCacheEntry(
             normalizedInput,
@@ -430,6 +426,38 @@ public sealed class EmbeddingsCache
             modelName,
             metadataPayload,
             key);
+    }
+
+    private async Task WriteEntriesAsync(
+        RedisKey key,
+        IReadOnlyList<HashEntry> entries,
+        IReadOnlyList<RedisValue> fieldsToClear,
+        TimeSpan? timeToLive,
+        CancellationToken cancellationToken)
+    {
+        // A plain HSET suffices only when there is nothing else to do; otherwise group the write,
+        // the stale-field cleanup, and the TTL into a single MULTI/EXEC so an entry can never be
+        // left with a stale optional field or without its configured TTL (for example when the
+        // connection drops or the token is cancelled between the HSET and the EXPIRE).
+        if (fieldsToClear.Count == 0 && !timeToLive.HasValue)
+        {
+            await _database.HashSetAsync(key, entries.ToArray()).WaitAsync(cancellationToken).ConfigureAwait(false);
+            return;
+        }
+
+        var transaction = _database.CreateTransaction();
+        _ = transaction.HashSetAsync(key, entries.ToArray());
+        if (fieldsToClear.Count > 0)
+        {
+            _ = transaction.HashDeleteAsync(key, fieldsToClear.ToArray());
+        }
+
+        if (timeToLive.HasValue)
+        {
+            _ = transaction.KeyExpireAsync(key, timeToLive);
+        }
+
+        await transaction.ExecuteAsync().WaitAsync(cancellationToken).ConfigureAwait(false);
     }
 
     private async Task<EmbeddingsCacheEntry?> LookupAsyncCore(

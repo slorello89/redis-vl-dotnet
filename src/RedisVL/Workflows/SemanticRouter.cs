@@ -483,7 +483,7 @@ public sealed class SemanticRouter
         string? metadata,
         CancellationToken cancellationToken)
     {
-        ArgumentNullException.ThrowIfNull(embedding);
+        ValidateEmbedding(embedding);
 
         var key = CreateKey(routeName, reference);
         var entries = new List<HashEntry>
@@ -493,18 +493,65 @@ public sealed class SemanticRouter
             new(Options.EmbeddingFieldName, EmbeddingsCache.EncodeFloat32(embedding))
         };
 
+        // The per-reference threshold and metadata are optional. Track the ones this write omits so
+        // they are cleared rather than left behind: re-adding a reference without a threshold must
+        // not keep an earlier reference's threshold silently live.
+        var fieldsToClear = new List<RedisValue>(2);
         if (distanceThreshold is double threshold)
         {
             entries.Add(new HashEntry(RouteThresholdFieldName, threshold.ToString("G", CultureInfo.InvariantCulture)));
+        }
+        else
+        {
+            fieldsToClear.Add(RouteThresholdFieldName);
         }
 
         if (metadata is not null)
         {
             entries.Add(new HashEntry(MetadataFieldName, metadata));
         }
+        else
+        {
+            fieldsToClear.Add(MetadataFieldName);
+        }
 
-        await _database.HashSetAsync(key, entries.ToArray()).WaitAsync(cancellationToken).ConfigureAwait(false);
+        await WriteReferenceEntriesAsync(key, entries, fieldsToClear, cancellationToken).ConfigureAwait(false);
         return key!;
+    }
+
+    private async Task WriteReferenceEntriesAsync(
+        RedisKey key,
+        IReadOnlyList<HashEntry> entries,
+        IReadOnlyList<RedisValue> fieldsToClear,
+        CancellationToken cancellationToken)
+    {
+        // Bundle the write and the stale-field cleanup into a single MULTI/EXEC so a reference can
+        // never be left with a previous add's threshold or metadata. References carry no TTL.
+        if (fieldsToClear.Count == 0)
+        {
+            await _database.HashSetAsync(key, entries.ToArray()).WaitAsync(cancellationToken).ConfigureAwait(false);
+            return;
+        }
+
+        var transaction = _database.CreateTransaction();
+        _ = transaction.HashSetAsync(key, entries.ToArray());
+        _ = transaction.HashDeleteAsync(key, fieldsToClear.ToArray());
+        await transaction.ExecuteAsync().WaitAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    private void ValidateEmbedding(float[] embedding)
+    {
+        ArgumentNullException.ThrowIfNull(embedding);
+
+        // RediSearch silently rejects (and never indexes) a hash whose vector length does not match
+        // the field's declared dimensions, so validate on write rather than storing a reference that
+        // can never match a route. Query-side vectors are validated by the search command builder.
+        if (embedding.Length != Options.EmbeddingFieldAttributes.Dimensions)
+        {
+            throw new ArgumentException(
+                $"Semantic router embedding must contain exactly {Options.EmbeddingFieldAttributes.Dimensions} values.",
+                nameof(embedding));
+        }
     }
 
     internal RedisKey CreateKey(string routeName, string reference)

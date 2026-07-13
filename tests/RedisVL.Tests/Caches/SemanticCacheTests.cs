@@ -110,6 +110,9 @@ public sealed class SemanticCacheTests
         Assert.StartsWith("semantic:unit-cache:tests:", key, StringComparison.Ordinal);
         Assert.Equal(1, recorder.HashSetAsyncCallCount);
         Assert.Equal(1, recorder.KeyExpireAsyncCallCount);
+        // The HSET and EXPIRE are bundled into one MULTI/EXEC so a cancellation or dropped
+        // connection between them can never leave the entry without its TTL.
+        Assert.Equal(1, recorder.CreateTransactionCallCount);
         Assert.Equal(TimeSpan.FromMinutes(5), recorder.LastExpiry);
         Assert.Contains(recorder.LastHashEntries!, entry => entry.Name == "response" && entry.Value == "cached response");
         Assert.Contains(recorder.LastHashEntries!, entry => entry.Name == "metadata" && entry.Value == "{\"source\":\"faq\"}");
@@ -166,6 +169,49 @@ public sealed class SemanticCacheTests
         await Assert.ThrowsAsync<OperationCanceledException>(() =>
             cache.StoreAsync("prompt", "response", [1f, 0f], cancellationToken: cancellationTokenSource.Token));
         Assert.Equal(0, recorder.HashSetAsyncCallCount);
+    }
+
+    [Fact]
+    public async Task StoreAsync_WithEmbeddingLengthNotMatchingDimensions_ThrowsAndDoesNotWrite()
+    {
+        var (database, recorder) = RecordingDatabaseProxy.CreatePair();
+        var cache = new SemanticCache(database, CreateOptions());
+
+        // The schema declares two dimensions; a three-value embedding would be silently rejected by
+        // RediSearch on write, so the store must fail loudly before dispatching any command.
+        await Assert.ThrowsAsync<ArgumentException>(() =>
+            cache.StoreAsync("prompt", "response", [1f, 2f, 3f]));
+        Assert.Equal(0, recorder.HashSetAsyncCallCount);
+        Assert.Equal(0, recorder.CreateTransactionCallCount);
+    }
+
+    [Fact]
+    public async Task StoreAsync_WithoutMetadata_ClearsStaleMetadataAtomically()
+    {
+        var (database, recorder) = RecordingDatabaseProxy.CreatePair();
+        var cache = new SemanticCache(database, CreateOptions());
+
+        await cache.StoreAsync("prompt", "response", [1f, 0f]);
+
+        // No metadata this time, so the field is deleted in the same transaction as the write to
+        // avoid an HSET-merge pairing the new response with a previous entry's metadata.
+        Assert.Equal(1, recorder.CreateTransactionCallCount);
+        Assert.Equal(1, recorder.HashDeleteAsyncCallCount);
+        Assert.Contains(recorder.LastHashDeleteFields!, field => field == "metadata");
+        Assert.DoesNotContain(recorder.LastHashEntries!, entry => entry.Name == "metadata");
+    }
+
+    [Fact]
+    public async Task StoreAsync_WithMetadataAndNoTtl_WritesWithoutClearing()
+    {
+        var (database, recorder) = RecordingDatabaseProxy.CreatePair();
+        var cache = new SemanticCache(database, CreateOptions());
+
+        await cache.StoreAsync("prompt", "response", [1f, 0f], metadata: new { source = "faq" });
+
+        Assert.Equal(0, recorder.HashDeleteAsyncCallCount);
+        Assert.Equal(0, recorder.CreateTransactionCallCount);
+        Assert.Contains(recorder.LastHashEntries!, entry => entry.Name == "metadata");
     }
 
     [Fact]
@@ -441,9 +487,15 @@ public sealed class SemanticCacheTests
 
         public int KeyExistsAsyncCallCount { get; private set; }
 
+        public int HashDeleteAsyncCallCount { get; private set; }
+
+        public int CreateTransactionCallCount { get; private set; }
+
         public bool KeyExistsResult { get; set; } = true;
 
         public HashEntry[]? LastHashEntries { get; private set; }
+
+        public RedisValue[]? LastHashDeleteFields { get; private set; }
 
         public TimeSpan? LastExpiry { get; private set; }
 
@@ -462,12 +514,22 @@ public sealed class SemanticCacheTests
             {
                 nameof(IDatabase.ExecuteAsync) => HandleExecuteAsync(args),
                 nameof(IDatabase.HashSetAsync) => HandleHashSetAsync(args),
+                nameof(IDatabase.HashDeleteAsync) => HandleHashDeleteAsync(args),
                 nameof(IDatabase.KeyExpireAsync) => HandleKeyExpireAsync(args),
                 nameof(IDatabase.KeyExistsAsync) => HandleKeyExistsAsync(),
+                nameof(IDatabase.CreateTransaction) => CreateRecordingTransaction(),
                 nameof(IDatabase.Multiplexer) => throw new NotSupportedException(),
                 nameof(IDatabase.Database) => 0,
                 _ => throw new NotSupportedException($"Method '{targetMethod.Name}' is not configured for this test proxy.")
             };
+        }
+
+        private ITransaction CreateRecordingTransaction()
+        {
+            CreateTransactionCallCount++;
+            var transaction = DispatchProxy.Create<ITransaction, RecordingTransactionProxy>();
+            ((RecordingTransactionProxy)(object)transaction).Parent = this;
+            return transaction;
         }
 
         private Task<RedisResult> HandleExecuteAsync(object?[]? args)
@@ -486,6 +548,13 @@ public sealed class SemanticCacheTests
             return Task.FromResult(true);
         }
 
+        private Task<long> HandleHashDeleteAsync(object?[]? args)
+        {
+            HashDeleteAsyncCallCount++;
+            LastHashDeleteFields = (RedisValue[])args![1]!;
+            return Task.FromResult((long)LastHashDeleteFields.Length);
+        }
+
         private Task<bool> HandleKeyExpireAsync(object?[]? args)
         {
             KeyExpireAsyncCallCount++;
@@ -497,6 +566,29 @@ public sealed class SemanticCacheTests
         {
             KeyExistsAsyncCallCount++;
             return Task.FromResult(KeyExistsResult);
+        }
+
+        // Records the commands queued inside a MULTI/EXEC onto the parent recorder so tests observe
+        // a transaction's HSET/HDEL/EXPIRE the same way they observe direct calls. Execution is not
+        // deferred (as a real transaction would be) because the production code never awaits the
+        // queued command tasks before ExecuteAsync.
+        private class RecordingTransactionProxy : DispatchProxy
+        {
+            public RecordingDatabaseProxy Parent { get; set; } = null!;
+
+            protected override object? Invoke(MethodInfo? targetMethod, object?[]? args)
+            {
+                ArgumentNullException.ThrowIfNull(targetMethod);
+
+                return targetMethod.Name switch
+                {
+                    nameof(ITransaction.HashSetAsync) => Parent.HandleHashSetAsync(args),
+                    nameof(ITransaction.HashDeleteAsync) => Parent.HandleHashDeleteAsync(args),
+                    nameof(ITransaction.KeyExpireAsync) => Parent.HandleKeyExpireAsync(args),
+                    nameof(ITransaction.ExecuteAsync) => Task.FromResult(true),
+                    _ => throw new NotSupportedException($"Method '{targetMethod.Name}' is not configured for this transaction proxy.")
+                };
+            }
         }
     }
 }
