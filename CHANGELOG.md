@@ -5,6 +5,14 @@ All notable changes to this project are documented here. This project adheres to
 
 ## [0.0.6] - Unreleased
 
+### Removed
+
+- **BREAKING: Redis Sentinel connection support** — `RedisConnectionFactory` no longer exposes
+  `CreateSentinelOptions`, `ConnectSentinelAsync`, or `ConnectSentinelPrimaryAsync` (nor the
+  `DefaultSentinelPort` constant). Redis 8 bundles the modules redis-vl needs and the supported
+  topologies are standalone and cluster; the Sentinel-specific API, tests, example branch, and docs
+  have been removed. Use a standalone or cluster connection instead.
+
 ### Fixed
 
 - **Schema model: HNSW `EPSILON` and vector `INDEXMISSING`** — `VectorFieldAttributes` no longer

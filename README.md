@@ -6,6 +6,8 @@
 
 It is the .NET sibling of [redis-vl-python](https://github.com/redis/redis-vl-python), built on top of [StackExchange.Redis](https://github.com/StackExchange/StackExchange.Redis).
 
+> **Preview:** redis-vl-dotnet is pre-1.0 and under active development. APIs may change between releases; pin an exact package version and review the [CHANGELOG](https://github.com/redis/redis-vl-dotnet/blob/main/CHANGELOG.md) before upgrading.
+
 ## Features
 
 - **Schema and index management** — define indexes in code or load them from YAML, create/drop/list indexes, and reconnect to existing ones.
@@ -119,7 +121,7 @@ foreach (var doc in results.Documents)
 }
 ```
 
-> Redis expects vector fields as raw little-endian float32 bytes, hence the `EncodeFloat32` helper. See [VectorSearchExample](examples/VectorSearchExample/README.md) for a complete, runnable version.
+> Redis expects vector fields as raw little-endian float32 bytes, hence the `EncodeFloat32` helper. See [VectorSearchExample](https://github.com/redis/redis-vl-dotnet/blob/main/examples/VectorSearchExample/README.md) for a complete, runnable version.
 
 ### JSON documents
 
@@ -201,7 +203,7 @@ Console.WriteLine(hit?.Response);
 
 ## Examples
 
-The [examples/](examples/README.md) directory contains runnable projects for every feature area. Run any of them from the repository root, for example:
+The [examples/](https://github.com/redis/redis-vl-dotnet/blob/main/examples/README.md) directory contains runnable projects for every feature area. Run any of them from the repository root, for example:
 
 ```bash
 dotnet run --project examples/VectorSearchExample/VectorSearchExample.csproj
@@ -211,27 +213,27 @@ Highlights:
 
 | Area | Example |
 | --- | --- |
-| JSON schema, load, fetch, filter/text/aggregate queries | [JsonStorageExample](examples/JsonStorageExample/README.md) |
-| Vector KNN, multi-vector, runtime tuning | [VectorSearchExample](examples/VectorSearchExample/README.md) |
-| SVS-VAMANA index + vector compression | [SvsVamanaExample](examples/SvsVamanaExample/README.md) |
-| Native `FT.HYBRID` hybrid search | [HybridSearchExample](examples/HybridSearchExample/README.md) |
-| Semantic cache | [SemanticCacheExample](examples/SemanticCacheExample/README.md) |
-| Semantic router | [SemanticRouterExample](examples/SemanticRouterExample/README.md) |
-| Embeddings cache | [EmbeddingsCacheExample](examples/EmbeddingsCacheExample/README.md) |
-| Semantic message history | [MessageHistoryExample](examples/MessageHistoryExample/README.md) |
-| OpenAI / Cohere / Hugging Face / ONNX vectorizers | [OpenAiVectorizerExample](examples/OpenAiVectorizerExample/README.md), [CohereVectorizerExample](examples/CohereVectorizerExample/README.md), [HuggingFaceVectorizerExample](examples/HuggingFaceVectorizerExample/README.md), [OnnxVectorizerExample](examples/OnnxVectorizerExample/README.md) |
-| Cohere / ONNX rerankers | [CohereRerankerExample](examples/CohereRerankerExample/README.md), [OnnxRerankerExample](examples/OnnxRerankerExample/README.md) |
-| Microsoft.Extensions.VectorData / Semantic Kernel connector | [VectorDataConnectorExample](examples/VectorDataConnectorExample/README.md), [SemanticKernelConnectorExample](examples/SemanticKernelConnectorExample/README.md) |
+| JSON schema, load, fetch, filter/text/aggregate queries | [JsonStorageExample](https://github.com/redis/redis-vl-dotnet/blob/main/examples/JsonStorageExample/README.md) |
+| Vector KNN, multi-vector, runtime tuning | [VectorSearchExample](https://github.com/redis/redis-vl-dotnet/blob/main/examples/VectorSearchExample/README.md) |
+| SVS-VAMANA index + vector compression | [SvsVamanaExample](https://github.com/redis/redis-vl-dotnet/blob/main/examples/SvsVamanaExample/README.md) |
+| Native `FT.HYBRID` hybrid search | [HybridSearchExample](https://github.com/redis/redis-vl-dotnet/blob/main/examples/HybridSearchExample/README.md) |
+| Semantic cache | [SemanticCacheExample](https://github.com/redis/redis-vl-dotnet/blob/main/examples/SemanticCacheExample/README.md) |
+| Semantic router | [SemanticRouterExample](https://github.com/redis/redis-vl-dotnet/blob/main/examples/SemanticRouterExample/README.md) |
+| Embeddings cache | [EmbeddingsCacheExample](https://github.com/redis/redis-vl-dotnet/blob/main/examples/EmbeddingsCacheExample/README.md) |
+| Semantic message history | [MessageHistoryExample](https://github.com/redis/redis-vl-dotnet/blob/main/examples/MessageHistoryExample/README.md) |
+| OpenAI / Cohere / Hugging Face / ONNX vectorizers | [OpenAiVectorizerExample](https://github.com/redis/redis-vl-dotnet/blob/main/examples/OpenAiVectorizerExample/README.md), [CohereVectorizerExample](https://github.com/redis/redis-vl-dotnet/blob/main/examples/CohereVectorizerExample/README.md), [HuggingFaceVectorizerExample](https://github.com/redis/redis-vl-dotnet/blob/main/examples/HuggingFaceVectorizerExample/README.md), [OnnxVectorizerExample](https://github.com/redis/redis-vl-dotnet/blob/main/examples/OnnxVectorizerExample/README.md) |
+| Cohere / ONNX rerankers | [CohereRerankerExample](https://github.com/redis/redis-vl-dotnet/blob/main/examples/CohereRerankerExample/README.md), [OnnxRerankerExample](https://github.com/redis/redis-vl-dotnet/blob/main/examples/OnnxRerankerExample/README.md) |
+| Microsoft.Extensions.VectorData / Semantic Kernel connector | [VectorDataConnectorExample](https://github.com/redis/redis-vl-dotnet/blob/main/examples/VectorDataConnectorExample/README.md), [SemanticKernelConnectorExample](https://github.com/redis/redis-vl-dotnet/blob/main/examples/SemanticKernelConnectorExample/README.md) |
 
 ## Documentation
 
 Full documentation lives in the Antora docs site source:
 
-- [Overview](docs-site/modules/ROOT/pages/index.adoc)
-- [Getting Started](docs-site/modules/ROOT/pages/getting-started/index.adoc) — installation, connection topologies, environment variables
-- [Core Features](docs-site/modules/ROOT/pages/core-features/index.adoc) — schema, indexes, documents, queries
-- [Extensions](docs-site/modules/ROOT/pages/extensions/index.adoc) — vectorizers, rerankers, connectors
-- [Testing](docs-site/modules/ROOT/pages/testing/index.adoc)
+- [Overview](https://github.com/redis/redis-vl-dotnet/blob/main/docs-site/modules/ROOT/pages/index.adoc)
+- [Getting Started](https://github.com/redis/redis-vl-dotnet/blob/main/docs-site/modules/ROOT/pages/getting-started/index.adoc) — installation, connection topologies, environment variables
+- [Core Features](https://github.com/redis/redis-vl-dotnet/blob/main/docs-site/modules/ROOT/pages/core-features/index.adoc) — schema, indexes, documents, queries
+- [Extensions](https://github.com/redis/redis-vl-dotnet/blob/main/docs-site/modules/ROOT/pages/extensions/index.adoc) — vectorizers, rerankers, connectors
+- [Testing](https://github.com/redis/redis-vl-dotnet/blob/main/docs-site/modules/ROOT/pages/testing/index.adoc)
 
 Build the docs locally from the repository root:
 
@@ -249,4 +251,4 @@ dotnet build redis-vl-dotnet.sln
 dotnet test
 ```
 
-Integration tests need a reachable Redis with the Query Engine enabled. See [Testing](docs-site/modules/ROOT/pages/testing/index.adoc) for details.
+Integration tests need a reachable Redis with the Query Engine enabled. See [Testing](https://github.com/redis/redis-vl-dotnet/blob/main/docs-site/modules/ROOT/pages/testing/index.adoc) for details.
