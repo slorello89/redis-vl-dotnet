@@ -79,6 +79,155 @@ public sealed class RedisVLVectorStoreIntegrationTests
     }
 
     [RedisSearchIntegrationFact]
+    public async Task SearchAsync_WithOldFilter_ThrowsNotSupported()
+    {
+        await using var harness = await ConnectorTestHarness.CreateAsync($"vectordata-it-{Guid.NewGuid():N}");
+        var query = new ReadOnlyMemory<float>([0.9f, 0.1f, 0.0f, 0.1f]);
+#pragma warning disable CS0618 // deliberately exercising rejection of the obsolete OldFilter option
+        var options = new VectorSearchOptions<ConnectorMovie> { OldFilter = new VectorSearchFilter() };
+#pragma warning restore CS0618
+
+        await Assert.ThrowsAsync<NotSupportedException>(async () =>
+        {
+            await foreach (var _ in harness.Collection.SearchAsync(query, top: 5, options))
+            {
+            }
+        });
+    }
+
+    [RedisSearchIntegrationFact]
+    public async Task SearchAsync_WithScoreThreshold_FiltersByDistance()
+    {
+        await using var harness = await ConnectorTestHarness.CreateAsync($"vectordata-it-{Guid.NewGuid():N}");
+        var collection = harness.Collection;
+
+        await collection.UpsertAsync(SampleMovies());
+        await RedisSearchTestEnvironment.WaitForIndexDocumentCountAsync(harness.Index, 4);
+
+        // The query vector is exactly The Matrix; the two sci-fi films sit at ~0 cosine distance
+        // while the crime films are far (~0.78). ConnectorMovie uses CosineDistance, so the score
+        // is the distance and the threshold is an upper bound on it.
+        var query = new ReadOnlyMemory<float>([0.9f, 0.1f, 0.0f, 0.1f]);
+
+        var near = new List<VectorSearchResult<ConnectorMovie>>();
+        await foreach (var result in collection.SearchAsync(
+                           query,
+                           top: 10,
+                           new VectorSearchOptions<ConnectorMovie> { ScoreThreshold = 0.1 }))
+        {
+            near.Add(result);
+        }
+
+        Assert.Equal(["scifi"], near.Select(r => r.Record.Genre).Distinct());
+        Assert.All(near, r => Assert.True(r.Score <= 0.1 + 1e-6, $"score {r.Score} exceeded threshold"));
+
+        // A threshold spanning the whole cosine-distance range keeps every document.
+        var all = new List<VectorSearchResult<ConnectorMovie>>();
+        await foreach (var result in collection.SearchAsync(
+                           query,
+                           top: 10,
+                           new VectorSearchOptions<ConnectorMovie> { ScoreThreshold = 2.0 }))
+        {
+            all.Add(result);
+        }
+
+        Assert.Equal(4, all.Count);
+        Assert.True(near.Count < all.Count, "the tighter threshold should return fewer results");
+    }
+
+    [RedisSearchIntegrationFact]
+    public async Task GetAsync_WithSingleKeyOrderBy_SortsResults()
+    {
+        await using var harness = await ConnectorTestHarness.CreateAsync($"vectordata-it-{Guid.NewGuid():N}");
+        var collection = harness.Collection;
+
+        await collection.UpsertAsync(SampleMovies());
+        await RedisSearchTestEnvironment.WaitForIndexDocumentCountAsync(harness.Index, 4);
+
+        var ascending = new List<int>();
+        await foreach (var movie in collection.GetAsync(
+                           m => m.Year > 0,
+                           top: 10,
+                           new FilteredRecordRetrievalOptions<ConnectorMovie> { OrderBy = o => o.Ascending(m => m.Year) }))
+        {
+            ascending.Add(movie.Year);
+        }
+
+        Assert.Equal([1995, 1995, 1999, 2016], ascending);
+
+        var descending = new List<int>();
+        await foreach (var movie in collection.GetAsync(
+                           m => m.Year > 0,
+                           top: 10,
+                           new FilteredRecordRetrievalOptions<ConnectorMovie> { OrderBy = o => o.Descending(m => m.Year) }))
+        {
+            descending.Add(movie.Year);
+        }
+
+        Assert.Equal([2016, 1999, 1995, 1995], descending);
+    }
+
+    [RedisSearchIntegrationFact]
+    public async Task GetAsync_WithMultiKeyOrderBy_ThrowsNotSupported()
+    {
+        await using var harness = await ConnectorTestHarness.CreateAsync($"vectordata-it-{Guid.NewGuid():N}");
+        var options = new FilteredRecordRetrievalOptions<ConnectorMovie>
+        {
+            OrderBy = o => o.Ascending(m => m.Genre).Descending(m => m.Year),
+        };
+
+        await Assert.ThrowsAsync<NotSupportedException>(async () =>
+        {
+            await foreach (var _ in harness.Collection.GetAsync(m => m.Genre == "scifi", top: 5, options))
+            {
+            }
+        });
+    }
+
+    [RedisSearchIntegrationFact]
+    public async Task SearchAsync_IncludeVectors_HonorsOption()
+    {
+        await using var harness = await ConnectorTestHarness.CreateAsync($"vectordata-it-{Guid.NewGuid():N}");
+        var collection = harness.Collection;
+
+        await collection.UpsertAsync(SampleMovies());
+        await RedisSearchTestEnvironment.WaitForIndexDocumentCountAsync(harness.Index, 4);
+
+        var query = new ReadOnlyMemory<float>([0.9f, 0.1f, 0.0f, 0.1f]);
+
+        // Default (IncludeVectors == false): the vector must not be materialized onto the record.
+        var omitted = await FirstRecordAsync(collection.SearchAsync(query, top: 1));
+        Assert.Equal(0, omitted.Embedding.Length);
+
+        // IncludeVectors == true: the stored vector is returned.
+        var included = await FirstRecordAsync(collection.SearchAsync(
+            query,
+            top: 1,
+            new VectorSearchOptions<ConnectorMovie> { IncludeVectors = true }));
+        Assert.Equal(4, included.Embedding.Length);
+    }
+
+    [RedisSearchIntegrationFact]
+    public async Task GetAsync_ByKey_IncludeVectors_HonorsOption()
+    {
+        await using var harness = await ConnectorTestHarness.CreateAsync($"vectordata-it-{Guid.NewGuid():N}");
+        var collection = harness.Collection;
+
+        await collection.UpsertAsync(SampleMovies());
+        await RedisSearchTestEnvironment.WaitForIndexDocumentCountAsync(harness.Index, 4);
+
+        var omitted = await collection.GetAsync("thematrix");
+        Assert.NotNull(omitted);
+        Assert.Equal(0, omitted!.Embedding.Length);
+
+        var included = await collection.GetAsync(
+            "thematrix",
+            new RecordRetrievalOptions { IncludeVectors = true });
+        Assert.NotNull(included);
+        Assert.Equal(4, included!.Embedding.Length);
+    }
+
+    [RedisSearchIntegrationFact]
     public async Task CollectionExists_TracksLifecycle()
     {
         var name = $"vectordata-it-{Guid.NewGuid():N}";
@@ -122,6 +271,17 @@ public sealed class RedisVLVectorStoreIntegrationTests
         Assert.Equal(
             ["Heat", "Se7en"],
             await TitlesAsync(collection, m => !(m.Genre == "scifi")));
+    }
+
+    private static async Task<ConnectorMovie> FirstRecordAsync(
+        IAsyncEnumerable<VectorSearchResult<ConnectorMovie>> results)
+    {
+        await foreach (var result in results)
+        {
+            return result.Record;
+        }
+
+        throw new InvalidOperationException("Expected at least one search result.");
     }
 
     private static async Task<string[]> TitlesAsync(

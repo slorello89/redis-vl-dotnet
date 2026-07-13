@@ -44,6 +44,14 @@ internal sealed class RedisVLProperty
     public VectorAlgorithm Algorithm { get; init; }
 
     public VectorDataType DataType { get; init; }
+
+    /// <summary>
+    /// The MEVD <see cref="DistanceFunction"/> the vector was configured with (may be
+    /// <see langword="null"/> when unspecified). Retained in addition to <see cref="Metric"/>
+    /// because the Redis metric collapses the similarity/distance variants (e.g. cosine
+    /// similarity vs. distance) that determine score and score-threshold semantics.
+    /// </summary>
+    public string? DistanceFunction { get; init; }
 }
 
 /// <summary>
@@ -340,6 +348,7 @@ internal sealed class RedisVLRecordModel
             Metric = MapDistance(distanceFunction),
             Algorithm = MapAlgorithm(indexKind),
             DataType = MapVectorDataType(property.PropertyType),
+            DistanceFunction = distanceFunction,
         };
     }
 

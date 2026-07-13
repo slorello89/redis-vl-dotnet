@@ -49,6 +49,13 @@ internal static class SearchQueryCommandBuilder
             arguments.AddRange(query.ReturnFields);
         }
 
+        if (query.SortBy is not null)
+        {
+            arguments.Add("SORTBY");
+            arguments.Add(query.SortBy.Field);
+            arguments.Add(query.SortBy.Descending ? "DESC" : "ASC");
+        }
+
         AppendLimit(arguments, query.Offset, query.Limit);
         arguments.Add("DIALECT");
         arguments.Add("2");

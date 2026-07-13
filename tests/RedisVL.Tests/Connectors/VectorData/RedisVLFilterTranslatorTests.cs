@@ -54,4 +54,29 @@ public sealed class RedisVLFilterTranslatorTests
 
         Assert.Equal("@year:[1995 1995]", result.ToQueryString());
     }
+
+    // Regression: a single translator instance is shared per collection (typically a DI singleton).
+    // Before the fix it stored the lambda's parameter in a mutable field, so concurrent Translate
+    // calls raced and intermittently produced wrong output or threw. Distinct filters translated in
+    // parallel on one instance must each yield their own correct query string.
+    [Fact]
+    public void Translate_IsThreadSafe_AcrossConcurrentCalls()
+    {
+        var translator = new RedisVLFilterTranslator(Model);
+
+        Expression<Func<ConnectorMovie, bool>> scifi = m => m.Genre == "scifi";
+        Expression<Func<ConnectorMovie, bool>> recent = m => m.Year >= 1990;
+
+        Parallel.For(0, 5_000, new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount }, i =>
+        {
+            if ((i & 1) == 0)
+            {
+                Assert.Equal("@genre:{scifi}", translator.Translate(scifi).ToQueryString());
+            }
+            else
+            {
+                Assert.Equal("@year:[1990 +inf]", translator.Translate(recent).ToQueryString());
+            }
+        });
+    }
 }
