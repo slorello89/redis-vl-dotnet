@@ -14,11 +14,23 @@ public sealed class RedisVLChatMessageStore
 {
     private readonly MessageHistory _history;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="RedisVLChatMessageStore"/> class backed by a new
+    /// <see cref="MessageHistory"/> built from the given database and options.
+    /// </summary>
+    /// <param name="database">The StackExchange.Redis database backing the message history.</param>
+    /// <param name="options">The message-history configuration.</param>
     public RedisVLChatMessageStore(IDatabase database, MessageHistoryOptions options)
         : this(new MessageHistory(database, options))
     {
     }
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="RedisVLChatMessageStore"/> class wrapping an
+    /// existing <see cref="MessageHistory"/> workflow.
+    /// </summary>
+    /// <param name="history">The message-history workflow to wrap.</param>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="history"/> is <c>null</c>.</exception>
     public RedisVLChatMessageStore(MessageHistory history)
     {
         _history = history ?? throw new ArgumentNullException(nameof(history));

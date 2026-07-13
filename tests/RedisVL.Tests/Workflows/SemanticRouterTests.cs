@@ -78,19 +78,22 @@ public sealed class SemanticRouterTests
     }
 
     [Fact]
-    public async Task AddRouteAsync_WithoutThresholdOrMetadata_ClearsBothOptionalFields()
+    public async Task AddRouteAsync_SingleReference_WritesReferenceWithoutTouchingRouteConfig()
     {
         var (database, recorder) = RecordingDatabaseProxy.CreatePair();
         var router = new SemanticRouter(database, CreateOptions());
 
         await router.AddRouteAsync("billing", "refund status", [1f, 0f]);
 
-        // Neither optional field is supplied, so both are deleted in the same transaction as the
-        // write to avoid a re-added reference keeping an earlier add's threshold or metadata.
-        Assert.Equal(1, recorder.CreateTransactionCallCount);
-        Assert.Equal(1, recorder.HashDeleteAsyncCallCount);
-        Assert.Contains(recorder.LastHashDeleteFields!, field => field == "routeThreshold");
-        Assert.Contains(recorder.LastHashDeleteFields!, field => field == "metadata");
+        // A bare reference add stores only reference fields via a plain HSET. Route-level config lives in a
+        // separate key, so a single add must not open a transaction, delete fields, or clear the route's
+        // threshold/metadata.
+        Assert.Equal(1, recorder.HashSetAsyncCallCount);
+        Assert.Equal(0, recorder.CreateTransactionCallCount);
+        Assert.Equal(0, recorder.HashDeleteAsyncCallCount);
+        Assert.Empty(recorder.DeletedKeys);
+        Assert.DoesNotContain(recorder.LastHashEntries!, entry => entry.Name == "routeThreshold");
+        Assert.DoesNotContain(recorder.LastHashEntries!, entry => entry.Name == "metadata");
     }
 
     [Fact]
@@ -165,16 +168,18 @@ public sealed class SemanticRouterTests
     [Fact]
     public async Task RouteManyAsync_DropsRoutesOutsidePerRouteThreshold()
     {
-        var (database, _) = CreateRouterWithSearchReplyEntries(
+        var (database, recorder) = CreateRouterWithSearchReplyEntries(
             new[]
             {
-                ("k1", new[] { ("routeName", "billing"), ("distance", "0.1"), ("routeThreshold", "0.1") }),
-                ("k2", new[] { ("routeName", "billing"), ("distance", "0.15"), ("routeThreshold", "0.1") }),
+                ("k1", new[] { ("routeName", "billing"), ("distance", "0.1") }),
+                ("k2", new[] { ("routeName", "billing"), ("distance", "0.15") }),
                 ("k3", new[] { ("routeName", "support"), ("distance", "0.05") }),
             });
         var router = new SemanticRouter(database, CreateOptions());
+        StubRouteThreshold(recorder, router, "billing", 0.1d);
 
-        // billing average (0.125) exceeds its per-route threshold (0.1) and is dropped.
+        // billing average (0.125) exceeds its per-route threshold (0.1) and is dropped; support has no
+        // per-route threshold and stays within the router default (0.3).
         var matches = await router.RouteManyAsync("question", [1f, 0f], maxResults: 5);
 
         Assert.Single(matches);
@@ -182,7 +187,50 @@ public sealed class SemanticRouterTests
     }
 
     [Fact]
-    public async Task AddRouteAsync_WithRoute_PersistsThresholdAndMetadataPerReference()
+    public async Task RouteAsync_AndRouteManyAsync_AgreeWhenPerRouteThresholdRejects()
+    {
+        // The nearest reference sits at 0.2 — between the route's stricter per-route threshold (0.1) and the
+        // router default (0.3). Before the fix, RouteAsync applied only the router default and returned the
+        // route while RouteManyAsync correctly rejected it. Both must now reject it identically.
+        var (database, recorder) = CreateRouterWithSearchReplyEntries(
+            new[]
+            {
+                ("k1", new[] { ("routeName", "billing"), ("reference", "refund status"), ("distance", "0.2") }),
+            });
+        var router = new SemanticRouter(database, CreateOptions());
+        StubRouteThreshold(recorder, router, "billing", 0.1d);
+
+        var single = await router.RouteAsync("question", [1f, 0f]);
+        var many = await router.RouteManyAsync("question", [1f, 0f], maxResults: 5);
+
+        Assert.Null(single);
+        Assert.Empty(many);
+    }
+
+    [Fact]
+    public async Task RouteAsync_SkipsNearestReferenceRejectedByPerRouteThreshold()
+    {
+        // billing is nearer but its per-route threshold rejects it; RouteAsync returns the nearest reference
+        // whose route actually accepts it rather than falling back to the globally nearest reference.
+        var (database, recorder) = CreateRouterWithSearchReplyEntries(
+            new[]
+            {
+                ("k1", new[] { ("routeName", "billing"), ("reference", "refund status"), ("distance", "0.12") }),
+                ("k2", new[] { ("routeName", "support"), ("reference", "reset password"), ("distance", "0.2") }),
+            });
+        var router = new SemanticRouter(database, CreateOptions());
+        StubRouteThreshold(recorder, router, "billing", 0.1d);
+
+        var match = await router.RouteAsync("question", [1f, 0f]);
+
+        Assert.NotNull(match);
+        Assert.Equal("support", match!.RouteName);
+        Assert.Equal("reset password", match.Reference);
+        Assert.Equal(0.2d, match.Distance, 5);
+    }
+
+    [Fact]
+    public async Task AddRouteAsync_WithRoute_PersistsThresholdAndMetadataInRouteConfig()
     {
         var (database, recorder) = RecordingDatabaseProxy.CreatePair();
         var router = new SemanticRouter(database, CreateOptions());
@@ -196,14 +244,25 @@ public sealed class SemanticRouterTests
         var keys = await router.AddRouteAsync(route, new[] { new[] { 1f, 0f }, new[] { 0f, 1f } });
 
         Assert.Equal(2, keys.Count);
-        Assert.Equal(2, recorder.HashSetCalls.Count);
-        // Both optional fields are present on every reference, so nothing is cleared.
-        Assert.Equal(0, recorder.HashDeleteAsyncCallCount);
-        foreach (var entries in recorder.HashSetCalls)
+
+        // Exactly one HSET carries the route-level config (threshold + metadata); it is the config key, not
+        // a reference. The two reference writes carry the route name but never the threshold or metadata.
+        var configWrites = recorder.HashSetCalls
+            .Where(entries => entries.Any(entry => entry.Name == "routeThreshold"))
+            .ToList();
+        var referenceWrites = recorder.HashSetCalls
+            .Where(entries => entries.All(entry => entry.Name != "routeThreshold"))
+            .ToList();
+
+        var configEntries = Assert.Single(configWrites);
+        Assert.Contains(configEntries, entry => entry.Name == "routeThreshold" && entry.Value == "0.2");
+        Assert.Contains(configEntries, entry => entry.Name == "metadata" && entry.Value.ToString()!.Contains("finance"));
+
+        Assert.Equal(2, referenceWrites.Count);
+        foreach (var entries in referenceWrites)
         {
             Assert.Contains(entries, entry => entry.Name == "routeName" && entry.Value == "billing");
-            Assert.Contains(entries, entry => entry.Name == "routeThreshold" && entry.Value == "0.2");
-            Assert.Contains(entries, entry => entry.Name == "metadata" && entry.Value.ToString()!.Contains("finance"));
+            Assert.DoesNotContain(entries, entry => entry.Name == "metadata");
         }
     }
 
@@ -222,6 +281,14 @@ public sealed class SemanticRouterTests
         Assert.Equal(2, recorder.HashSetCalls.Count);
         Assert.All(recorder.HashSetCalls, entries =>
             Assert.Contains(entries, entry => entry.Name == "routeName" && entry.Value == "billing"));
+
+        // Adding references must not write or clear route-level config: no threshold on the references, and
+        // no transaction or delete against the config key. This is what keeps a route's threshold stable
+        // regardless of which reference happens to be nearest at query time.
+        Assert.All(recorder.HashSetCalls, entries =>
+            Assert.DoesNotContain(entries, entry => entry.Name == "routeThreshold"));
+        Assert.Equal(0, recorder.CreateTransactionCallCount);
+        Assert.Empty(recorder.DeletedKeys);
     }
 
     [Fact]
@@ -269,10 +336,30 @@ public sealed class SemanticRouterTests
 
         var deleted = await router.DeleteRouteAsync("billing");
 
+        // The returned count reports references removed (2); the per-route config key is deleted too so a
+        // future route reusing the name cannot inherit stale config, but it is not counted.
         Assert.Equal(2, deleted);
-        Assert.Equal(
-            ["semantic-router:unit-router:tests:k1", "semantic-router:unit-router:tests:k2"],
-            recorder.DeletedKeys.Select(key => key.ToString()));
+        Assert.Contains("semantic-router:unit-router:tests:k1", recorder.DeletedKeys.Select(key => key.ToString()));
+        Assert.Contains("semantic-router:unit-router:tests:k2", recorder.DeletedKeys.Select(key => key.ToString()));
+        Assert.Contains(recorder.DeletedKeys, key => key == router.CreateConfigKey("billing"));
+    }
+
+    // Wires the recorder so the given route's config key reports a per-route threshold; other keys keep
+    // whatever a previous stub set, defaulting to "no config" (router-default threshold). Composable across
+    // calls so several routes can be stubbed independently.
+    private static void StubRouteThreshold(
+        RecordingDatabaseProxy recorder,
+        SemanticRouter router,
+        string routeName,
+        double threshold)
+    {
+        var configKey = router.CreateConfigKey(routeName);
+        var thresholdValue = (RedisValue)threshold;
+        var previous = recorder.HashGetHandler;
+        recorder.HashGetHandler = (key, fields) =>
+            key == configKey
+                ? [.. fields.Select(field => field == "routeThreshold" ? thresholdValue : RedisValue.Null)]
+                : previous?.Invoke(key, fields) ?? [.. fields.Select(static _ => RedisValue.Null)];
     }
 
     private static (IDatabase Database, RecordingDatabaseProxy Recorder) CreateRouterWithSearchReply(
@@ -341,6 +428,10 @@ public sealed class SemanticRouterTests
     {
         public Func<string, object?[]?, Task<RedisResult>>? ExecuteAsyncHandler { get; set; }
 
+        // Resolves the value of each requested hash field for a given key. Defaults to "field missing" so
+        // routing falls back to the router-wide threshold unless a test wires per-route config.
+        public Func<RedisKey, RedisValue[], RedisValue[]>? HashGetHandler { get; set; }
+
         public int ExecuteAsyncCallCount { get; private set; }
 
         public int HashSetAsyncCallCount { get; private set; }
@@ -373,12 +464,29 @@ public sealed class SemanticRouterTests
                 nameof(IDatabase.ExecuteAsync) => HandleExecuteAsync(args),
                 nameof(IDatabase.HashSetAsync) => HandleHashSetAsync(args),
                 nameof(IDatabase.HashDeleteAsync) => HandleHashDeleteAsync(args),
+                nameof(IDatabase.HashGetAsync) => HandleHashGetAsync(args),
                 nameof(IDatabase.KeyDeleteAsync) => HandleKeyDeleteAsync(args),
                 nameof(IDatabase.CreateTransaction) => CreateRecordingTransaction(),
                 nameof(IDatabase.Multiplexer) => throw new NotSupportedException(),
                 nameof(IDatabase.Database) => 0,
                 _ => throw new NotSupportedException($"Method '{targetMethod.Name}' is not configured for this test proxy.")
             };
+        }
+
+        // IDatabase exposes HashGetAsync as both a single-field (Task<RedisValue>) and a multi-field
+        // (Task<RedisValue[]>) overload; the second argument's type tells them apart.
+        private object HandleHashGetAsync(object?[]? args)
+        {
+            var key = (RedisKey)args![0]!;
+            if (args[1] is RedisValue[] fields)
+            {
+                var values = HashGetHandler?.Invoke(key, fields) ?? [.. fields.Select(static _ => RedisValue.Null)];
+                return Task.FromResult(values);
+            }
+
+            var field = (RedisValue)args[1]!;
+            var single = HashGetHandler?.Invoke(key, [field]);
+            return Task.FromResult(single is { Length: > 0 } ? single[0] : RedisValue.Null);
         }
 
         private ITransaction CreateRecordingTransaction()
@@ -413,7 +521,9 @@ public sealed class SemanticRouterTests
             return Task.FromResult((long)LastHashDeleteFields.Length);
         }
 
-        private Task<long> HandleKeyDeleteAsync(object?[]? args)
+        // IDatabase/ITransaction expose KeyDeleteAsync as a multi-key (Task<long>) and single-key
+        // (Task<bool>) overload; return the type that matches the overload actually invoked.
+        private object HandleKeyDeleteAsync(object?[]? args)
         {
             if (args![0] is RedisKey[] keys)
             {
@@ -422,7 +532,7 @@ public sealed class SemanticRouterTests
             }
 
             DeletedKeys.Add((RedisKey)args[0]!);
-            return Task.FromResult(1L);
+            return Task.FromResult(true);
         }
 
         // Records the commands queued inside a MULTI/EXEC onto the parent recorder so a
@@ -440,6 +550,7 @@ public sealed class SemanticRouterTests
                 {
                     nameof(ITransaction.HashSetAsync) => Parent.HandleHashSetAsync(args),
                     nameof(ITransaction.HashDeleteAsync) => Parent.HandleHashDeleteAsync(args),
+                    nameof(ITransaction.KeyDeleteAsync) => Parent.HandleKeyDeleteAsync(args),
                     nameof(ITransaction.ExecuteAsync) => Task.FromResult(true),
                     _ => throw new NotSupportedException($"Method '{targetMethod.Name}' is not configured for this transaction proxy.")
                 };

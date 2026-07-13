@@ -8,6 +8,11 @@ namespace RedisVL.Queries;
 /// </summary>
 public sealed class SearchSortBy
 {
+    /// <summary>
+    /// Initializes a new <see cref="SearchSortBy"/>.
+    /// </summary>
+    /// <param name="field">The index field to sort by; a leading <c>@</c> is normalized away.</param>
+    /// <param name="descending">Whether to sort in descending order; ascending when <see langword="false"/>.</param>
     public SearchSortBy(string field, bool descending = false)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(field);

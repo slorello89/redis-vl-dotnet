@@ -6,6 +6,10 @@ using StackExchange.Redis;
 
 namespace RedisVL.Caches;
 
+/// <summary>
+/// An exact-match cache that maps input text (optionally scoped by model name) to a stored embedding vector,
+/// backed by a Redis hash per entry. Use it to avoid recomputing embeddings for text that has been seen before.
+/// </summary>
 public sealed class EmbeddingsCache
 {
     private const string InputFieldName = "input";
@@ -17,6 +21,10 @@ public sealed class EmbeddingsCache
     private readonly IDatabase _database;
     private readonly JsonSerializerOptions _serializerOptions;
 
+    /// <summary>Initializes a new <see cref="EmbeddingsCache" /> over the given database and options.</summary>
+    /// <param name="database">The Redis database used for storage.</param>
+    /// <param name="options">The cache configuration, including name, namespace, and default TTL.</param>
+    /// <exception cref="ArgumentNullException"><paramref name="database" /> or <paramref name="options" /> is <see langword="null" />.</exception>
     public EmbeddingsCache(IDatabase database, EmbeddingsCacheOptions options)
     {
         ArgumentNullException.ThrowIfNull(database);
@@ -27,20 +35,35 @@ public sealed class EmbeddingsCache
         Options = options;
     }
 
+    /// <summary>Gets the configuration this cache was created with.</summary>
     public EmbeddingsCacheOptions Options { get; }
 
+    /// <summary>Gets the cache name (from <see cref="Options" />).</summary>
     public string Name => Options.Name;
 
+    /// <summary>Gets the optional key namespace (from <see cref="Options" />), or <see langword="null" /> when unset.</summary>
     public string? KeyNamespace => Options.KeyNamespace;
 
+    /// <summary>Gets the default entry expiry (from <see cref="Options" />), or <see langword="null" /> for no expiry.</summary>
     public TimeSpan? TimeToLive => Options.TimeToLive;
 
+    /// <summary>Stores an embedding for <paramref name="input" /> using the cache's default TTL.</summary>
+    /// <param name="input">The source text the embedding was generated from.</param>
+    /// <param name="embedding">The embedding vector to cache.</param>
+    /// <param name="cancellationToken">A token used to cancel the operation.</param>
+    /// <returns><see langword="true" /> once the entry has been stored.</returns>
     public async Task<bool> StoreAsync(string input, float[] embedding, CancellationToken cancellationToken = default)
     {
         await SetAsync(input, embedding, cancellationToken).ConfigureAwait(false);
         return true;
     }
 
+    /// <summary>Stores an embedding for <paramref name="input" /> with the supplied metadata, using the cache's default TTL.</summary>
+    /// <param name="input">The source text the embedding was generated from.</param>
+    /// <param name="embedding">The embedding vector to cache.</param>
+    /// <param name="metadata">Metadata to serialize and store alongside the embedding, or <see langword="null" /> for none.</param>
+    /// <param name="cancellationToken">A token used to cancel the operation.</param>
+    /// <returns><see langword="true" /> once the entry has been stored.</returns>
     public async Task<bool> StoreAsync(
         string input,
         float[] embedding,
@@ -51,6 +74,13 @@ public sealed class EmbeddingsCache
         return true;
     }
 
+    /// <summary>Stores an embedding for <paramref name="input" /> with metadata and an explicit expiry.</summary>
+    /// <param name="input">The source text the embedding was generated from.</param>
+    /// <param name="embedding">The embedding vector to cache.</param>
+    /// <param name="metadata">Metadata to serialize and store alongside the embedding, or <see langword="null" /> for none.</param>
+    /// <param name="timeToLive">The entry expiry, overriding the cache default; <see langword="null" /> uses the default.</param>
+    /// <param name="cancellationToken">A token used to cancel the operation.</param>
+    /// <returns><see langword="true" /> once the entry has been stored.</returns>
     public async Task<bool> StoreAsync(
         string input,
         float[] embedding,
@@ -62,6 +92,12 @@ public sealed class EmbeddingsCache
         return true;
     }
 
+    /// <summary>Stores an embedding for <paramref name="input" /> scoped to <paramref name="modelName" />, using the cache's default TTL.</summary>
+    /// <param name="input">The source text the embedding was generated from.</param>
+    /// <param name="modelName">The embedding model name that scopes the entry's key.</param>
+    /// <param name="embedding">The embedding vector to cache.</param>
+    /// <param name="cancellationToken">A token used to cancel the operation.</param>
+    /// <returns><see langword="true" /> once the entry has been stored.</returns>
     public async Task<bool> StoreAsync(
         string input,
         string modelName,
@@ -72,6 +108,13 @@ public sealed class EmbeddingsCache
         return true;
     }
 
+    /// <summary>Stores an embedding for <paramref name="input" /> scoped to <paramref name="modelName" /> with metadata, using the cache's default TTL.</summary>
+    /// <param name="input">The source text the embedding was generated from.</param>
+    /// <param name="modelName">The embedding model name that scopes the entry's key.</param>
+    /// <param name="embedding">The embedding vector to cache.</param>
+    /// <param name="metadata">Metadata to serialize and store alongside the embedding, or <see langword="null" /> for none.</param>
+    /// <param name="cancellationToken">A token used to cancel the operation.</param>
+    /// <returns><see langword="true" /> once the entry has been stored.</returns>
     public async Task<bool> StoreAsync(
         string input,
         string modelName,
@@ -83,6 +126,14 @@ public sealed class EmbeddingsCache
         return true;
     }
 
+    /// <summary>Stores an embedding for <paramref name="input" /> scoped to <paramref name="modelName" /> with metadata and an explicit expiry.</summary>
+    /// <param name="input">The source text the embedding was generated from.</param>
+    /// <param name="modelName">The embedding model name that scopes the entry's key.</param>
+    /// <param name="embedding">The embedding vector to cache.</param>
+    /// <param name="metadata">Metadata to serialize and store alongside the embedding, or <see langword="null" /> for none.</param>
+    /// <param name="timeToLive">The entry expiry, overriding the cache default; <see langword="null" /> uses the default.</param>
+    /// <param name="cancellationToken">A token used to cancel the operation.</param>
+    /// <returns><see langword="true" /> once the entry has been stored.</returns>
     public async Task<bool> StoreAsync(
         string input,
         string modelName,
@@ -95,9 +146,20 @@ public sealed class EmbeddingsCache
         return true;
     }
 
+    /// <summary>Stores an embedding for <paramref name="input" /> and returns the resulting cache entry.</summary>
+    /// <param name="input">The source text the embedding was generated from.</param>
+    /// <param name="embedding">The embedding vector to cache.</param>
+    /// <param name="cancellationToken">A token used to cancel the operation.</param>
+    /// <returns>The stored <see cref="EmbeddingsCacheEntry" />, including its Redis key.</returns>
     public Task<EmbeddingsCacheEntry> SetAsync(string input, float[] embedding, CancellationToken cancellationToken = default) =>
         SetAsyncCore(input, embedding, modelName: null, metadata: null, timeToLive: null, cancellationToken);
 
+    /// <summary>Stores an embedding for <paramref name="input" /> with metadata and returns the resulting cache entry.</summary>
+    /// <param name="input">The source text the embedding was generated from.</param>
+    /// <param name="embedding">The embedding vector to cache.</param>
+    /// <param name="metadata">Metadata to serialize and store alongside the embedding, or <see langword="null" /> for none.</param>
+    /// <param name="cancellationToken">A token used to cancel the operation.</param>
+    /// <returns>The stored <see cref="EmbeddingsCacheEntry" />, including its Redis key.</returns>
     public Task<EmbeddingsCacheEntry> SetAsync(
         string input,
         float[] embedding,
@@ -105,6 +167,13 @@ public sealed class EmbeddingsCache
         CancellationToken cancellationToken = default) =>
         SetAsyncCore(input, embedding, modelName: null, metadata, timeToLive: null, cancellationToken);
 
+    /// <summary>Stores an embedding for <paramref name="input" /> with metadata and an explicit expiry, and returns the resulting cache entry.</summary>
+    /// <param name="input">The source text the embedding was generated from.</param>
+    /// <param name="embedding">The embedding vector to cache.</param>
+    /// <param name="metadata">Metadata to serialize and store alongside the embedding, or <see langword="null" /> for none.</param>
+    /// <param name="timeToLive">The entry expiry, overriding the cache default; <see langword="null" /> uses the default.</param>
+    /// <param name="cancellationToken">A token used to cancel the operation.</param>
+    /// <returns>The stored <see cref="EmbeddingsCacheEntry" />, including its Redis key.</returns>
     public Task<EmbeddingsCacheEntry> SetAsync(
         string input,
         float[] embedding,
@@ -113,6 +182,12 @@ public sealed class EmbeddingsCache
         CancellationToken cancellationToken = default) =>
         SetAsyncCore(input, embedding, modelName: null, metadata, timeToLive, cancellationToken);
 
+    /// <summary>Stores an embedding for <paramref name="input" /> scoped to <paramref name="modelName" /> and returns the resulting cache entry.</summary>
+    /// <param name="input">The source text the embedding was generated from.</param>
+    /// <param name="modelName">The embedding model name that scopes the entry's key.</param>
+    /// <param name="embedding">The embedding vector to cache.</param>
+    /// <param name="cancellationToken">A token used to cancel the operation.</param>
+    /// <returns>The stored <see cref="EmbeddingsCacheEntry" />, including its Redis key.</returns>
     public Task<EmbeddingsCacheEntry> SetAsync(
         string input,
         string modelName,
@@ -120,6 +195,13 @@ public sealed class EmbeddingsCache
         CancellationToken cancellationToken = default) =>
         SetAsyncCore(input, embedding, NormalizeModelName(modelName), metadata: null, timeToLive: null, cancellationToken);
 
+    /// <summary>Stores an embedding for <paramref name="input" /> scoped to <paramref name="modelName" /> with metadata, and returns the resulting cache entry.</summary>
+    /// <param name="input">The source text the embedding was generated from.</param>
+    /// <param name="modelName">The embedding model name that scopes the entry's key.</param>
+    /// <param name="embedding">The embedding vector to cache.</param>
+    /// <param name="metadata">Metadata to serialize and store alongside the embedding, or <see langword="null" /> for none.</param>
+    /// <param name="cancellationToken">A token used to cancel the operation.</param>
+    /// <returns>The stored <see cref="EmbeddingsCacheEntry" />, including its Redis key.</returns>
     public Task<EmbeddingsCacheEntry> SetAsync(
         string input,
         string modelName,
@@ -128,6 +210,14 @@ public sealed class EmbeddingsCache
         CancellationToken cancellationToken = default) =>
         SetAsyncCore(input, embedding, NormalizeModelName(modelName), metadata, timeToLive: null, cancellationToken);
 
+    /// <summary>Stores an embedding for <paramref name="input" /> scoped to <paramref name="modelName" /> with metadata and an explicit expiry, and returns the resulting cache entry.</summary>
+    /// <param name="input">The source text the embedding was generated from.</param>
+    /// <param name="modelName">The embedding model name that scopes the entry's key.</param>
+    /// <param name="embedding">The embedding vector to cache.</param>
+    /// <param name="metadata">Metadata to serialize and store alongside the embedding, or <see langword="null" /> for none.</param>
+    /// <param name="timeToLive">The entry expiry, overriding the cache default; <see langword="null" /> uses the default.</param>
+    /// <param name="cancellationToken">A token used to cancel the operation.</param>
+    /// <returns>The stored <see cref="EmbeddingsCacheEntry" />, including its Redis key.</returns>
     public Task<EmbeddingsCacheEntry> SetAsync(
         string input,
         string modelName,
@@ -137,6 +227,10 @@ public sealed class EmbeddingsCache
         CancellationToken cancellationToken = default) =>
         SetAsyncCore(input, embedding, NormalizeModelName(modelName), metadata, timeToLive, cancellationToken);
 
+    /// <summary>Stores multiple embedding entries in a pipelined batch.</summary>
+    /// <param name="entries">The entries to store.</param>
+    /// <param name="cancellationToken">A token used to cancel the operation.</param>
+    /// <returns><see langword="true" /> once the batch has been stored.</returns>
     public async Task<bool> StoreManyAsync(
         IReadOnlyList<EmbeddingsCacheWriteRequest> entries,
         CancellationToken cancellationToken = default)
@@ -174,15 +268,28 @@ public sealed class EmbeddingsCache
             cancellationToken).ConfigureAwait(false);
     }
 
+    /// <summary>Retrieves the cached entry for <paramref name="input" />, or <see langword="null" /> if none exists.</summary>
+    /// <param name="input">The source text to look up.</param>
+    /// <param name="cancellationToken">A token used to cancel the operation.</param>
+    /// <returns>The matching <see cref="EmbeddingsCacheEntry" />, or <see langword="null" /> on a miss.</returns>
     public Task<EmbeddingsCacheEntry?> GetAsync(string input, CancellationToken cancellationToken = default) =>
         LookupAsyncCore(input, modelName: null, cancellationToken);
 
+    /// <summary>Retrieves the cached entry for <paramref name="input" /> scoped to <paramref name="modelName" />, or <see langword="null" /> if none exists.</summary>
+    /// <param name="input">The source text to look up.</param>
+    /// <param name="modelName">The embedding model name that scopes the lookup.</param>
+    /// <param name="cancellationToken">A token used to cancel the operation.</param>
+    /// <returns>The matching <see cref="EmbeddingsCacheEntry" />, or <see langword="null" /> on a miss.</returns>
     public Task<EmbeddingsCacheEntry?> GetAsync(
         string input,
         string modelName,
         CancellationToken cancellationToken = default) =>
         LookupAsyncCore(input, NormalizeModelName(modelName), cancellationToken);
 
+    /// <summary>Retrieves cached entries for multiple lookups in a pipelined batch.</summary>
+    /// <param name="lookups">The lookups to resolve.</param>
+    /// <param name="cancellationToken">A token used to cancel the operation.</param>
+    /// <returns>A list aligned to <paramref name="lookups" />; each element is the matching entry or <see langword="null" /> on a miss.</returns>
     public async Task<IReadOnlyList<EmbeddingsCacheEntry?>> GetManyAsync(
         IReadOnlyList<EmbeddingsCacheLookup> lookups,
         CancellationToken cancellationToken = default)
@@ -202,9 +309,17 @@ public sealed class EmbeddingsCache
             cancellationToken).ConfigureAwait(false);
     }
 
+    /// <summary>Retrieves the cached entry stored under the given Redis <paramref name="key" />, or <see langword="null" /> if none exists.</summary>
+    /// <param name="key">The Redis key to read.</param>
+    /// <param name="cancellationToken">A token used to cancel the operation.</param>
+    /// <returns>The entry stored at <paramref name="key" />, or <see langword="null" /> when absent.</returns>
     public Task<EmbeddingsCacheEntry?> GetByKeyAsync(string key, CancellationToken cancellationToken = default) =>
         GetByKeyAsyncCore(NormalizeKey(key), cancellationToken);
 
+    /// <summary>Retrieves entries for multiple Redis keys in a pipelined batch.</summary>
+    /// <param name="keys">The Redis keys to read.</param>
+    /// <param name="cancellationToken">A token used to cancel the operation.</param>
+    /// <returns>A list aligned to <paramref name="keys" />; each element is the entry at that key or <see langword="null" /> when absent.</returns>
     public async Task<IReadOnlyList<EmbeddingsCacheEntry?>> GetManyByKeyAsync(
         IReadOnlyList<string> keys,
         CancellationToken cancellationToken = default)
@@ -222,25 +337,47 @@ public sealed class EmbeddingsCache
             cancellationToken).ConfigureAwait(false);
     }
 
+    /// <summary>Alias for <see cref="GetAsync(string, CancellationToken)" />; retrieves the cached entry for <paramref name="input" />.</summary>
+    /// <param name="input">The source text to look up.</param>
+    /// <param name="cancellationToken">A token used to cancel the operation.</param>
+    /// <returns>The matching <see cref="EmbeddingsCacheEntry" />, or <see langword="null" /> on a miss.</returns>
     public Task<EmbeddingsCacheEntry?> LookupAsync(string input, CancellationToken cancellationToken = default) =>
         GetAsync(input, cancellationToken);
 
+    /// <summary>Alias for <see cref="GetAsync(string, string, CancellationToken)" />; retrieves the model-scoped cached entry for <paramref name="input" />.</summary>
+    /// <param name="input">The source text to look up.</param>
+    /// <param name="modelName">The embedding model name that scopes the lookup.</param>
+    /// <param name="cancellationToken">A token used to cancel the operation.</param>
+    /// <returns>The matching <see cref="EmbeddingsCacheEntry" />, or <see langword="null" /> on a miss.</returns>
     public Task<EmbeddingsCacheEntry?> LookupAsync(
         string input,
         string modelName,
         CancellationToken cancellationToken = default) =>
         GetAsync(input, modelName, cancellationToken);
 
+    /// <summary>Alias for <see cref="GetManyAsync" />; retrieves cached entries for multiple lookups in a batch.</summary>
+    /// <param name="lookups">The lookups to resolve.</param>
+    /// <param name="cancellationToken">A token used to cancel the operation.</param>
+    /// <returns>A list aligned to <paramref name="lookups" />; each element is the matching entry or <see langword="null" /> on a miss.</returns>
     public Task<IReadOnlyList<EmbeddingsCacheEntry?>> LookupManyAsync(
         IReadOnlyList<EmbeddingsCacheLookup> lookups,
         CancellationToken cancellationToken = default) =>
         GetManyAsync(lookups, cancellationToken);
 
+    /// <summary>Retrieves only the cached embedding vector for <paramref name="input" />.</summary>
+    /// <param name="input">The source text to look up.</param>
+    /// <param name="cancellationToken">A token used to cancel the operation.</param>
+    /// <returns>The cached embedding, or <see langword="null" /> on a miss.</returns>
     public async Task<float[]?> LookupEmbeddingAsync(string input, CancellationToken cancellationToken = default)
     {
         return (await LookupAsync(input, cancellationToken).ConfigureAwait(false))?.Embedding;
     }
 
+    /// <summary>Retrieves only the cached embedding vector for <paramref name="input" /> scoped to <paramref name="modelName" />.</summary>
+    /// <param name="input">The source text to look up.</param>
+    /// <param name="modelName">The embedding model name that scopes the lookup.</param>
+    /// <param name="cancellationToken">A token used to cancel the operation.</param>
+    /// <returns>The cached embedding, or <see langword="null" /> on a miss.</returns>
     public async Task<float[]?> LookupEmbeddingAsync(
         string input,
         string modelName,
@@ -249,15 +386,28 @@ public sealed class EmbeddingsCache
         return (await LookupAsync(input, modelName, cancellationToken).ConfigureAwait(false))?.Embedding;
     }
 
+    /// <summary>Determines whether a cached entry exists for <paramref name="input" />.</summary>
+    /// <param name="input">The source text to check.</param>
+    /// <param name="cancellationToken">A token used to cancel the operation.</param>
+    /// <returns><see langword="true" /> if an entry exists; otherwise <see langword="false" />.</returns>
     public Task<bool> ExistsAsync(string input, CancellationToken cancellationToken = default) =>
         ExistsAsyncCore(CreateKey(NormalizeInput(input)), cancellationToken);
 
+    /// <summary>Determines whether a cached entry exists for <paramref name="input" /> scoped to <paramref name="modelName" />.</summary>
+    /// <param name="input">The source text to check.</param>
+    /// <param name="modelName">The embedding model name that scopes the check.</param>
+    /// <param name="cancellationToken">A token used to cancel the operation.</param>
+    /// <returns><see langword="true" /> if an entry exists; otherwise <see langword="false" />.</returns>
     public Task<bool> ExistsAsync(
         string input,
         string modelName,
         CancellationToken cancellationToken = default) =>
         ExistsAsyncCore(CreateKey(NormalizeInput(input), NormalizeModelName(modelName)), cancellationToken);
 
+    /// <summary>Checks existence for multiple lookups in a pipelined batch.</summary>
+    /// <param name="lookups">The lookups to check.</param>
+    /// <param name="cancellationToken">A token used to cancel the operation.</param>
+    /// <returns>A list aligned to <paramref name="lookups" />; each element indicates whether an entry exists.</returns>
     public async Task<IReadOnlyList<bool>> ExistsManyAsync(
         IReadOnlyList<EmbeddingsCacheLookup> lookups,
         CancellationToken cancellationToken = default)
@@ -277,9 +427,17 @@ public sealed class EmbeddingsCache
             cancellationToken).ConfigureAwait(false);
     }
 
+    /// <summary>Determines whether a cached entry exists at the given Redis <paramref name="key" />.</summary>
+    /// <param name="key">The Redis key to check.</param>
+    /// <param name="cancellationToken">A token used to cancel the operation.</param>
+    /// <returns><see langword="true" /> if the key exists; otherwise <see langword="false" />.</returns>
     public Task<bool> ExistsByKeyAsync(string key, CancellationToken cancellationToken = default) =>
         ExistsAsyncCore(NormalizeKey(key), cancellationToken);
 
+    /// <summary>Checks existence for multiple Redis keys in a pipelined batch.</summary>
+    /// <param name="keys">The Redis keys to check.</param>
+    /// <param name="cancellationToken">A token used to cancel the operation.</param>
+    /// <returns>A list aligned to <paramref name="keys" />; each element indicates whether that key exists.</returns>
     public async Task<IReadOnlyList<bool>> ExistsManyByKeyAsync(
         IReadOnlyList<string> keys,
         CancellationToken cancellationToken = default)
@@ -297,15 +455,28 @@ public sealed class EmbeddingsCache
             cancellationToken).ConfigureAwait(false);
     }
 
+    /// <summary>Deletes the cached entry for <paramref name="input" />.</summary>
+    /// <param name="input">The source text whose entry should be deleted.</param>
+    /// <param name="cancellationToken">A token used to cancel the operation.</param>
+    /// <returns><see langword="true" /> if an entry was deleted; <see langword="false" /> if none existed.</returns>
     public Task<bool> DeleteAsync(string input, CancellationToken cancellationToken = default) =>
         DeleteAsyncCore(CreateKey(NormalizeInput(input)), cancellationToken);
 
+    /// <summary>Deletes the cached entry for <paramref name="input" /> scoped to <paramref name="modelName" />.</summary>
+    /// <param name="input">The source text whose entry should be deleted.</param>
+    /// <param name="modelName">The embedding model name that scopes the entry.</param>
+    /// <param name="cancellationToken">A token used to cancel the operation.</param>
+    /// <returns><see langword="true" /> if an entry was deleted; <see langword="false" /> if none existed.</returns>
     public Task<bool> DeleteAsync(
         string input,
         string modelName,
         CancellationToken cancellationToken = default) =>
         DeleteAsyncCore(CreateKey(NormalizeInput(input), NormalizeModelName(modelName)), cancellationToken);
 
+    /// <summary>Deletes the cached entries for multiple lookups in a pipelined batch.</summary>
+    /// <param name="lookups">The lookups whose entries should be deleted.</param>
+    /// <param name="cancellationToken">A token used to cancel the operation.</param>
+    /// <returns>The number of entries that were actually deleted.</returns>
     public async Task<long> DeleteManyAsync(
         IReadOnlyList<EmbeddingsCacheLookup> lookups,
         CancellationToken cancellationToken = default)
@@ -327,9 +498,17 @@ public sealed class EmbeddingsCache
         return deletions.Count(static deleted => deleted);
     }
 
+    /// <summary>Deletes the cached entry stored at the given Redis <paramref name="key" />.</summary>
+    /// <param name="key">The Redis key to delete.</param>
+    /// <param name="cancellationToken">A token used to cancel the operation.</param>
+    /// <returns><see langword="true" /> if the key was deleted; <see langword="false" /> if it did not exist.</returns>
     public Task<bool> DeleteByKeyAsync(string key, CancellationToken cancellationToken = default) =>
         DeleteAsyncCore(NormalizeKey(key), cancellationToken);
 
+    /// <summary>Deletes multiple cached entries by Redis key in a pipelined batch.</summary>
+    /// <param name="keys">The Redis keys to delete.</param>
+    /// <param name="cancellationToken">A token used to cancel the operation.</param>
+    /// <returns>The number of keys that were actually deleted.</returns>
     public async Task<long> DeleteManyByKeyAsync(
         IReadOnlyList<string> keys,
         CancellationToken cancellationToken = default)

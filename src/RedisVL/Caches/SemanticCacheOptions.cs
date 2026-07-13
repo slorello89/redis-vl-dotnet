@@ -3,8 +3,24 @@ using RedisVL.Schema;
 
 namespace RedisVL.Caches;
 
+/// <summary>Configuration for a <see cref="SemanticCache" />, including its schema, matching threshold, and field names.</summary>
 public sealed class SemanticCacheOptions
 {
+    /// <summary>Initializes a new <see cref="SemanticCacheOptions" />.</summary>
+    /// <param name="name">The cache name, used as part of the index name and key prefix.</param>
+    /// <param name="embeddingFieldAttributes">The vector field attributes (dimensions, distance metric, etc.) for the embedding field; must use <see cref="VectorDataType.Float32" />.</param>
+    /// <param name="distanceThreshold">The maximum vector distance for a cached entry to be considered a match; must be greater than zero.</param>
+    /// <param name="keyNamespace">An optional namespace inserted into the index name and key prefix to partition entries.</param>
+    /// <param name="timeToLive">An optional default expiry applied to stored entries; must be positive when provided.</param>
+    /// <param name="promptFieldName">The hash field name used to store the prompt text.</param>
+    /// <param name="responseFieldName">The hash field name used to store the response text.</param>
+    /// <param name="metadataFieldName">The hash field name used to store serialized metadata.</param>
+    /// <param name="embeddingFieldName">The hash field name used to store the embedding vector.</param>
+    /// <param name="filterableFields">Optional additional indexed fields that can be used to filter cache lookups.</param>
+    /// <param name="trackStatistics">Whether the cache should track hit/miss statistics.</param>
+    /// <exception cref="ArgumentException">A required name argument is blank, or <paramref name="embeddingFieldAttributes" /> is not <see cref="VectorDataType.Float32" />.</exception>
+    /// <exception cref="ArgumentNullException"><paramref name="embeddingFieldAttributes" /> is <see langword="null" />.</exception>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="distanceThreshold" /> is not positive, or <paramref name="timeToLive" /> is zero or negative.</exception>
     public SemanticCacheOptions(
         string name,
         VectorFieldAttributes embeddingFieldAttributes,
@@ -53,24 +69,34 @@ public sealed class SemanticCacheOptions
         TrackStatistics = trackStatistics;
     }
 
+    /// <summary>Gets the cache name used as part of the index name and key prefix.</summary>
     public string Name { get; }
 
+    /// <summary>Gets the vector field attributes for the embedding field.</summary>
     public VectorFieldAttributes EmbeddingFieldAttributes { get; }
 
+    /// <summary>Gets the maximum vector distance for a cached entry to be considered a match.</summary>
     public double DistanceThreshold { get; }
 
+    /// <summary>Gets the optional namespace inserted into the index name and key prefix, or <see langword="null" /> when unset.</summary>
     public string? KeyNamespace { get; }
 
+    /// <summary>Gets the optional default expiry applied to stored entries, or <see langword="null" /> for no expiry.</summary>
     public TimeSpan? TimeToLive { get; }
 
+    /// <summary>Gets the hash field name used to store the prompt text.</summary>
     public string PromptFieldName { get; }
 
+    /// <summary>Gets the hash field name used to store the response text.</summary>
     public string ResponseFieldName { get; }
 
+    /// <summary>Gets the hash field name used to store serialized metadata.</summary>
     public string MetadataFieldName { get; }
 
+    /// <summary>Gets the hash field name used to store the embedding vector.</summary>
     public string EmbeddingFieldName { get; }
 
+    /// <summary>Gets the additional indexed fields that can be used to filter cache lookups.</summary>
     public IReadOnlyList<FieldDefinition> FilterableFields { get; }
 
     /// <summary>

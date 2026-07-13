@@ -3,8 +3,27 @@ using RedisVL.Filters;
 
 namespace RedisVL.Queries;
 
+/// <summary>
+/// A vector range query that returns every document whose distance to the query vector falls within a
+/// given threshold, rather than a fixed number of nearest neighbors.
+/// </summary>
 public sealed class VectorRangeQuery
 {
+    /// <summary>
+    /// Initializes a new <see cref="VectorRangeQuery"/>.
+    /// </summary>
+    /// <param name="fieldName">The name of the vector field to search.</param>
+    /// <param name="vector">The raw query vector bytes; must be non-empty.</param>
+    /// <param name="distanceThreshold">The maximum vector distance a document may have to be returned; must be greater than zero.</param>
+    /// <param name="filter">An optional pre-filter that narrows the candidate set.</param>
+    /// <param name="returnFields">The fields to return for each match; when <see langword="null"/> all fields are returned.</param>
+    /// <param name="scoreAlias">The alias under which the vector distance is projected.</param>
+    /// <param name="offset">The number of leading results to skip.</param>
+    /// <param name="limit">The maximum number of results to return.</param>
+    /// <param name="runtimeOptions">Optional query-time index tuning parameters.</param>
+    /// <param name="pagination">Optional pagination window; overrides <paramref name="offset"/> and <paramref name="limit"/> when supplied.</param>
+    /// <exception cref="ArgumentException"><paramref name="vector"/> is empty.</exception>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="distanceThreshold"/> is not greater than zero.</exception>
     public VectorRangeQuery(
         string fieldName,
         byte[] vector,
@@ -43,26 +62,48 @@ public sealed class VectorRangeQuery
         RuntimeOptions = runtimeOptions;
     }
 
+    /// <summary>The name of the vector field being searched.</summary>
     public string FieldName { get; }
 
+    /// <summary>The raw query vector bytes.</summary>
     public byte[] Vector { get; }
 
+    /// <summary>The maximum vector distance a document may have to be included in the results.</summary>
     public double DistanceThreshold { get; }
 
+    /// <summary>An optional pre-filter applied to the candidate set, or <see langword="null"/> for none.</summary>
     public FilterExpression? Filter { get; }
 
+    /// <summary>The alias under which the vector distance is projected.</summary>
     public string ScoreAlias { get; }
 
+    /// <summary>The number of leading results to skip.</summary>
     public int Offset { get; }
 
+    /// <summary>The maximum number of results to return.</summary>
     public int Limit { get; }
 
+    /// <summary>The pagination window applied to the results.</summary>
     public QueryPagination Pagination { get; }
 
+    /// <summary>The fields returned for each matching document.</summary>
     public IReadOnlyList<string> ReturnFields { get; }
 
+    /// <summary>Optional query-time index tuning parameters, or <see langword="null"/> to use index defaults.</summary>
     public VectorRangeRuntimeOptions? RuntimeOptions { get; }
 
+    /// <summary>Creates a vector range query from a single-precision (<c>FLOAT32</c>) vector.</summary>
+    /// <param name="fieldName">The name of the vector field to search.</param>
+    /// <param name="vector">The query vector as 32-bit floats.</param>
+    /// <param name="distanceThreshold">The maximum vector distance a document may have to be returned.</param>
+    /// <param name="filter">An optional pre-filter that narrows the candidate set.</param>
+    /// <param name="returnFields">The fields to return for each match.</param>
+    /// <param name="scoreAlias">The alias under which the vector distance is projected.</param>
+    /// <param name="offset">The number of leading results to skip.</param>
+    /// <param name="limit">The maximum number of results to return.</param>
+    /// <param name="runtimeOptions">Optional query-time index tuning parameters.</param>
+    /// <param name="pagination">Optional pagination window.</param>
+    /// <returns>A new <see cref="VectorRangeQuery"/>.</returns>
     public static VectorRangeQuery FromFloat32(
         string fieldName,
         float[] vector,
@@ -76,6 +117,18 @@ public sealed class VectorRangeQuery
         QueryPagination? pagination = null) =>
         new(fieldName, MemoryMarshal.AsBytes<float>(vector.AsSpan()).ToArray(), distanceThreshold, filter, returnFields, scoreAlias, offset, limit, runtimeOptions, pagination);
 
+    /// <summary>Creates a vector range query from a double-precision (<c>FLOAT64</c>) vector.</summary>
+    /// <param name="fieldName">The name of the vector field to search.</param>
+    /// <param name="vector">The query vector as 64-bit floats.</param>
+    /// <param name="distanceThreshold">The maximum vector distance a document may have to be returned.</param>
+    /// <param name="filter">An optional pre-filter that narrows the candidate set.</param>
+    /// <param name="returnFields">The fields to return for each match.</param>
+    /// <param name="scoreAlias">The alias under which the vector distance is projected.</param>
+    /// <param name="offset">The number of leading results to skip.</param>
+    /// <param name="limit">The maximum number of results to return.</param>
+    /// <param name="runtimeOptions">Optional query-time index tuning parameters.</param>
+    /// <param name="pagination">Optional pagination window.</param>
+    /// <returns>A new <see cref="VectorRangeQuery"/>.</returns>
     public static VectorRangeQuery FromFloat64(
         string fieldName,
         double[] vector,

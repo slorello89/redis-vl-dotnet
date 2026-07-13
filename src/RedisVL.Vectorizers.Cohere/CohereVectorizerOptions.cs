@@ -1,5 +1,9 @@
 namespace RedisVL.Vectorizers.Cohere;
 
+/// <summary>
+/// Configuration options for <see cref="CohereTextVectorizer"/>, controlling how text is
+/// submitted to the Cohere embed API.
+/// </summary>
 public sealed class CohereVectorizerOptions
 {
     private int? _outputDimension;
