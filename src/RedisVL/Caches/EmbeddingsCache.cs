@@ -6,7 +6,7 @@ using StackExchange.Redis;
 
 namespace RedisVL.Caches;
 
-public sealed class EmbeddingsCache
+public sealed class EmbeddingsCache : IEmbeddingsCache
 {
     private const string InputFieldName = "input";
     private const string ModelNameFieldName = "model_name";

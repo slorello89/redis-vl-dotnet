@@ -9,7 +9,7 @@ using System.Text.Json;
 
 namespace RedisVL.Indexes;
 
-public sealed class SearchIndex
+public sealed class SearchIndex : ISearchIndex
 {
     private readonly IDatabase _database;
     private readonly JsonSerializerOptions _serializerOptions;

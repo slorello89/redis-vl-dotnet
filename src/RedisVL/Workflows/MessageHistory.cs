@@ -9,13 +9,21 @@ using StackExchange.Redis;
 
 namespace RedisVL.Workflows;
 
-public sealed class MessageHistory
+public sealed class MessageHistory : IMessageHistory
 {
     private readonly IDatabase _database;
     private readonly JsonSerializerOptions _serializerOptions;
-    private readonly SearchIndex _index;
+    private readonly ISearchIndex _index;
 
     public MessageHistory(IDatabase database, MessageHistoryOptions options)
+        : this(database, options, index: null)
+    {
+    }
+
+    // Lets tests supply a substitute ISearchIndex instead of the one this history would otherwise build
+    // from its options. Not public: an externally supplied index could carry a schema that does not
+    // match the history's field expectations.
+    internal MessageHistory(IDatabase database, MessageHistoryOptions options, ISearchIndex? index)
     {
         ArgumentNullException.ThrowIfNull(database);
         ArgumentNullException.ThrowIfNull(options);
@@ -23,7 +31,7 @@ public sealed class MessageHistory
         _database = database;
         _serializerOptions = new JsonSerializerOptions(JsonSerializerDefaults.Web);
         Options = options;
-        _index = new SearchIndex(
+        _index = index ?? new SearchIndex(
             database,
             new SearchSchema(
                 new IndexDefinition(CreateIndexName(options), CreateMessageKeyPrefix(options), StorageType.Hash),

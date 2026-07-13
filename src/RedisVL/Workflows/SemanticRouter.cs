@@ -13,17 +13,25 @@ using StackExchange.Redis;
 
 namespace RedisVL.Workflows;
 
-public sealed class SemanticRouter
+public sealed class SemanticRouter : ISemanticRouter
 {
     private const string RouteThresholdFieldName = "routeThreshold";
     private const string MetadataFieldName = "metadata";
     private const string DistanceAlias = "distance";
 
     private readonly IDatabase _database;
-    private readonly SearchIndex _index;
+    private readonly ISearchIndex _index;
     private readonly JsonSerializerOptions _serializerOptions;
 
     public SemanticRouter(IDatabase database, SemanticRouterOptions options)
+        : this(database, options, index: null)
+    {
+    }
+
+    // Lets tests supply a substitute ISearchIndex instead of the one this router would otherwise build
+    // from its options. Not public: an externally supplied index could carry a schema that does not
+    // match the router's field expectations.
+    internal SemanticRouter(IDatabase database, SemanticRouterOptions options, ISearchIndex? index)
     {
         ArgumentNullException.ThrowIfNull(database);
         ArgumentNullException.ThrowIfNull(options);
@@ -31,7 +39,7 @@ public sealed class SemanticRouter
         _database = database;
         _serializerOptions = new JsonSerializerOptions(JsonSerializerDefaults.Web);
         Options = options;
-        _index = new SearchIndex(
+        _index = index ?? new SearchIndex(
             database,
             new SearchSchema(
                 new IndexDefinition(CreateIndexName(options), CreateKeyPrefix(options), StorageType.Hash),

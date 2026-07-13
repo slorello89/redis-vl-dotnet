@@ -12,15 +12,23 @@ using StackExchange.Redis;
 
 namespace RedisVL.Caches;
 
-public sealed class SemanticCache
+public sealed class SemanticCache : ISemanticCache
 {
     private readonly IDatabase _database;
-    private readonly SearchIndex _index;
+    private readonly ISearchIndex _index;
     private readonly JsonSerializerOptions _serializerOptions;
     private long _hitCount;
     private long _missCount;
 
     public SemanticCache(IDatabase database, SemanticCacheOptions options)
+        : this(database, options, index: null)
+    {
+    }
+
+    // Lets tests supply a substitute ISearchIndex instead of the one this cache would otherwise build
+    // from its options. Not public: an externally supplied index could carry a schema that does not
+    // match the cache's field expectations.
+    internal SemanticCache(IDatabase database, SemanticCacheOptions options, ISearchIndex? index)
     {
         ArgumentNullException.ThrowIfNull(database);
         ArgumentNullException.ThrowIfNull(options);
@@ -28,7 +36,7 @@ public sealed class SemanticCache
         _database = database;
         _serializerOptions = new JsonSerializerOptions(JsonSerializerDefaults.Web);
         Options = options;
-        _index = new SearchIndex(database, CreateSchema(options));
+        _index = index ?? new SearchIndex(database, CreateSchema(options));
     }
 
     public SemanticCacheOptions Options { get; }
