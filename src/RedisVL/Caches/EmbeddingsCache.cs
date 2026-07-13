@@ -10,7 +10,7 @@ namespace RedisVL.Caches;
 /// An exact-match cache that maps input text (optionally scoped by model name) to a stored embedding vector,
 /// backed by a Redis hash per entry. Use it to avoid recomputing embeddings for text that has been seen before.
 /// </summary>
-public sealed class EmbeddingsCache
+public sealed class EmbeddingsCache : IEmbeddingsCache
 {
     private const string InputFieldName = "input";
     private const string ModelNameFieldName = "model_name";

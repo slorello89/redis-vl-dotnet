@@ -18,7 +18,7 @@ namespace RedisVL.Workflows;
 /// more reference phrases whose embeddings are indexed with RediSearch; an input is routed by finding the
 /// nearest references within the configured distance threshold.
 /// </summary>
-public sealed class SemanticRouter
+public sealed class SemanticRouter : ISemanticRouter
 {
     private const string RouteThresholdFieldName = "routeThreshold";
     private const string MetadataFieldName = "metadata";
@@ -31,7 +31,7 @@ public sealed class SemanticRouter
     private const string ConfigKeyInfix = "__config__";
 
     private readonly IDatabase _database;
-    private readonly SearchIndex _index;
+    private readonly ISearchIndex _index;
     private readonly JsonSerializerOptions _serializerOptions;
 
     /// <summary>Initializes a new <see cref="SemanticRouter" /> over the given database using the supplied options.</summary>
@@ -39,6 +39,14 @@ public sealed class SemanticRouter
     /// <param name="options">The router configuration, including field names, thresholds, and the embedding attributes.</param>
     /// <exception cref="ArgumentNullException"><paramref name="database" /> or <paramref name="options" /> is <see langword="null" />.</exception>
     public SemanticRouter(IDatabase database, SemanticRouterOptions options)
+        : this(database, options, index: null)
+    {
+    }
+
+    // Lets tests supply a substitute ISearchIndex instead of the one this router would otherwise build
+    // from its options. Not public: an externally supplied index could carry a schema that does not
+    // match the router's field expectations.
+    internal SemanticRouter(IDatabase database, SemanticRouterOptions options, ISearchIndex? index)
     {
         ArgumentNullException.ThrowIfNull(database);
         ArgumentNullException.ThrowIfNull(options);
@@ -46,7 +54,7 @@ public sealed class SemanticRouter
         _database = database;
         _serializerOptions = new JsonSerializerOptions(JsonSerializerDefaults.Web);
         Options = options;
-        _index = new SearchIndex(
+        _index = index ?? new SearchIndex(
             database,
             new SearchSchema(
                 new IndexDefinition(CreateIndexName(options), CreateKeyPrefix(options), StorageType.Hash),

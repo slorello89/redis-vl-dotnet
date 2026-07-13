@@ -13,7 +13,7 @@ namespace RedisVL.Indexes;
 /// Represents a Redis search index and provides the operations to manage it and to load, fetch,
 /// update, delete, search, and aggregate the documents it indexes.
 /// </summary>
-public sealed class SearchIndex
+public sealed class SearchIndex : ISearchIndex
 {
     private readonly IDatabase _database;
     private readonly JsonSerializerOptions _serializerOptions;

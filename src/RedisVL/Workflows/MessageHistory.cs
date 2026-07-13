@@ -13,17 +13,25 @@ namespace RedisVL.Workflows;
 /// Stores chat message history in Redis and retrieves it in recency order. Messages are kept as hashes and
 /// indexed with RediSearch by session, role, timestamp, and a monotonic per-session sequence number.
 /// </summary>
-public sealed class MessageHistory
+public sealed class MessageHistory : IMessageHistory
 {
     private readonly IDatabase _database;
     private readonly JsonSerializerOptions _serializerOptions;
-    private readonly SearchIndex _index;
+    private readonly ISearchIndex _index;
 
     /// <summary>Initializes a new <see cref="MessageHistory" /> over the given database using the supplied options.</summary>
     /// <param name="database">The Redis database used to store and search messages.</param>
     /// <param name="options">The history configuration, including field names and naming.</param>
     /// <exception cref="ArgumentNullException"><paramref name="database" /> or <paramref name="options" /> is <see langword="null" />.</exception>
     public MessageHistory(IDatabase database, MessageHistoryOptions options)
+        : this(database, options, index: null)
+    {
+    }
+
+    // Lets tests supply a substitute ISearchIndex instead of the one this history would otherwise build
+    // from its options. Not public: an externally supplied index could carry a schema that does not
+    // match the history's field expectations.
+    internal MessageHistory(IDatabase database, MessageHistoryOptions options, ISearchIndex? index)
     {
         ArgumentNullException.ThrowIfNull(database);
         ArgumentNullException.ThrowIfNull(options);
@@ -31,7 +39,7 @@ public sealed class MessageHistory
         _database = database;
         _serializerOptions = new JsonSerializerOptions(JsonSerializerDefaults.Web);
         Options = options;
-        _index = new SearchIndex(
+        _index = index ?? new SearchIndex(
             database,
             new SearchSchema(
                 new IndexDefinition(CreateIndexName(options), CreateMessageKeyPrefix(options), StorageType.Hash),
