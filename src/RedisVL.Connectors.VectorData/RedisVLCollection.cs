@@ -33,6 +33,15 @@ public sealed class RedisVLCollection<TKey, TRecord> : VectorStoreCollection<TKe
     private readonly string _keyPrefix;
     private readonly JsonSerializerOptions _serializerOptions;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="RedisVLCollection{TKey, TRecord}"/> class.
+    /// </summary>
+    /// <param name="database">The StackExchange.Redis database backing the collection.</param>
+    /// <param name="name">The collection name, also used as the default key prefix and index name.</param>
+    /// <param name="options">Optional collection options such as key prefix, index name, and record definition.</param>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="database"/> is <c>null</c>.</exception>
+    /// <exception cref="ArgumentException">Thrown when <paramref name="name"/> is null or whitespace.</exception>
+    /// <exception cref="NotSupportedException">Thrown when <typeparamref name="TKey"/> is not <see cref="string"/>.</exception>
     public RedisVLCollection(IDatabase database, string name, RedisVLCollectionOptions? options = null)
     {
         ArgumentNullException.ThrowIfNull(database);
@@ -55,14 +64,18 @@ public sealed class RedisVLCollection<TKey, TRecord> : VectorStoreCollection<TKe
         _serializerOptions = new JsonSerializerOptions(JsonSerializerDefaults.Web);
     }
 
+    /// <inheritdoc/>
     public override string Name { get; }
 
+    /// <inheritdoc/>
     public override Task<bool> CollectionExistsAsync(CancellationToken cancellationToken = default) =>
         _index.ExistsAsync(cancellationToken);
 
+    /// <inheritdoc/>
     public override Task EnsureCollectionExistsAsync(CancellationToken cancellationToken = default) =>
         _index.CreateAsync(new CreateIndexOptions(skipIfExists: true), cancellationToken);
 
+    /// <inheritdoc/>
     public override async Task EnsureCollectionDeletedAsync(CancellationToken cancellationToken = default)
     {
         if (await _index.ExistsAsync(cancellationToken).ConfigureAwait(false))
@@ -71,6 +84,7 @@ public sealed class RedisVLCollection<TKey, TRecord> : VectorStoreCollection<TKe
         }
     }
 
+    /// <inheritdoc/>
     public override async Task<TRecord?> GetAsync(
         TKey key,
         RecordRetrievalOptions? options = null,
@@ -86,6 +100,7 @@ public sealed class RedisVLCollection<TKey, TRecord> : VectorStoreCollection<TKe
         return record;
     }
 
+    /// <inheritdoc/>
     public override async IAsyncEnumerable<TRecord> GetAsync(
         Expression<Func<TRecord, bool>> filter,
         int top,
@@ -120,6 +135,7 @@ public sealed class RedisVLCollection<TKey, TRecord> : VectorStoreCollection<TKe
         }
     }
 
+    /// <inheritdoc/>
     public override async Task UpsertAsync(TRecord record, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(record);
@@ -127,6 +143,7 @@ public sealed class RedisVLCollection<TKey, TRecord> : VectorStoreCollection<TKe
             .ConfigureAwait(false);
     }
 
+    /// <inheritdoc/>
     public override async Task UpsertAsync(IEnumerable<TRecord> records, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(records);
@@ -139,12 +156,14 @@ public sealed class RedisVLCollection<TKey, TRecord> : VectorStoreCollection<TKe
             cancellationToken: cancellationToken).ConfigureAwait(false);
     }
 
+    /// <inheritdoc/>
     public override Task DeleteAsync(TKey key, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(key);
         return _index.DeleteJsonByKeyAsync(ToRedisKey(key), cancellationToken);
     }
 
+    /// <inheritdoc/>
     public override async IAsyncEnumerable<VectorSearchResult<TRecord>> SearchAsync<TInput>(
         TInput searchValue,
         int top,
@@ -193,6 +212,7 @@ public sealed class RedisVLCollection<TKey, TRecord> : VectorStoreCollection<TKe
         }
     }
 
+    /// <inheritdoc/>
     public override object? GetService(Type serviceType, object? serviceKey = null)
     {
         ArgumentNullException.ThrowIfNull(serviceType);

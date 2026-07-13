@@ -3,19 +3,39 @@ using System.Text;
 
 namespace RedisVL.Filters;
 
+/// <summary>
+/// The base type for a query filter expression that renders to a RediSearch query-string fragment.
+/// Instances are produced by the field builders and combined with the boolean operators or the
+/// <see cref="Filter"/> combinators.
+/// </summary>
 public abstract class FilterExpression
 {
+    /// <summary>Combines two expressions with logical AND (intersection).</summary>
+    /// <param name="left">The left operand.</param>
+    /// <param name="right">The right operand.</param>
+    /// <returns>The combined expression.</returns>
     public static FilterExpression operator &(FilterExpression left, FilterExpression right) =>
         Filter.And(left, right);
 
+    /// <summary>Combines two expressions with logical OR (union).</summary>
+    /// <param name="left">The left operand.</param>
+    /// <param name="right">The right operand.</param>
+    /// <returns>The combined expression.</returns>
     public static FilterExpression operator |(FilterExpression left, FilterExpression right) =>
         Filter.Or(left, right);
 
+    /// <summary>Negates an expression with logical NOT.</summary>
+    /// <param name="expression">The expression to negate.</param>
+    /// <returns>The negated expression.</returns>
     public static FilterExpression operator !(FilterExpression expression) =>
         Filter.Not(expression);
 
+    /// <summary>Returns the rendered RediSearch query string for this expression.</summary>
+    /// <returns>The query-string representation.</returns>
     public sealed override string ToString() => ToQueryString();
 
+    /// <summary>Renders this expression to its RediSearch query-string fragment.</summary>
+    /// <returns>The query-string representation.</returns>
     public string ToQueryString() => Render(grouped: false);
 
     internal abstract string Render(bool grouped);

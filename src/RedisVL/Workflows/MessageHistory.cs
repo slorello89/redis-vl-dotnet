@@ -9,12 +9,20 @@ using StackExchange.Redis;
 
 namespace RedisVL.Workflows;
 
+/// <summary>
+/// Stores chat message history in Redis and retrieves it in recency order. Messages are kept as hashes and
+/// indexed with RediSearch by session, role, timestamp, and a monotonic per-session sequence number.
+/// </summary>
 public sealed class MessageHistory : IMessageHistory
 {
     private readonly IDatabase _database;
     private readonly JsonSerializerOptions _serializerOptions;
     private readonly ISearchIndex _index;
 
+    /// <summary>Initializes a new <see cref="MessageHistory" /> over the given database using the supplied options.</summary>
+    /// <param name="database">The Redis database used to store and search messages.</param>
+    /// <param name="options">The history configuration, including field names and naming.</param>
+    /// <exception cref="ArgumentNullException"><paramref name="database" /> or <paramref name="options" /> is <see langword="null" />.</exception>
     public MessageHistory(IDatabase database, MessageHistoryOptions options)
         : this(database, options, index: null)
     {
@@ -45,21 +53,42 @@ public sealed class MessageHistory : IMessageHistory
                 ]));
     }
 
+    /// <summary>Gets the options this history was configured with.</summary>
     public MessageHistoryOptions Options { get; }
 
+    /// <summary>Gets the history name, used to derive the index name and key prefixes.</summary>
     public string Name => Options.Name;
 
+    /// <summary>Gets the optional key namespace that isolates this history's keys and index from others sharing a name.</summary>
     public string? KeyNamespace => Options.KeyNamespace;
 
+    /// <summary>Creates the underlying RediSearch index backing this history.</summary>
+    /// <param name="options">Optional index creation options.</param>
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
+    /// <returns><see langword="true" /> if the index was created; otherwise <see langword="false" />.</returns>
     public Task<bool> CreateAsync(CreateIndexOptions? options = null, CancellationToken cancellationToken = default) =>
         _index.CreateAsync(options, cancellationToken);
 
+    /// <summary>Determines whether the underlying index already exists.</summary>
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
+    /// <returns><see langword="true" /> if the index exists; otherwise <see langword="false" />.</returns>
     public Task<bool> ExistsAsync(CancellationToken cancellationToken = default) =>
         _index.ExistsAsync(cancellationToken);
 
+    /// <summary>Drops the underlying index, optionally deleting the stored message documents.</summary>
+    /// <param name="deleteDocuments">When <see langword="true" />, deletes the stored messages as well as the index.</param>
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
     public Task DropAsync(bool deleteDocuments = false, CancellationToken cancellationToken = default) =>
         _index.DropAsync(deleteDocuments, cancellationToken);
 
+    /// <summary>Appends a message to a session's history.</summary>
+    /// <param name="sessionId">The session the message belongs to.</param>
+    /// <param name="role">The role of the message author (for example <c>user</c> or <c>assistant</c>).</param>
+    /// <param name="content">The message content.</param>
+    /// <param name="metadata">Optional metadata serialized and stored alongside the message.</param>
+    /// <param name="timestamp">The message timestamp; defaults to the current UTC time when omitted.</param>
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
+    /// <returns>The Redis key under which the message was stored.</returns>
     public async Task<string> AppendAsync(
         string sessionId,
         string role,
@@ -98,6 +127,12 @@ public sealed class MessageHistory : IMessageHistory
         return key!;
     }
 
+    /// <summary>Returns the most recent messages for a session, ordered newest-first.</summary>
+    /// <param name="sessionId">The session to read history for.</param>
+    /// <param name="limit">The maximum number of messages to return.</param>
+    /// <param name="role">When set, restricts results to messages with this role.</param>
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
+    /// <returns>The most recent messages, ordered by sequence then timestamp descending.</returns>
     public async Task<IReadOnlyList<MessageHistoryMessage>> GetRecentAsync(
         string sessionId,
         int limit = 10,

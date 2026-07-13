@@ -35,6 +35,8 @@
                             '$(MSBuildProjectName)' == 'RedisVL.Vectorizers.Onnx' Or
                             '$(MSBuildProjectName)' == 'RedisVL.Connectors.VectorData'">
     <IsPackable>true</IsPackable>
+    <!-- Ship XML documentation in every package so consumers get IntelliSense. -->
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(IsPackable)' == ''">

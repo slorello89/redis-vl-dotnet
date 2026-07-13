@@ -685,6 +685,38 @@ public sealed class SearchSchemaTests
     }
 
     [Fact]
+    public void AllowsEpsilonForHnswVectorFields()
+    {
+        var attributes = new VectorFieldAttributes(
+            VectorAlgorithm.Hnsw,
+            VectorDataType.Float32,
+            VectorDistanceMetric.Cosine,
+            4,
+            m: 8,
+            efConstruction: 100,
+            efRuntime: 50,
+            epsilon: 0.05);
+
+        Assert.Equal(VectorAlgorithm.Hnsw, attributes.Algorithm);
+        Assert.Equal(0.05, attributes.Epsilon);
+    }
+
+    [Fact]
+    public void RejectsEpsilonForFlatVectorFields()
+    {
+        var exception = Assert.Throws<ArgumentException>(() => new VectorFieldAttributes(
+            VectorAlgorithm.Flat,
+            VectorDataType.Float32,
+            VectorDistanceMetric.Cosine,
+            4,
+            epsilon: 0.05));
+
+        Assert.Equal("algorithm", exception.ParamName);
+        Assert.Contains("FLAT", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("EPSILON", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void ParsesSvsVamanaVectorFieldFromYaml()
     {
         const string yaml = """

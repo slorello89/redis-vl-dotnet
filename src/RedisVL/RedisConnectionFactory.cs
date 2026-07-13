@@ -2,10 +2,16 @@ using StackExchange.Redis;
 
 namespace RedisVL;
 
+/// <summary>Factory helpers for building StackExchange.Redis connections configured for Redis clusters.</summary>
 public static class RedisConnectionFactory
 {
     private const int DefaultRedisPort = 6379;
 
+    /// <summary>Builds cluster <see cref="ConfigurationOptions"/> from a delimited list of seed nodes.</summary>
+    /// <param name="seedNodes">A comma-, semicolon-, or newline-separated list of <c>host</c> or <c>host:port</c> seed nodes.</param>
+    /// <param name="configure">An optional callback to further customize the options before validation.</param>
+    /// <returns>The configured <see cref="ConfigurationOptions"/>.</returns>
+    /// <exception cref="ArgumentException">Thrown when <paramref name="seedNodes"/> is <see langword="null"/>, empty, or whitespace.</exception>
     public static ConfigurationOptions CreateClusterOptions(
         string seedNodes,
         Action<ConfigurationOptions>? configure = null)
@@ -14,6 +20,11 @@ public static class RedisConnectionFactory
         return CreateClusterOptions(SplitNodes(seedNodes), configure);
     }
 
+    /// <summary>Builds cluster <see cref="ConfigurationOptions"/> from a collection of seed nodes.</summary>
+    /// <param name="seedNodes">The <c>host</c> or <c>host:port</c> seed nodes; entries are trimmed and de-duplicated.</param>
+    /// <param name="configure">An optional callback to further customize the options before validation.</param>
+    /// <returns>The configured <see cref="ConfigurationOptions"/>.</returns>
+    /// <exception cref="ArgumentException">Thrown when no valid seed nodes are supplied or the resulting options fail cluster validation.</exception>
     public static ConfigurationOptions CreateClusterOptions(
         IEnumerable<string> seedNodes,
         Action<ConfigurationOptions>? configure = null)
@@ -36,12 +47,22 @@ public static class RedisConnectionFactory
         return options;
     }
 
+    /// <summary>Connects to a Redis cluster using a delimited list of seed nodes.</summary>
+    /// <param name="seedNodes">A comma-, semicolon-, or newline-separated list of <c>host</c> or <c>host:port</c> seed nodes.</param>
+    /// <param name="configure">An optional callback to further customize the options before connecting.</param>
+    /// <param name="cancellationToken">A token used to cancel the connection attempt.</param>
+    /// <returns>A task that resolves to the connected <see cref="IConnectionMultiplexer"/>.</returns>
     public static Task<IConnectionMultiplexer> ConnectClusterAsync(
         string seedNodes,
         Action<ConfigurationOptions>? configure = null,
         CancellationToken cancellationToken = default) =>
         ConnectClusterAsync(SplitNodes(seedNodes), configure, cancellationToken);
 
+    /// <summary>Connects to a Redis cluster using a collection of seed nodes.</summary>
+    /// <param name="seedNodes">The <c>host</c> or <c>host:port</c> seed nodes; entries are trimmed and de-duplicated.</param>
+    /// <param name="configure">An optional callback to further customize the options before connecting.</param>
+    /// <param name="cancellationToken">A token used to cancel the connection attempt.</param>
+    /// <returns>A task that resolves to the connected <see cref="IConnectionMultiplexer"/>.</returns>
     public static async Task<IConnectionMultiplexer> ConnectClusterAsync(
         IEnumerable<string> seedNodes,
         Action<ConfigurationOptions>? configure = null,

@@ -12,12 +12,21 @@ using StackExchange.Redis;
 
 namespace RedisVL.Workflows;
 
+/// <summary>
+/// Stores chat message history in Redis and retrieves it either in recency order or by semantic relevance.
+/// Each message's content is embedded and indexed with RediSearch so prior turns can be recalled by vector
+/// similarity to a prompt.
+/// </summary>
 public sealed class SemanticMessageHistory : ISemanticMessageHistory
 {
     private readonly IDatabase _database;
     private readonly ISearchIndex _index;
     private readonly JsonSerializerOptions _serializerOptions;
 
+    /// <summary>Initializes a new <see cref="SemanticMessageHistory" /> over the given database using the supplied options.</summary>
+    /// <param name="database">The Redis database used to store and search messages.</param>
+    /// <param name="options">The history configuration, including field names, threshold, and embedding attributes.</param>
+    /// <exception cref="ArgumentNullException"><paramref name="database" /> or <paramref name="options" /> is <see langword="null" />.</exception>
     public SemanticMessageHistory(IDatabase database, SemanticMessageHistoryOptions options)
         : this(database, options, index: null)
     {
@@ -49,23 +58,46 @@ public sealed class SemanticMessageHistory : ISemanticMessageHistory
                 ]));
     }
 
+    /// <summary>Gets the options this history was configured with.</summary>
     public SemanticMessageHistoryOptions Options { get; }
 
+    /// <summary>Gets the history name, used to derive the index name and key prefixes.</summary>
     public string Name => Options.Name;
 
+    /// <summary>Gets the optional key namespace that isolates this history's keys and index from others sharing a name.</summary>
     public string? KeyNamespace => Options.KeyNamespace;
 
+    /// <summary>Gets the default maximum distance a message must be within to be considered relevant.</summary>
     public double DistanceThreshold => Options.DistanceThreshold;
 
+    /// <summary>Creates the underlying RediSearch index backing this history.</summary>
+    /// <param name="options">Optional index creation options.</param>
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
+    /// <returns><see langword="true" /> if the index was created; otherwise <see langword="false" />.</returns>
     public Task<bool> CreateAsync(CreateIndexOptions? options = null, CancellationToken cancellationToken = default) =>
         _index.CreateAsync(options, cancellationToken);
 
+    /// <summary>Determines whether the underlying index already exists.</summary>
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
+    /// <returns><see langword="true" /> if the index exists; otherwise <see langword="false" />.</returns>
     public Task<bool> ExistsAsync(CancellationToken cancellationToken = default) =>
         _index.ExistsAsync(cancellationToken);
 
+    /// <summary>Drops the underlying index, optionally deleting the stored message documents.</summary>
+    /// <param name="deleteDocuments">When <see langword="true" />, deletes the stored messages as well as the index.</param>
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
     public Task DropAsync(bool deleteDocuments = false, CancellationToken cancellationToken = default) =>
         _index.DropAsync(deleteDocuments, cancellationToken);
 
+    /// <summary>Appends a message to a session's history using a precomputed embedding of its content.</summary>
+    /// <param name="sessionId">The session the message belongs to.</param>
+    /// <param name="role">The role of the message author (for example <c>user</c> or <c>assistant</c>).</param>
+    /// <param name="content">The message content.</param>
+    /// <param name="embedding">The precomputed embedding of the content.</param>
+    /// <param name="metadata">Optional metadata serialized and stored alongside the message.</param>
+    /// <param name="timestamp">The message timestamp; defaults to the current UTC time when omitted.</param>
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
+    /// <returns>The Redis key under which the message was stored.</returns>
     public async Task<string> AppendAsync(
         string sessionId,
         string role,
@@ -107,6 +139,15 @@ public sealed class SemanticMessageHistory : ISemanticMessageHistory
         return key!;
     }
 
+    /// <summary>Appends a message to a session's history, vectorizing its content with <paramref name="vectorizer" />.</summary>
+    /// <param name="sessionId">The session the message belongs to.</param>
+    /// <param name="role">The role of the message author (for example <c>user</c> or <c>assistant</c>).</param>
+    /// <param name="content">The message content to store and vectorize.</param>
+    /// <param name="vectorizer">The vectorizer used to embed the content.</param>
+    /// <param name="metadata">Optional metadata serialized and stored alongside the message.</param>
+    /// <param name="timestamp">The message timestamp; defaults to the current UTC time when omitted.</param>
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
+    /// <returns>The Redis key under which the message was stored.</returns>
     public async Task<string> AppendAsync(
         string sessionId,
         string role,
@@ -124,6 +165,12 @@ public sealed class SemanticMessageHistory : ISemanticMessageHistory
         return await AppendAsync(sessionId, role, normalizedContent, embedding, metadata, timestamp, cancellationToken).ConfigureAwait(false);
     }
 
+    /// <summary>Returns the most recent messages for a session, ordered newest-first.</summary>
+    /// <param name="sessionId">The session to read history for.</param>
+    /// <param name="limit">The maximum number of messages to return.</param>
+    /// <param name="role">When set, restricts results to messages with this role.</param>
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
+    /// <returns>The most recent messages, ordered by sequence then timestamp descending.</returns>
     public async Task<IReadOnlyList<MessageHistoryMessage>> GetRecentAsync(
         string sessionId,
         int limit = 10,
@@ -144,6 +191,17 @@ public sealed class SemanticMessageHistory : ISemanticMessageHistory
             .ToArray();
     }
 
+    /// <summary>
+    /// Returns the messages in a session most semantically relevant to a precomputed embedding, ordered
+    /// nearest-first and limited to those within the effective distance threshold.
+    /// </summary>
+    /// <param name="sessionId">The session to search within.</param>
+    /// <param name="embedding">The precomputed query embedding to compare messages against.</param>
+    /// <param name="limit">The maximum number of matches to return.</param>
+    /// <param name="role">When set, restricts results to messages with this role.</param>
+    /// <param name="distanceThreshold">The maximum distance a message may be to qualify, or <see langword="null" /> to use the configured default.</param>
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
+    /// <returns>The relevant messages with their distances, ordered nearest-first.</returns>
     public async Task<IReadOnlyList<SemanticMessageHistoryMatch>> GetRelevantAsync(
         string sessionId,
         float[] embedding,
@@ -184,6 +242,18 @@ public sealed class SemanticMessageHistory : ISemanticMessageHistory
             .ToArray();
     }
 
+    /// <summary>
+    /// Returns the messages in a session most semantically relevant to a prompt, vectorizing the prompt with
+    /// <paramref name="vectorizer" /> and ordering results nearest-first within the effective distance threshold.
+    /// </summary>
+    /// <param name="sessionId">The session to search within.</param>
+    /// <param name="prompt">The prompt to embed and compare messages against.</param>
+    /// <param name="vectorizer">The vectorizer used to embed the prompt.</param>
+    /// <param name="limit">The maximum number of matches to return.</param>
+    /// <param name="role">When set, restricts results to messages with this role.</param>
+    /// <param name="distanceThreshold">The maximum distance a message may be to qualify, or <see langword="null" /> to use the configured default.</param>
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
+    /// <returns>The relevant messages with their distances, ordered nearest-first.</returns>
     public async Task<IReadOnlyList<SemanticMessageHistoryMatch>> GetRelevantAsync(
         string sessionId,
         string prompt,

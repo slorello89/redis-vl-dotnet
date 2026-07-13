@@ -341,6 +341,10 @@ internal static class SearchResultMapper
     private readonly record struct MetadataCacheKey(Type DocumentType, JsonSerializerOptions SerializerOptions);
 }
 
+/// <summary>
+/// The exception thrown when a <see cref="SearchDocument"/> cannot be materialized into the requested
+/// document type, for example when a required field is missing or a value cannot be converted.
+/// </summary>
 public sealed class SearchResultMappingException : InvalidOperationException
 {
     internal SearchResultMappingException(Type targetType, string? documentId, string message, Exception? innerException = null)
@@ -350,8 +354,10 @@ public sealed class SearchResultMappingException : InvalidOperationException
         DocumentId = documentId;
     }
 
+    /// <summary>The type the document was being mapped into when the failure occurred.</summary>
     public Type TargetType { get; }
 
+    /// <summary>The key of the document being mapped, or <see langword="null"/> when it is not available.</summary>
     public string? DocumentId { get; }
 
     private static string BuildMessage(Type targetType, string? documentId, string message)

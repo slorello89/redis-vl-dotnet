@@ -6,6 +6,9 @@ using RedisVL.Vectorizers;
 
 namespace RedisVL.Vectorizers.Cohere;
 
+/// <summary>
+/// An <see cref="IBatchTextVectorizer"/> that generates text embeddings using Cohere's embed API.
+/// </summary>
 public sealed class CohereTextVectorizer : IBatchTextVectorizer
 {
     private const string DefaultEndpoint = "https://api.cohere.com/v2/embed";
@@ -19,6 +22,13 @@ public sealed class CohereTextVectorizer : IBatchTextVectorizer
     private readonly string _model;
     private readonly CohereVectorizerOptions _options;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="CohereTextVectorizer"/> class.
+    /// </summary>
+    /// <param name="model">The Cohere embedding model name (for example, <c>embed-english-v3.0</c>).</param>
+    /// <param name="apiKey">The Cohere API key used as the bearer credential.</param>
+    /// <param name="options">Optional embedding options such as input type, output dimension, and truncation.</param>
+    /// <param name="httpClient">An optional <see cref="HttpClient"/>; a new instance is created when not supplied.</param>
     public CohereTextVectorizer(
         string model,
         string apiKey,
@@ -31,12 +41,16 @@ public sealed class CohereTextVectorizer : IBatchTextVectorizer
         _httpClient = httpClient ?? new HttpClient();
     }
 
+    /// <summary>Gets the <see cref="HttpClient"/> used to call the Cohere API.</summary>
     public HttpClient Client => _httpClient;
 
+    /// <summary>Gets the Cohere embedding model name.</summary>
     public string Model => _model;
 
+    /// <summary>Gets the embedding options applied to each request.</summary>
     public CohereVectorizerOptions Options => _options;
 
+    /// <inheritdoc/>
     public async Task<float[]> VectorizeAsync(string input, CancellationToken cancellationToken = default)
     {
         var normalizedInput = ValidateInput(input);
@@ -45,6 +59,7 @@ public sealed class CohereTextVectorizer : IBatchTextVectorizer
         return embeddings[0];
     }
 
+    /// <inheritdoc/>
     public async Task<IReadOnlyList<float[]>> VectorizeAsync(
         IReadOnlyList<string> inputs,
         CancellationToken cancellationToken = default)

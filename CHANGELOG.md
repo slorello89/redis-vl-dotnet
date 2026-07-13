@@ -7,6 +7,12 @@ All notable changes to this project are documented here. This project adheres to
 
 ### Fixed
 
+- **Schema model: HNSW `EPSILON` and vector `INDEXMISSING`** — `VectorFieldAttributes` no longer
+  rejects a positive `epsilon` for HNSW fields; `EPSILON` is a documented HNSW/SVS-VAMANA range-query
+  approximation factor and is still rejected for FLAT (matching Redis). `FT.CREATE` now emits the
+  field-level `INDEXMISSING` token for vector fields (after the counted algorithm attributes) when
+  `VectorFieldDefinition.IndexMissing` is set, so declared schemas are no longer silently dropped and
+  `FromExisting`/create round-trips stay symmetric (issue #50).
 - **RESP3 result parsing** — `FT.SEARCH`, `FT.AGGREGATE`, and `FT.HYBRID` replies are now parsed
   correctly on connections negotiated over RESP3 (`ConfigurationOptions.Protocol =
   RedisProtocol.Resp3`). Previously the parsers assumed the flat RESP2 reply shape and threw

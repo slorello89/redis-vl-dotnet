@@ -73,7 +73,8 @@ Supported vector attributes:
 * `dimensions`: required and must be greater than zero
 * `initialCapacity`, `blockSize`: optional tuning knobs for any algorithm
 * HNSW-only: `m`, `efConstruction`, `efRuntime`
-* SVS-VAMANA-only: `compression`, `constructionWindowSize`, `graphMaxDegree`, `searchWindowSize`, `epsilon`, `trainingThreshold`, `reduce`
+* HNSW and SVS-VAMANA: `epsilon` (range-query approximation factor)
+* SVS-VAMANA-only: `compression`, `constructionWindowSize`, `graphMaxDegree`, `searchWindowSize`, `trainingThreshold`, `reduce`
 
 === SVS-VAMANA with vector compression
 
