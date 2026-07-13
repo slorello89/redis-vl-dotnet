@@ -2104,6 +2104,74 @@ public sealed class SearchIndexIntegrationTests
         }
     }
 
+    [RedisSearchIntegrationFact]
+    public async Task FromExistingAsync_PreservesVectorIndexMissingAcrossRoundTrip()
+    {
+        await using var connection = await RedisSearchTestEnvironment.ConnectAsync();
+        var database = connection.GetDatabase();
+
+        var token = Guid.NewGuid().ToString("N");
+        var originalName = $"vec-flag-idx-{token}";
+        var roundTripName = $"vec-flag-roundtrip-idx-{token}";
+        var schema = new SearchSchema(
+            new IndexDefinition(originalName, $"vec-flag:{token}:", StorageType.Hash),
+            [
+                new VectorFieldDefinition(
+                    "embedding",
+                    new VectorFieldAttributes(
+                        VectorAlgorithm.Hnsw,
+                        VectorDataType.Float32,
+                        VectorDistanceMetric.Cosine,
+                        4,
+                        m: 8,
+                        efConstruction: 100,
+                        efRuntime: 50,
+                        epsilon: 0.05),
+                    indexMissing: true)
+            ]);
+        var originalIndex = new SearchIndex(database, schema);
+        SearchIndex? roundTripIndex = null;
+
+        try
+        {
+            await originalIndex.CreateAsync(new CreateIndexOptions(overwrite: true));
+
+            var reconstructed = await SearchIndex.FromExistingAsync(database, originalName);
+            AssertVectorIndexMissingField(reconstructed.Schema);
+
+            // Re-create a fresh index from the reconstructed schema: a dropped
+            // INDEXMISSING flag on the first pass would be permanently lost here.
+            roundTripIndex = new SearchIndex(
+                database,
+                new SearchSchema(
+                    new IndexDefinition(roundTripName, $"vec-flag-roundtrip:{token}:", StorageType.Hash),
+                    reconstructed.Schema.Fields));
+            await roundTripIndex.CreateAsync(new CreateIndexOptions(overwrite: true));
+
+            var roundTripped = await SearchIndex.FromExistingAsync(database, roundTripName);
+            AssertVectorIndexMissingField(roundTripped.Schema);
+        }
+        finally
+        {
+            if (await originalIndex.ExistsAsync())
+            {
+                await originalIndex.DropAsync();
+            }
+
+            if (roundTripIndex is not null && await roundTripIndex.ExistsAsync())
+            {
+                await roundTripIndex.DropAsync();
+            }
+        }
+    }
+
+    private static void AssertVectorIndexMissingField(SearchSchema schema)
+    {
+        var vectorField = Assert.IsType<VectorFieldDefinition>(schema.Fields.Single(static field => field.Name == "embedding"));
+        Assert.True(vectorField.IndexMissing);
+        Assert.Equal(VectorAlgorithm.Hnsw, vectorField.Attributes.Algorithm);
+    }
+
     private static void AssertMultiFlagFields(SearchSchema schema)
     {
         var textField = Assert.IsType<TextFieldDefinition>(schema.Fields.Single(static field => field.Name == "title"));

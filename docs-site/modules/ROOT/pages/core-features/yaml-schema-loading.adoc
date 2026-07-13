@@ -70,7 +70,7 @@ Supported field `type` values:
 * `geo`
 * `vector`
 
-Vector fields must include an `attrs` block with algorithm, data type, dimensions, and distance metric. SVS-VAMANA fields can also set `compression`, `construction_window_size`, `graph_max_degree`, `search_window_size`, `epsilon`, `training_threshold`, and `reduce` in `attrs`.
+Vector fields must include an `attrs` block with algorithm, data type, dimensions, and distance metric. HNSW and SVS-VAMANA fields can set `epsilon` (the range-query approximation factor); SVS-VAMANA fields can also set `compression`, `construction_window_size`, `graph_max_degree`, `search_window_size`, `training_threshold`, and `reduce` in `attrs`.
 
 == Validation behavior
 
