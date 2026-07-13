@@ -85,10 +85,13 @@ public abstract class FilterExpression
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(value);
 
+        // Escape '*' so an exact-term match (`Match`) stays a literal term rather than silently
+        // becoming a prefix wildcard, and so `Prefix` (which appends its own '*') cannot emit an
+        // invalid double wildcard like `foo**`. Wildcard patterns go through the `w'...'` path instead.
         var builder = new StringBuilder(value.Length);
         foreach (var character in value.Trim())
         {
-            if (char.IsLetterOrDigit(character) || character is '_' or '*')
+            if (char.IsLetterOrDigit(character) || character is '_')
             {
                 builder.Append(character);
                 continue;

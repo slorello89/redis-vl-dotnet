@@ -1,4 +1,3 @@
-using System.Runtime.InteropServices;
 using RedisVL.Filters;
 
 namespace RedisVL.Queries;
@@ -56,7 +55,7 @@ public sealed class HybridQuery
 
         TextFilter = textFilter;
         VectorFieldName = FilterExpression.NormalizeFieldName(vectorFieldName);
-        Vector = vector.ToArray();
+        _vector = vector.ToArray();
         TopK = topK;
         Filter = filter;
         ScoreAlias = FilterExpression.NormalizeFieldName(scoreAlias);
@@ -71,11 +70,13 @@ public sealed class HybridQuery
     /// <summary>The text filter that supplies the required text predicate.</summary>
     public FilterExpression TextFilter { get; }
 
+    private readonly byte[] _vector;
+
     /// <summary>The name of the vector field searched with <c>KNN</c>.</summary>
     public string VectorFieldName { get; }
 
-    /// <summary>The raw query vector bytes.</summary>
-    public byte[] Vector { get; }
+    /// <summary>The raw query vector bytes. Each read returns a fresh copy so the query's state cannot be mutated.</summary>
+    public byte[] Vector => _vector.ToArray();
 
     /// <summary>The number of nearest neighbors to retrieve.</summary>
     public int TopK { get; }
@@ -124,7 +125,7 @@ public sealed class HybridQuery
         string scoreAlias = "vector_distance",
         VectorKnnRuntimeOptions? runtimeOptions = null,
         QueryPagination? pagination = null) =>
-        new(textFilter, vectorFieldName, MemoryMarshal.AsBytes<float>(vector.AsSpan()).ToArray(), topK, filter, returnFields, scoreAlias, runtimeOptions, pagination);
+        new(textFilter, vectorFieldName, VectorEncoding.ToBytes(vector), topK, filter, returnFields, scoreAlias, runtimeOptions, pagination);
 
     /// <summary>Creates a hybrid query from a double-precision (<c>FLOAT64</c>) vector.</summary>
     /// <param name="textFilter">The text filter; it must contain at least one text predicate.</param>
@@ -147,7 +148,7 @@ public sealed class HybridQuery
         string scoreAlias = "vector_distance",
         VectorKnnRuntimeOptions? runtimeOptions = null,
         QueryPagination? pagination = null) =>
-        new(textFilter, vectorFieldName, MemoryMarshal.AsBytes<double>(vector.AsSpan()).ToArray(), topK, filter, returnFields, scoreAlias, runtimeOptions, pagination);
+        new(textFilter, vectorFieldName, VectorEncoding.ToBytes(vector), topK, filter, returnFields, scoreAlias, runtimeOptions, pagination);
 
     private static void ValidatePaginationWindow(int topK, QueryPagination pagination, string parameterName)
     {

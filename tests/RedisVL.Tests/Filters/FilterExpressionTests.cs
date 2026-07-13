@@ -29,6 +29,18 @@ public sealed class FilterExpressionTests
     }
 
     [Fact]
+    public void EscapesAsteriskInTermAndPrefixMatches()
+    {
+        // A '*' in an exact-term match is escaped so Match stays a literal term instead of a silent
+        // prefix wildcard, and Prefix cannot emit an invalid double wildcard like `foo**`.
+        Assert.Equal("@title:foo\\*", Filter.Text("title").Match("foo*").ToQueryString());
+        Assert.Equal("@title:foo\\**", Filter.Text("title").Prefix("foo*").ToQueryString());
+
+        // The ordinary prefix case still appends exactly one trailing wildcard.
+        Assert.Equal("@title:foo*", Filter.Text("title").Prefix("foo").ToQueryString());
+    }
+
+    [Fact]
     public void BuildsGeoRadiusFilters()
     {
         var filter = Filter.Geo("location").WithinRadius(-73.9857, 40.7484, 5, GeoUnit.Kilometers);
@@ -97,6 +109,9 @@ public sealed class FilterExpressionTests
     {
         Assert.Throws<ArgumentException>(() => Filter.Tag("genre").In());
         Assert.Throws<ArgumentException>(() => Filter.Numeric("rating").Between(10, 5));
+        Assert.Throws<ArgumentException>(() => Filter.Numeric("rating").Between(double.NaN, 5));
+        Assert.Throws<ArgumentException>(() => Filter.Numeric("rating").Between(5, double.NaN));
+        Assert.Throws<ArgumentException>(() => Filter.Numeric("rating").Eq(double.NaN));
         Assert.Throws<ArgumentOutOfRangeException>(() => Filter.Geo("location").WithinRadius(1, 2, 0, GeoUnit.Meters));
         Assert.Throws<ArgumentException>(() => Filter.And(Filter.Tag("genre").Eq("science fiction")));
         Assert.Throws<ArgumentException>(() => Filter.Tag("genre").Like());
