@@ -225,6 +225,50 @@ public sealed class SearchResultMappingTests
         }
     }
 
+    [Fact]
+    public void MapsEnumFieldStoredAsNumericStringIntoTypedResult()
+    {
+        // Hash-backed results carry an enum as its numeric string ("2"); mapping must reconstruct the
+        // enum rather than throwing when the default numeric converter rejects a string token.
+        var document = new SearchDocument(
+            "movie:1",
+            new Dictionary<string, RedisValue>(StringComparer.Ordinal)
+            {
+                ["title"] = "Heat",
+                ["status"] = "2"
+            });
+
+        var mapped = document.Map<EnumMovieProjection>();
+
+        Assert.Equal("Heat", mapped.Title);
+        Assert.Equal(MovieStatus.Archived, mapped.Status);
+    }
+
+    [Fact]
+    public void MapsEnumFieldStoredAsMemberNameIntoTypedResult()
+    {
+        var document = new SearchDocument(
+            "movie:2",
+            new Dictionary<string, RedisValue>(StringComparer.Ordinal)
+            {
+                ["title"] = "Thief",
+                ["status"] = "Released"
+            });
+
+        var mapped = document.Map<EnumMovieProjection>();
+
+        Assert.Equal(MovieStatus.Released, mapped.Status);
+    }
+
+    private enum MovieStatus
+    {
+        Draft = 0,
+        Released = 1,
+        Archived = 2
+    }
+
+    private sealed record EnumMovieProjection(string Title, MovieStatus Status);
+
     private sealed record MovieProjection(
         string Id,
         string Title,

@@ -19,6 +19,8 @@ namespace RedisVL.Workflows;
 /// </summary>
 public sealed class SemanticMessageHistory : ISemanticMessageHistory
 {
+    private const string DistanceAlias = "distance";
+
     private readonly IDatabase _database;
     private readonly ISearchIndex _index;
     private readonly JsonSerializerOptions _serializerOptions;
@@ -217,7 +219,12 @@ public sealed class SemanticMessageHistory : ISemanticMessageHistory
 
         var threshold = NormalizeDistanceThreshold(distanceThreshold);
         var filter = BuildSessionFilter(normalizedSessionId, normalizedRole);
-        var results = await _index.SearchAsync<SemanticMessageHistoryDocument>(
+
+        // Read fields untyped and resolve them by the configured field names (and the distance score alias)
+        // rather than mapping into a fixed record whose property names only line up with the option defaults.
+        // A typed mapper camel-cases property names, so custom SessionId/Role/Content/Timestamp field names
+        // would never be found and every match would fail to materialize.
+        var results = await _index.SearchAsync(
             VectorRangeQuery.FromFloat32(
                 Options.EmbeddingFieldName,
                 normalizedEmbedding,
@@ -228,10 +235,9 @@ public sealed class SemanticMessageHistory : ISemanticMessageHistory
                     Options.RoleFieldName,
                     Options.ContentFieldName,
                     Options.MetadataFieldName,
-                    Options.TimestampFieldName,
-                    "id"
+                    Options.TimestampFieldName
                 ],
-                scoreAlias: "distance",
+                scoreAlias: DistanceAlias,
                 limit: limit),
             cancellationToken: cancellationToken).ConfigureAwait(false);
 
@@ -335,23 +341,23 @@ public sealed class SemanticMessageHistory : ISemanticMessageHistory
         return new MessageHistoryMessage(sessionId, role, content, timestamp, metadata, sequence, document.Id);
     }
 
-    private SemanticMessageHistoryMatch MapRelevantMessage(SemanticMessageHistoryDocument document)
+    private SemanticMessageHistoryMatch MapRelevantMessage(SearchDocument document)
     {
-        if (string.IsNullOrWhiteSpace(document.Id))
+        // Build the message exactly as GetRecentAsync does (same required-field handling and field-name
+        // resolution) so the recency and relevance paths never disagree, then attach the search distance.
+        var message = MapMessage(document);
+        return new SemanticMessageHistoryMatch(message, GetRequiredDistance(document));
+    }
+
+    private static double GetRequiredDistance(SearchDocument document)
+    {
+        var value = GetRequiredValue(document, DistanceAlias);
+        if (!double.TryParse(value, NumberStyles.Float | NumberStyles.AllowThousands, CultureInfo.InvariantCulture, out var distance))
         {
-            throw new InvalidOperationException("Semantic message history result is missing the document id.");
+            throw new InvalidOperationException($"Semantic message history search result field '{DistanceAlias}' is not a valid distance.");
         }
 
-        var message = new MessageHistoryMessage(
-            document.SessionId,
-            document.Role,
-            document.Content,
-            ParseTimestamp(document.Timestamp),
-            document.Metadata,
-            ParseSequence(document.Id),
-            document.Id);
-
-        return new SemanticMessageHistoryMatch(message, document.Distance);
+        return distance;
     }
 
     private static string GetRequiredValue(SearchDocument document, string fieldName)
@@ -459,15 +465,6 @@ public sealed class SemanticMessageHistory : ISemanticMessageHistory
         ArgumentException.ThrowIfNullOrWhiteSpace(content);
         return content.Trim();
     }
-
-    private sealed record SemanticMessageHistoryDocument(
-        string SessionId,
-        string Role,
-        string Content,
-        string Timestamp,
-        string? Metadata,
-        string Id,
-        double Distance);
 }
 
 internal static class SemanticMessageHistoryOptionsExtensions

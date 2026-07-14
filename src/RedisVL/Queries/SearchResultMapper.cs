@@ -194,6 +194,20 @@ internal static class SearchResultMapper
 
         if (targetType.IsEnum)
         {
+            // Hash-backed results carry enums as their serialized text (a numeric string like "2" under the
+            // default converter, or a member name like "Active" when a string enum converter is registered).
+            // A raw JSON string token would break the default converter, which reads enums from number tokens
+            // only. Parse the text back into the enum (Enum.TryParse accepts both numeric strings and member
+            // names, case-insensitively) and re-serialize through the caller's options so whichever enum
+            // converter they use round-trips its own wire format.
+            if (Enum.TryParse(targetType, value.ToString(), ignoreCase: true, out var parsed))
+            {
+                JsonSerializer.Serialize(writer, parsed, targetType, serializerOptions);
+                return;
+            }
+
+            // Preserve prior behavior for values that are neither a defined member nor numeric: emit the
+            // string and let the converter throw a descriptive JsonException.
             writer.WriteStringValue(value.ToString());
             return;
         }

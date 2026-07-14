@@ -2,7 +2,7 @@ namespace RedisVL.Schema;
 
 /// <summary>
 /// Defines a <c>GEO</c> field for an index, storing longitude/latitude pairs for geospatial
-/// radius and bounding-box filtering.
+/// radius filtering.
 /// </summary>
 public sealed record GeoFieldDefinition : FieldDefinition
 {

@@ -85,6 +85,19 @@ internal sealed class RedisVLFilterTranslator
             // record.TagField.Contains(constant) -> membership in the tag set.
             if (TryGetProperty(source, recordParameter, out var collectionProperty))
             {
+                // Only a collection-typed property mapped to TAG carries set-membership semantics.
+                // A scalar string (or any non-collection) reaching this branch means the caller
+                // intended substring matching, which RediSearch cannot express, so translating it to
+                // tag equality would silently return the wrong documents. Note that string itself is
+                // IEnumerable<char>, so the check must exclude scalar strings explicitly.
+                if (collectionProperty.Kind != RedisVLFieldKind.Tag
+                    || !RedisVLRecordModel.IsStringCollection(collectionProperty.Property.PropertyType))
+                {
+                    throw new NotSupportedException(
+                        $"'Contains' on property '{collectionProperty.Property.Name}' is not translatable: substring matching " +
+                        "is not supported. To match a full value, index the property as a tag and use equality ('==') instead.");
+                }
+
                 var memberValue = Evaluate(item);
                 return Filter.Tag(collectionProperty.JsonName).Eq(FormatTag(memberValue));
             }
@@ -94,8 +107,21 @@ internal sealed class RedisVLFilterTranslator
             {
                 var values = Evaluate(source) as IEnumerable
                     ?? throw Unsupported(call);
-                var formatted = values.Cast<object?>().Select(FormatTag).ToArray();
-                return Filter.Tag(property.JsonName).In(formatted);
+
+                return property.Kind switch
+                {
+                    // TAG membership: @field:{v1|v2|...}.
+                    RedisVLFieldKind.Tag => Filter.Tag(property.JsonName)
+                        .In(values.Cast<object?>().Select(FormatTag).ToArray()),
+
+                    // NUMERIC membership: OR-compose an equality per value, since TAG syntax on a
+                    // numeric field (@field:{1995|1999}) matches nothing and returns wrong results.
+                    RedisVLFieldKind.Numeric => BuildNumericIn(property, values),
+
+                    _ => throw new NotSupportedException(
+                        $"'Contains' over a value collection is only supported for tag and numeric properties " +
+                        $"(property '{property.Property.Name}')."),
+                };
             }
         }
 
@@ -166,6 +192,18 @@ internal sealed class RedisVLFilterTranslator
             ExpressionType.LessThanOrEqual => field.LessThanOrEqualTo(number),
             _ => throw new NotSupportedException($"Unsupported numeric comparison '{comparison}'."),
         };
+    }
+
+    private static FilterExpression BuildNumericIn(RedisVLProperty property, IEnumerable values)
+    {
+        var expressions = values
+            .Cast<object?>()
+            .Select(value => Filter.Numeric(property.JsonName).Eq(ToDouble(value)))
+            .ToArray();
+
+        // A single value needs no OR wrapper. An empty collection falls through to Filter.Or, which
+        // rejects fewer than two operands - matching the tag branch, which also throws on an empty set.
+        return expressions.Length == 1 ? expressions[0] : Filter.Or(expressions);
     }
 
     private bool TryGetProperty(Expression expression, ParameterExpression recordParameter, out RedisVLProperty property)

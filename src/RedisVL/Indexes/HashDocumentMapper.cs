@@ -176,6 +176,20 @@ internal static class HashDocumentMapper
 
         if (targetType.IsEnum)
         {
+            // Enums are stored in the hash as their serialized form (a numeric string like "2" under the
+            // default converter, or a member name like "Active" when the caller registered a string enum
+            // converter). Emitting a raw JSON string token here would break the default converter, which
+            // reads enums from number tokens only. Parse the stored text back into the enum (Enum.TryParse
+            // accepts both numeric strings and member names, case-insensitively) and re-serialize through
+            // the caller's options so whichever enum converter they use round-trips its own wire format.
+            if (Enum.TryParse(targetType, value, ignoreCase: true, out var parsed))
+            {
+                JsonSerializer.Serialize(writer, parsed, targetType, serializerOptions);
+                return true;
+            }
+
+            // Preserve prior behavior for values that are neither a defined member nor numeric: emit the
+            // string and let the converter throw a descriptive JsonException.
             writer.WriteStringValue(value);
             return true;
         }

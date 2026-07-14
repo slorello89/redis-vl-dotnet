@@ -400,6 +400,28 @@ public sealed class SearchIndexAsyncTests
     }
 
     [Fact]
+    public async Task LoadHashAsync_ThenFetchHashByKeyAsync_RoundTripsEnumProperty()
+    {
+        // End-to-end guard for the enum round-trip bug: LoadHashAsync writes the enum to the hash, and
+        // feeding exactly those entries back through FetchHashByKeyAsync must reconstruct the document
+        // instead of throwing a JsonException on the enum field.
+        var (database, recorder) = RecordingDatabaseProxy.CreatePair();
+        var index = new SearchIndex(database, CreateHashSchema("enum-roundtrip"));
+
+        var key = await index.LoadHashAsync(new HashEnumDocument("movie-1", "Heat", MovieStatus.Archived));
+
+        var stored = recorder.HashSetCalls.Single(call => call.Key.ToString() == key).Entries;
+        recorder.HashGetAllResponses.Enqueue(stored);
+
+        var fetched = await index.FetchHashByKeyAsync<HashEnumDocument>(key);
+
+        Assert.NotNull(fetched);
+        Assert.Equal("movie-1", fetched!.Id);
+        Assert.Equal("Heat", fetched.Title);
+        Assert.Equal(MovieStatus.Archived, fetched.Status);
+    }
+
+    [Fact]
     public async Task UpdateHashByKeyAsync_RejectsInvalidUpdateRequests()
     {
         var (database, recorder) = RecordingDatabaseProxy.CreatePair();
@@ -697,6 +719,130 @@ public sealed class SearchIndexAsyncTests
             recorder.ExecuteAsyncCalls
                 .Select(static call => call.Arguments.Select(static argument => argument?.ToString() ?? string.Empty).TakeLast(5).ToArray())
                 .ToArray());
+    }
+
+    [Fact]
+    public async Task SearchBatchesAsync_FilterQuery_PreservesSortByOnEveryPage()
+    {
+        // Regression: the per-page FilterQuery clone dropped SortBy, so batched paging silently
+        // ignored the requested sort while single-shot SearchAsync honored it.
+        var (database, recorder) = RecordingDatabaseProxy.CreatePair();
+        var index = new SearchIndex(database, CreateHashSchema("filter-sort-batches"));
+        recorder.ExecuteAsyncResponses.Enqueue(
+            RedisResult.Create(
+                [
+                    RedisResult.Create(3),
+                    RedisResult.Create((RedisValue)"movie:1"),
+                    RedisResult.Create(
+                        [
+                            RedisResult.Create((RedisValue)"title"),
+                            RedisResult.Create((RedisValue)"Heat")
+                        ]),
+                    RedisResult.Create((RedisValue)"movie:2"),
+                    RedisResult.Create(
+                        [
+                            RedisResult.Create((RedisValue)"title"),
+                            RedisResult.Create((RedisValue)"Thief")
+                        ])
+                ]));
+        recorder.ExecuteAsyncResponses.Enqueue(
+            RedisResult.Create(
+                [
+                    RedisResult.Create(3),
+                    RedisResult.Create((RedisValue)"movie:3"),
+                    RedisResult.Create(
+                        [
+                            RedisResult.Create((RedisValue)"title"),
+                            RedisResult.Create((RedisValue)"Arrival")
+                        ])
+                ]));
+
+        var query = new FilterQuery(
+            Filter.Tag("genre").Eq("crime"),
+            sortBy: new SearchSortBy("year", descending: true),
+            limit: 1);
+
+        var batches = new List<SearchResults>();
+        await foreach (var batch in index.SearchBatchesAsync(query, batchSize: 2))
+        {
+            batches.Add(batch);
+        }
+
+        Assert.Equal(2, recorder.ExecuteAsyncCallCount);
+        Assert.All(
+            recorder.ExecuteAsyncCalls,
+            call =>
+            {
+                var arguments = call.Arguments.Select(static argument => argument?.ToString() ?? string.Empty).ToArray();
+                var sortByIndex = Array.IndexOf(arguments, "SORTBY");
+                Assert.True(sortByIndex >= 0, "Every batched page must carry the SORTBY clause.");
+                Assert.Equal("year", arguments[sortByIndex + 1]);
+                Assert.Equal("DESC", arguments[sortByIndex + 2]);
+            });
+    }
+
+    [Fact]
+    public async Task SearchBatchesAsync_TextQuery_PreservesFieldWeightsOnEveryPage()
+    {
+        // Regression: the per-page TextQuery clone dropped FieldWeights, so batched paging emitted
+        // the raw text instead of the weighted per-field query string that single-shot SearchAsync
+        // emits. Every page must reproduce the single-shot weighted query string verbatim.
+        var fieldWeights = new Dictionary<string, double> { ["title"] = 2.0, ["genre"] = 0.5 };
+
+        var (singleShotDatabase, singleShotRecorder) = RecordingDatabaseProxy.CreatePair();
+        var singleShotIndex = new SearchIndex(singleShotDatabase, CreateHashSchema("text-weight-single"));
+        singleShotRecorder.ExecuteAsyncResponses.Enqueue(RedisResult.Create([RedisResult.Create(0)]));
+        await singleShotIndex.SearchAsync(new TextQuery("heat wave", fieldWeights: fieldWeights, limit: 1));
+        var expectedQueryString = singleShotRecorder.ExecuteAsyncCalls[0].Arguments[1]?.ToString();
+
+        // Sanity check that the authoritative query string really is the weighted per-field form and
+        // not the raw text, otherwise the comparison below could pass trivially.
+        Assert.Contains("@title:", expectedQueryString);
+        Assert.DoesNotContain("heat wave", expectedQueryString);
+
+        var (database, recorder) = RecordingDatabaseProxy.CreatePair();
+        var index = new SearchIndex(database, CreateHashSchema("text-weight-batches"));
+        recorder.ExecuteAsyncResponses.Enqueue(
+            RedisResult.Create(
+                [
+                    RedisResult.Create(3),
+                    RedisResult.Create((RedisValue)"movie:1"),
+                    RedisResult.Create(
+                        [
+                            RedisResult.Create((RedisValue)"title"),
+                            RedisResult.Create((RedisValue)"Heat")
+                        ]),
+                    RedisResult.Create((RedisValue)"movie:2"),
+                    RedisResult.Create(
+                        [
+                            RedisResult.Create((RedisValue)"title"),
+                            RedisResult.Create((RedisValue)"Wave")
+                        ])
+                ]));
+        recorder.ExecuteAsyncResponses.Enqueue(
+            RedisResult.Create(
+                [
+                    RedisResult.Create(3),
+                    RedisResult.Create((RedisValue)"movie:3"),
+                    RedisResult.Create(
+                        [
+                            RedisResult.Create((RedisValue)"title"),
+                            RedisResult.Create((RedisValue)"Heatwave")
+                        ])
+                ]));
+
+        var batches = new List<SearchResults>();
+        await foreach (var batch in index.SearchBatchesAsync(
+            new TextQuery("heat wave", fieldWeights: fieldWeights, limit: 1),
+            batchSize: 2))
+        {
+            batches.Add(batch);
+        }
+
+        Assert.Equal(2, recorder.ExecuteAsyncCallCount);
+        Assert.All(
+            recorder.ExecuteAsyncCalls,
+            call => Assert.Equal(expectedQueryString, call.Arguments[1]?.ToString()));
     }
 
     [Fact]
@@ -1597,6 +1743,15 @@ public sealed class SearchIndexAsyncTests
         entries.SelectMany(static entry => new[] { RedisResult.Create((RedisValue)entry.Key), entry.Value }).ToArray();
 
     private sealed record HashMovieDocument(string Id, string Title, int Year, string Genre);
+
+    private enum MovieStatus
+    {
+        Draft = 0,
+        Released = 1,
+        Archived = 2
+    }
+
+    private sealed record HashEnumDocument(string Id, string Title, MovieStatus Status);
 
     private sealed record GenreAggregateRow(string Genre, int MovieCount, double AvgYear);
 
