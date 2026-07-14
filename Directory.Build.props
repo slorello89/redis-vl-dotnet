@@ -1,7 +1,7 @@
 <Project>
   <PropertyGroup>
     <!-- Single source of truth for the package version across all projects. Bump here for a release. -->
-    <Version>0.0.6</Version>
+    <Version>0.1.0</Version>
 
     <!-- Multi-target LTS + current releases so both net8.0 (LTS) and net10.0 (LTS) consumers can
          install the packages, not just net9.0 (STS). Example apps opt out below and stay
