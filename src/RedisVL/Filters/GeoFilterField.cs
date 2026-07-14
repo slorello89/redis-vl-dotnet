@@ -1,8 +1,7 @@
 namespace RedisVL.Filters;
 
 /// <summary>
-/// Builds geospatial filters over a <c>GEO</c> field, matching points within a radius or a
-/// bounding box.
+/// Builds geospatial filters over a <c>GEO</c> field, matching points within a radius.
 /// </summary>
 public sealed class GeoFilterField
 {
@@ -28,27 +27,5 @@ public sealed class GeoFilterField
         }
 
         return new GeoFilterExpression(_fieldName, longitude, latitude, radius, unit);
-    }
-
-    /// <summary>Matches points inside the given longitude/latitude bounding box.</summary>
-    /// <param name="minLongitude">The minimum (west) longitude.</param>
-    /// <param name="minLatitude">The minimum (south) latitude.</param>
-    /// <param name="maxLongitude">The maximum (east) longitude.</param>
-    /// <param name="maxLatitude">The maximum (north) latitude.</param>
-    /// <returns>A <see cref="FilterExpression"/> for the bounding-box query.</returns>
-    /// <exception cref="ArgumentException">Thrown when a minimum bound exceeds its corresponding maximum bound.</exception>
-    public FilterExpression WithinBox(double minLongitude, double minLatitude, double maxLongitude, double maxLatitude)
-    {
-        if (minLongitude > maxLongitude)
-        {
-            throw new ArgumentException("Geo box minimum longitude cannot be greater than maximum longitude.");
-        }
-
-        if (minLatitude > maxLatitude)
-        {
-            throw new ArgumentException("Geo box minimum latitude cannot be greater than maximum latitude.");
-        }
-
-        return new GeoBoxFilterExpression(_fieldName, minLongitude, minLatitude, maxLongitude, maxLatitude);
     }
 }

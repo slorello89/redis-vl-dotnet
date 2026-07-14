@@ -49,14 +49,6 @@ public sealed class FilterExpressionTests
     }
 
     [Fact]
-    public void BuildsGeoBoxFilters()
-    {
-        var filter = Filter.Geo("location").WithinBox(-74.05, 40.6, -73.85, 40.9);
-
-        Assert.Equal("@location:[-74.05 40.6 -73.85 40.9]", filter.ToQueryString());
-    }
-
-    [Fact]
     public void BuildsFuzzyTextFilters()
     {
         Assert.Equal("@title:%redis%", Filter.Text("title").Fuzzy("redis").ToQueryString());
@@ -121,7 +113,6 @@ public sealed class FilterExpressionTests
         Assert.Throws<ArgumentException>(() => Filter.Tag("genre").Like());
         Assert.Throws<ArgumentOutOfRangeException>(() => Filter.Text("title").Fuzzy("redis", 0));
         Assert.Throws<ArgumentOutOfRangeException>(() => Filter.Text("title").Fuzzy("redis", 4));
-        Assert.Throws<ArgumentException>(() => Filter.Geo("location").WithinBox(2, 0, 1, 5));
         Assert.Throws<ArgumentException>(() => Filter.Timestamp("created").Between(20, 10));
     }
 }
