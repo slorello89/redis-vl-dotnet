@@ -310,7 +310,7 @@ internal sealed class RedisVLRecordModel
         return null;
     }
 
-    private static bool IsStringCollection(Type type)
+    internal static bool IsStringCollection(Type type)
     {
         if (type == typeof(string))
         {
