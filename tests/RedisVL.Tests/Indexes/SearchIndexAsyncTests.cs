@@ -400,6 +400,28 @@ public sealed class SearchIndexAsyncTests
     }
 
     [Fact]
+    public async Task LoadHashAsync_ThenFetchHashByKeyAsync_RoundTripsEnumProperty()
+    {
+        // End-to-end guard for the enum round-trip bug: LoadHashAsync writes the enum to the hash, and
+        // feeding exactly those entries back through FetchHashByKeyAsync must reconstruct the document
+        // instead of throwing a JsonException on the enum field.
+        var (database, recorder) = RecordingDatabaseProxy.CreatePair();
+        var index = new SearchIndex(database, CreateHashSchema("enum-roundtrip"));
+
+        var key = await index.LoadHashAsync(new HashEnumDocument("movie-1", "Heat", MovieStatus.Archived));
+
+        var stored = recorder.HashSetCalls.Single(call => call.Key.ToString() == key).Entries;
+        recorder.HashGetAllResponses.Enqueue(stored);
+
+        var fetched = await index.FetchHashByKeyAsync<HashEnumDocument>(key);
+
+        Assert.NotNull(fetched);
+        Assert.Equal("movie-1", fetched!.Id);
+        Assert.Equal("Heat", fetched.Title);
+        Assert.Equal(MovieStatus.Archived, fetched.Status);
+    }
+
+    [Fact]
     public async Task UpdateHashByKeyAsync_RejectsInvalidUpdateRequests()
     {
         var (database, recorder) = RecordingDatabaseProxy.CreatePair();
@@ -1558,6 +1580,15 @@ public sealed class SearchIndexAsyncTests
         entries.SelectMany(static entry => new[] { RedisResult.Create((RedisValue)entry.Key), entry.Value }).ToArray();
 
     private sealed record HashMovieDocument(string Id, string Title, int Year, string Genre);
+
+    private enum MovieStatus
+    {
+        Draft = 0,
+        Released = 1,
+        Archived = 2
+    }
+
+    private sealed record HashEnumDocument(string Id, string Title, MovieStatus Status);
 
     private sealed record GenreAggregateRow(string Genre, int MovieCount, double AvgYear);
 

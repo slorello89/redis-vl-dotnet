@@ -89,7 +89,69 @@ public sealed class HashDocumentMapperTests
         }
     }
 
+    [Fact]
+    public void MaterializesEnumStoredAsNumericStringAlongsideOtherProperties()
+    {
+        // The default (Web) converter serializes an enum to its numeric string, so a stored hash holds
+        // "status" as "2". Reading it back must reconstruct the enum instead of throwing.
+        var entries = HashDocumentMapper.ToHashEntries(
+            new HashEnumDocument("movie-1", "Heat", MovieStatus.Archived, 1995),
+            SerializerOptions);
+
+        Assert.Equal("2", entries.Single(entry => entry.Name.ToString() == "status").Value.ToString());
+
+        var document = HashDocumentMapper.FromHashEntries<HashEnumDocument>(entries, SerializerOptions);
+
+        Assert.NotNull(document);
+        Assert.Equal("movie-1", document!.Id);
+        Assert.Equal("Heat", document.Title);
+        Assert.Equal(MovieStatus.Archived, document.Status);
+        Assert.Equal(1995, document.Year);
+    }
+
+    [Fact]
+    public void MaterializesEnumStoredAsMemberName()
+    {
+        // Hashes written by a client using a string enum converter store the member name; parsing must
+        // accept it case-insensitively even when the read-side options use the default numeric converter.
+        var document = HashDocumentMapper.FromHashEntries<HashEnumDocument>(
+            [
+                new HashEntry("id", "movie-2"),
+                new HashEntry("title", "Alien"),
+                new HashEntry("status", "released"),
+                new HashEntry("year", "1979")
+            ],
+            SerializerOptions);
+
+        Assert.NotNull(document);
+        Assert.Equal(MovieStatus.Released, document!.Status);
+    }
+
+    [Fact]
+    public void MaterializesNullableEnumFromStoredValue()
+    {
+        var entries = HashDocumentMapper.ToHashEntries(
+            new HashNullableEnumDocument("movie-3", MovieStatus.Draft),
+            SerializerOptions);
+
+        var document = HashDocumentMapper.FromHashEntries<HashNullableEnumDocument>(entries, SerializerOptions);
+
+        Assert.NotNull(document);
+        Assert.Equal(MovieStatus.Draft, document!.Status);
+    }
+
+    private enum MovieStatus
+    {
+        Draft = 0,
+        Released = 1,
+        Archived = 2
+    }
+
     private sealed record HashMovieDocument(string Id, string Title, int Year, string Genre);
 
     private sealed record HashConcurrentDocument(string Id, string Title, int Year, string Genre);
+
+    private sealed record HashEnumDocument(string Id, string Title, MovieStatus Status, int Year);
+
+    private sealed record HashNullableEnumDocument(string Id, MovieStatus? Status);
 }
