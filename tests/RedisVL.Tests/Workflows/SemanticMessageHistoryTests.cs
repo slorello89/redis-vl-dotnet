@@ -149,6 +149,57 @@ public sealed class SemanticMessageHistoryTests
     }
 
     [Fact]
+    public async Task GetRelevantAsync_WithCustomFieldNames_MapsMatchFromConfiguredNames()
+    {
+        // The search reply carries the CONFIGURED field names ("sid"/"speaker"/"text"), not the option
+        // defaults. GetRelevantAsync must resolve them by Options.*FieldName; the earlier typed-mapper path
+        // looked for the camel-cased property names ("sessionId"/"role"/"content") and threw on every match.
+        var (database, recorder) = RecordingDatabaseProxy.CreatePair();
+        recorder.ExecuteAsyncHandler = (command, _) => command switch
+        {
+            "FT.SEARCH" => Task.FromResult(
+                RedisResult.Create(
+                    [
+                        RedisResult.Create(1),
+                        RedisResult.Create((RedisValue)"semantic-message-history:custom-history:tests:msg:hash:00000000000000000005"),
+                        RedisResult.Create(
+                            [
+                                RedisResult.Create((RedisValue)"sid"),
+                                RedisResult.Create((RedisValue)"session-9"),
+                                RedisResult.Create((RedisValue)"speaker"),
+                                RedisResult.Create((RedisValue)"assistant"),
+                                RedisResult.Create((RedisValue)"text"),
+                                RedisResult.Create((RedisValue)"refund details"),
+                                RedisResult.Create((RedisValue)"timestamp"),
+                                RedisResult.Create((RedisValue)"1776085200000"),
+                                RedisResult.Create((RedisValue)"distance"),
+                                RedisResult.Create((RedisValue)"0.03")
+                            ])
+                    ])),
+            _ => Task.FromResult(RedisResult.Create((RedisValue)"OK"))
+        };
+
+        var options = new SemanticMessageHistoryOptions(
+            "custom-history",
+            CreateVectorAttributes(),
+            0.3d,
+            "tests",
+            sessionIdFieldName: "sid",
+            roleFieldName: "speaker",
+            contentFieldName: "text");
+        var history = new SemanticMessageHistory(database, options);
+
+        var matches = await history.GetRelevantAsync("session-9", [1f, 0f], limit: 2, role: "assistant");
+
+        var match = Assert.Single(matches);
+        Assert.Equal("session-9", match.Message.SessionId);
+        Assert.Equal("assistant", match.Message.Role);
+        Assert.Equal("refund details", match.Message.Content);
+        Assert.Equal(5L, match.Message.Sequence);
+        Assert.Equal(0.03d, match.Distance, 3);
+    }
+
+    [Fact]
     public async Task GetRelevantAsync_WithEmbeddingGenerator_UsesGeneratedEmbedding()
     {
         var (database, recorder) = RecordingDatabaseProxy.CreatePair();

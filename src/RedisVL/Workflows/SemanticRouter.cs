@@ -401,7 +401,11 @@ public sealed class SemanticRouter : ISemanticRouter
 
         cancellationToken.ThrowIfCancellationRequested();
 
-        var results = await _index.SearchAsync<SemanticRouteDocument>(
+        // Read fields untyped and resolve them by the configured field names (and the distance score alias)
+        // rather than mapping into a fixed record whose property names only line up with the option defaults.
+        // A typed mapper camel-cases property names, so custom RouteNameFieldName/ReferenceFieldName values
+        // would never be found and every match would fail to materialize.
+        var results = await _index.SearchAsync(
             VectorRangeQuery.FromFloat32(
                 Options.EmbeddingFieldName,
                 embedding,
@@ -416,19 +420,28 @@ public sealed class SemanticRouter : ISemanticRouter
             return null;
         }
 
-        // Candidates arrive nearest-first (SORTBY distance ASC). Resolve each candidate route's threshold
-        // once, then walk in order and return the first reference its route accepts.
-        var routeNames = results.Documents
-            .Select(document => document.RouteName)
+        // Candidates arrive nearest-first (SORTBY distance ASC). Extract each candidate once, resolve every
+        // candidate route's threshold, then walk in order and return the first reference its route accepts.
+        var candidates = new List<(string RouteName, string Reference, double Distance)>(results.Documents.Count);
+        foreach (var document in results.Documents)
+        {
+            candidates.Add((
+                GetRequiredValue(document, Options.RouteNameFieldName),
+                GetRequiredValue(document, Options.ReferenceFieldName),
+                GetRequiredDistance(document)));
+        }
+
+        var routeNames = candidates
+            .Select(candidate => candidate.RouteName)
             .Distinct(StringComparer.Ordinal)
             .ToArray();
         var thresholds = await LoadRouteThresholdsAsync(routeNames, cancellationToken).ConfigureAwait(false);
 
-        foreach (var match in results.Documents)
+        foreach (var (routeName, reference, distance) in candidates)
         {
-            if (match.Distance <= thresholds[match.RouteName])
+            if (distance <= thresholds[routeName])
             {
-                return new SemanticRouteMatch(normalizedInput, match.RouteName, match.Reference, match.Distance);
+                return new SemanticRouteMatch(normalizedInput, routeName, reference, distance);
             }
         }
 
@@ -598,6 +611,27 @@ public sealed class SemanticRouter : ISemanticRouter
         }
 
         return thresholds;
+    }
+
+    private static string GetRequiredValue(SearchDocument document, string fieldName)
+    {
+        if (!document.TryGetValue(fieldName, out var value) || value.IsNullOrEmpty)
+        {
+            throw new InvalidOperationException($"Semantic router search result is missing required field '{fieldName}'.");
+        }
+
+        return value.ToString()!;
+    }
+
+    private static double GetRequiredDistance(SearchDocument document)
+    {
+        var value = GetRequiredValue(document, DistanceAlias);
+        if (!double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out var distance))
+        {
+            throw new InvalidOperationException($"Semantic router search result field '{DistanceAlias}' is not a valid distance.");
+        }
+
+        return distance;
     }
 
     private double ResolveEffectiveThreshold(RedisValue thresholdValue) =>
@@ -771,8 +805,6 @@ public sealed class SemanticRouter : ISemanticRouter
             _ => _sum / _count
         };
     }
-
-    private sealed record SemanticRouteDocument(string RouteName, string Reference, double Distance);
 }
 
 /// <summary>The single nearest route matched by <see cref="SemanticRouter.RouteAsync(string, float[], System.Threading.CancellationToken)" />.</summary>

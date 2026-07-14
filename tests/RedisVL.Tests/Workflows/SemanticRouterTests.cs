@@ -47,6 +47,51 @@ public sealed class SemanticRouterTests
     }
 
     [Fact]
+    public async Task RouteAsync_WithCustomFieldNames_MapsMatchFromConfiguredNames()
+    {
+        // The search reply carries the CONFIGURED field names ("route"/"phrase"), not the option defaults.
+        // RouteAsync must resolve them by Options.*FieldName; the earlier typed-mapper path looked for the
+        // camel-cased property names ("routeName"/"reference") and threw on every match here.
+        var (database, recorder) = RecordingDatabaseProxy.CreatePair();
+        recorder.ExecuteAsyncHandler = (command, _) => command switch
+        {
+            "FT.SEARCH" => Task.FromResult(
+                RedisResult.Create(
+                    [
+                        RedisResult.Create(1),
+                        RedisResult.Create((RedisValue)"semantic-router:unit-router:tests:key"),
+                        RedisResult.Create(
+                            [
+                                RedisResult.Create((RedisValue)"route"),
+                                RedisResult.Create((RedisValue)"billing"),
+                                RedisResult.Create((RedisValue)"phrase"),
+                                RedisResult.Create((RedisValue)"refund status"),
+                                RedisResult.Create((RedisValue)"distance"),
+                                RedisResult.Create((RedisValue)"0.08")
+                            ])
+                    ])),
+            _ => Task.FromResult(RedisResult.Create((RedisValue)"OK"))
+        };
+
+        var options = new SemanticRouterOptions(
+            "unit-router",
+            CreateVectorAttributes(),
+            0.3d,
+            "tests",
+            routeNameFieldName: "route",
+            referenceFieldName: "phrase");
+        var router = new SemanticRouter(database, options);
+
+        var match = await router.RouteAsync("where is my refund?", [1f, 0f]);
+
+        Assert.NotNull(match);
+        Assert.Equal("where is my refund?", match!.Input);
+        Assert.Equal("billing", match.RouteName);
+        Assert.Equal("refund status", match.Reference);
+        Assert.Equal(0.08d, match.Distance, 3);
+    }
+
+    [Fact]
     public async Task AddRouteAsync_WithEmbeddingGenerator_WritesHashDocument()
     {
         var (database, recorder) = RecordingDatabaseProxy.CreatePair();
