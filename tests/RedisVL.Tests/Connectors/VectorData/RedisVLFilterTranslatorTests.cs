@@ -1,4 +1,5 @@
 using System.Linq.Expressions;
+using Microsoft.Extensions.VectorData;
 using RedisVL.Connectors.VectorData.Mapping;
 
 namespace RedisVL.Tests.Connectors.VectorData;
@@ -44,6 +45,68 @@ public sealed class RedisVLFilterTranslatorTests
     }
 
     [Fact]
+    public void Translate_NumericIn_ProducesOrOfEqualities()
+    {
+        // A numeric field must translate `Contains` to an OR of numeric equalities. Before the fix
+        // this emitted TAG syntax (@year:{1995|1999}) on a numeric field, which matches nothing.
+        var translator = new RedisVLFilterTranslator(Model);
+        var years = new[] { 1995, 1999 };
+        Expression<Func<ConnectorMovie, bool>> filter = m => years.Contains(m.Year);
+
+        var result = translator.Translate(filter);
+
+        Assert.Equal("@year:[1995 1995] | @year:[1999 1999]", result.ToQueryString());
+    }
+
+    [Fact]
+    public void Translate_NumericIn_SingleValue_ProducesSingleEquality()
+    {
+        var translator = new RedisVLFilterTranslator(Model);
+        var years = new[] { 1995 };
+        Expression<Func<ConnectorMovie, bool>> filter = m => years.Contains(m.Year);
+
+        var result = translator.Translate(filter);
+
+        Assert.Equal("@year:[1995 1995]", result.ToQueryString());
+    }
+
+    [Fact]
+    public void Translate_CollectionTagMembership_ProducesTagEquality()
+    {
+        // A collection-typed TAG property retains set-membership semantics unchanged.
+        var model = RedisVLRecordModel.Build(typeof(TaggedRecord), definition: null);
+        var translator = new RedisVLFilterTranslator(model);
+        Expression<Func<TaggedRecord, bool>> filter = r => r.Tags.Contains("crime");
+
+        var result = translator.Translate(filter);
+
+        Assert.Equal("@tags:{crime}", result.ToQueryString());
+    }
+
+    [Fact]
+    public void Translate_ScalarStringContains_Throws()
+    {
+        // `Contains` on a scalar string is a substring request that RediSearch cannot express.
+        // Before the fix it was silently translated to tag equality (@genre:{crime}).
+        var translator = new RedisVLFilterTranslator(Model);
+        Expression<Func<ConnectorMovie, bool>> filter = m => m.Genre.Contains("crime");
+
+        Assert.Throws<NotSupportedException>(() => translator.Translate(filter));
+    }
+
+    [Fact]
+    public void Translate_ContainsOnTextProperty_Throws()
+    {
+        // `values.Contains(record.TextField)` has no tag/numeric membership meaning. Before the fix
+        // it was silently translated to TAG IN syntax on a full-text field.
+        var translator = new RedisVLFilterTranslator(Model);
+        var titles = new[] { "Heat", "Thief" };
+        Expression<Func<ConnectorMovie, bool>> filter = m => titles.Contains(m.Title);
+
+        Assert.Throws<NotSupportedException>(() => translator.Translate(filter));
+    }
+
+    [Fact]
     public void Translate_CapturedVariable_IsEvaluated()
     {
         var translator = new RedisVLFilterTranslator(Model);
@@ -78,5 +141,15 @@ public sealed class RedisVLFilterTranslatorTests
                 Assert.Equal("@year:[1990 +inf]", translator.Translate(recent).ToQueryString());
             }
         });
+    }
+
+    /// <summary>A record with a collection-typed TAG property, to exercise set-membership Contains.</summary>
+    private sealed class TaggedRecord
+    {
+        [VectorStoreKey]
+        public string Id { get; set; } = string.Empty;
+
+        [VectorStoreData(IsIndexed = true)]
+        public string[] Tags { get; set; } = [];
     }
 }

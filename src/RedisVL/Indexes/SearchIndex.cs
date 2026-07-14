@@ -776,7 +776,11 @@ public sealed class SearchIndex : ISearchIndex
             batchSize,
             SearchAsync,
             static query => query.Pagination,
-            static (query, pagination) => new FilterQuery(query.Filter, query.ReturnFields, pagination: pagination),
+            static (query, pagination) => new FilterQuery(
+                query.Filter,
+                query.ReturnFields,
+                pagination: pagination,
+                sortBy: query.SortBy),
             static _ => null,
             static result => result.TotalCount,
             static result => result.Documents.Count,
@@ -818,7 +822,13 @@ public sealed class SearchIndex : ISearchIndex
             batchSize,
             SearchAsync,
             static query => query.Pagination,
-            static (query, pagination) => new TextQuery(query.Text, query.ReturnFields, pagination: pagination),
+            static (query, pagination) => new TextQuery(
+                query.Text,
+                query.ReturnFields,
+                pagination: pagination,
+                fieldWeights: query.FieldWeights.ToDictionary(
+                    static weight => weight.Key,
+                    static weight => weight.Value)),
             static _ => null,
             static result => result.TotalCount,
             static result => result.Documents.Count,
