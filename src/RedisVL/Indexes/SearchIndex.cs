@@ -865,7 +865,9 @@ public sealed class SearchIndex : ISearchIndex
                 query.Vector,
                 query.TopK,
                 query.Filter,
-                query.ReturnFields,
+                // Preserve the "unspecified" state so the cloned page keeps omitting RETURN; passing the
+                // non-null empty ReturnFields would re-add the score alias and make batched typed queries throw.
+                query.HasExplicitReturnFields ? query.ReturnFields : null,
                 query.ScoreAlias,
                 query.RuntimeOptions,
                 pagination),
@@ -916,7 +918,9 @@ public sealed class SearchIndex : ISearchIndex
                 query.Vector,
                 query.TopK,
                 query.Filter,
-                query.ReturnFields,
+                // Preserve the "unspecified" state so the cloned page keeps omitting RETURN; passing the
+                // non-null empty ReturnFields would re-add the score alias and make batched typed queries throw.
+                query.HasExplicitReturnFields ? query.ReturnFields : null,
                 query.ScoreAlias,
                 query.RuntimeOptions,
                 pagination),
@@ -966,7 +970,9 @@ public sealed class SearchIndex : ISearchIndex
                 query.Vector,
                 query.DistanceThreshold,
                 query.Filter,
-                query.ReturnFields,
+                // Preserve the "unspecified" state so the cloned page keeps omitting RETURN; passing the
+                // non-null empty ReturnFields would re-add the score alias and make batched typed queries throw.
+                query.HasExplicitReturnFields ? query.ReturnFields : null,
                 query.ScoreAlias,
                 runtimeOptions: query.RuntimeOptions,
                 pagination: pagination),
@@ -1015,7 +1021,10 @@ public sealed class SearchIndex : ISearchIndex
                 query.Vectors,
                 query.TopK,
                 query.Filter,
-                query.ProjectedFields,
+                // Preserve the "unspecified" state so the cloned page keeps omitting RETURN in its fan-out and
+                // the combiner keeps copying all stored fields; passing the non-null empty ProjectedFields
+                // would narrow combined documents to just the score and make batched typed queries throw.
+                query.HasExplicitReturnFields ? query.ProjectedFields : null,
                 query.ScoreAlias,
                 query.RuntimeOptions,
                 pagination),
@@ -1360,11 +1369,34 @@ public sealed class SearchIndex : ISearchIndex
             perVectorScores[index] = score;
             combinedScore += query.Vectors[index].Weight * score;
 
-            foreach (var fieldName in query.ProjectedFields)
+            var sourceDocument = documentLookups[index][documentId];
+
+            if (query.HasExplicitReturnFields)
             {
-                if (!values.ContainsKey(fieldName) &&
-                    documentLookups[index][documentId].TryGetValue(fieldName, out var fieldValue))
+                // The caller narrowed the projection, so copy exactly those fields from the sub-results.
+                foreach (var fieldName in query.ProjectedFields)
                 {
+                    if (!values.ContainsKey(fieldName) &&
+                        sourceDocument.TryGetValue(fieldName, out var fieldValue))
+                    {
+                        values[fieldName] = fieldValue;
+                    }
+                }
+            }
+            else
+            {
+                // Projected fields were left unspecified, so each sub-query omitted RETURN and the server
+                // returned every stored field alongside this vector's internal score alias. Copy all stored
+                // fields, skipping the internal per-vector score alias so it never leaks into combined results.
+                var internalScoreAlias = SearchQueryCommandBuilder.GetMultiVectorScoreAlias(index);
+                foreach (var (fieldName, fieldValue) in sourceDocument.Values)
+                {
+                    if (values.ContainsKey(fieldName) ||
+                        string.Equals(fieldName, internalScoreAlias, StringComparison.Ordinal))
+                    {
+                        continue;
+                    }
+
                     values[fieldName] = fieldValue;
                 }
             }

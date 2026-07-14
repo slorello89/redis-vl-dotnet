@@ -1335,6 +1335,53 @@ public sealed class SearchIndexIntegrationTests
     }
 
     [RedisSearchIntegrationFact]
+    public async Task TypedVectorRangeSearchWithoutReturnFieldsMapsStoredFields()
+    {
+        await using var connection = await RedisSearchTestEnvironment.ConnectAsync();
+        var database = connection.GetDatabase();
+
+        var token = Guid.NewGuid().ToString("N");
+        var schema = new SearchSchema(
+            new IndexDefinition($"vector-range-typed-idx-{token}", $"vrange-typed:{token}:", StorageType.Hash),
+            [
+                new TagFieldDefinition("genre"),
+                new TextFieldDefinition("title"),
+                new VectorFieldDefinition(
+                    "embedding",
+                    new VectorFieldAttributes(
+                        VectorAlgorithm.Flat,
+                        VectorDataType.Float32,
+                        VectorDistanceMetric.Cosine,
+                        2))
+            ]);
+        var index = new SearchIndex(database, schema);
+
+        try
+        {
+            await index.CreateAsync();
+            await SeedHashDocumentsAsync(database, schema, SearchIndexSeedData.VectorMovies);
+            await RedisSearchTestEnvironment.WaitForIndexDocumentCountAsync(index, SearchIndexSeedData.VectorMovies.Count);
+
+            // No return fields specified: the range query used to emit `RETURN 1 vector_distance`, so mapping
+            // a POCO with non-nullable properties threw. It must now return all stored fields so the obvious
+            // typed happy path just works. Threshold 0.3 from [1, 0] admits "Heat" (0.0) and "Thief" (~0.03).
+            var results = await index.SearchAsync<VectorMovieRow>(
+                VectorRangeQuery.FromFloat32("embedding", [1f, 0f], 0.3));
+
+            Assert.Equal(2, results.Documents.Count);
+            Assert.All(results.Documents, static row => Assert.False(string.IsNullOrEmpty(row.Title)));
+            Assert.Contains(results.Documents, static row => row.Title == "Heat");
+        }
+        finally
+        {
+            if (await index.ExistsAsync())
+            {
+                await index.DropAsync(deleteDocuments: true);
+            }
+        }
+    }
+
+    [RedisSearchIntegrationFact]
     public async Task ExecutesVectorQueriesWithCompoundFilters()
     {
         await using var connection = await RedisSearchTestEnvironment.ConnectAsync();

@@ -242,12 +242,15 @@ internal static class SearchQueryCommandBuilder
             var vectorField = ResolveVectorField(schema, vector.FieldName);
             ValidateCosineDistanceMetric(vectorField, vector.FieldName);
 
+            // Preserve the "unspecified" state: when the caller left projected fields unset, pass null so the
+            // sub-query omits RETURN and the server returns every stored field alongside the per-vector score
+            // alias. When fields were specified, pass them through so the sub-query narrows as before.
             var subQuery = new VectorQuery(
                 vector.FieldName,
                 vector.Vector,
                 query.TopK,
                 query.Filter,
-                query.ProjectedFields,
+                query.HasExplicitReturnFields ? query.ProjectedFields : null,
                 GetMultiVectorScoreAlias(index),
                 query.RuntimeOptions,
                 new QueryPagination(limit: query.TopK));
@@ -273,16 +276,18 @@ internal static class SearchQueryCommandBuilder
             BuildHybridSearchQuery(schema, vectorField, query)
         };
         arguments.AddRange(BuildVectorParams(query.Vector, CollectKnnRuntimeParams(query.RuntimeOptions)));
-        arguments.AddRange(
-        [
-            "SORTBY",
-            query.ScoreAlias,
-            "ASC",
-            "RETURN",
-            query.ReturnFields.Count.ToString(CultureInfo.InvariantCulture)
-        ]);
+        arguments.AddRange(["SORTBY", query.ScoreAlias, "ASC"]);
 
-        arguments.AddRange(query.ReturnFields);
+        // An empty return set means "unspecified" — omit RETURN so the server returns all stored fields plus
+        // the yielded score (which the KNN `AS` clause produces and SORTBY targets), rather than narrowing to
+        // just the score alias.
+        if (query.ReturnFields.Count > 0)
+        {
+            arguments.Add("RETURN");
+            arguments.Add(query.ReturnFields.Count.ToString(CultureInfo.InvariantCulture));
+            arguments.AddRange(query.ReturnFields);
+        }
+
         AppendLimit(arguments, query.Offset, query.Limit);
         arguments.Add("DIALECT");
         arguments.Add("2");
@@ -373,16 +378,18 @@ internal static class SearchQueryCommandBuilder
             BuildVectorRangeSearchQuery(schema, vectorField, query)
         };
         arguments.AddRange(BuildVectorParams(query.Vector, ("epsilon", query.RuntimeOptions?.Epsilon)));
-        arguments.AddRange(
-        [
-            "SORTBY",
-            query.ScoreAlias,
-            "ASC",
-            "RETURN",
-            query.ReturnFields.Count.ToString(CultureInfo.InvariantCulture)
-        ]);
+        arguments.AddRange(["SORTBY", query.ScoreAlias, "ASC"]);
 
-        arguments.AddRange(query.ReturnFields);
+        // An empty return set means "unspecified" — omit RETURN so the server returns all stored fields plus
+        // the yielded distance (which the VECTOR_RANGE `$YIELD_DISTANCE_AS` clause produces and SORTBY
+        // targets), rather than narrowing to just the score alias.
+        if (query.ReturnFields.Count > 0)
+        {
+            arguments.Add("RETURN");
+            arguments.Add(query.ReturnFields.Count.ToString(CultureInfo.InvariantCulture));
+            arguments.AddRange(query.ReturnFields);
+        }
+
         AppendLimit(arguments, query.Offset, query.Limit);
         arguments.Add("DIALECT");
         arguments.Add("2");

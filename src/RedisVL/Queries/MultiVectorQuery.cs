@@ -47,6 +47,13 @@ public sealed class MultiVectorQuery
         TopK = topK;
         Filter = filter;
         ScoreAlias = FilterExpression.NormalizeFieldName(scoreAlias);
+
+        // When the caller does not specify projected fields, leave the set empty so each fan-out sub-query
+        // omits RETURN and CreateCombinedSearchDocument copies every stored field (minus the internal
+        // per-vector score aliases) into the combined document. Otherwise the combined documents would carry
+        // only the score and the typed happy path would throw. When fields are specified, behavior is
+        // unchanged: sub-queries RETURN exactly those fields and only they are copied.
+        HasExplicitReturnFields = returnFields is not null;
         ProjectedFields = QueryFieldNormalizer.NormalizeReturnFields(returnFields);
         ReturnFields = QueryReturnFieldHelper.NormalizeReturnFields(returnFields, ScoreAlias);
         RuntimeOptions = runtimeOptions;
@@ -82,6 +89,13 @@ public sealed class MultiVectorQuery
 
     /// <summary>The pagination window applied to the results.</summary>
     public QueryPagination Pagination { get; }
+
+    /// <summary>
+    /// Whether the caller explicitly supplied projected fields. When <see langword="false"/> the set was left
+    /// unspecified and <see cref="ProjectedFields"/> is empty, signalling the fan-out to omit RETURN and the
+    /// combiner to copy every stored field. Preserved through cloning so batched queries keep the same behavior.
+    /// </summary>
+    internal bool HasExplicitReturnFields { get; }
 
     internal IReadOnlyList<string> ProjectedFields { get; }
 
