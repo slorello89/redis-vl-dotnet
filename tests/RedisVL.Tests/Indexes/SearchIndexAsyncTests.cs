@@ -905,6 +905,62 @@ public sealed class SearchIndexAsyncTests
     }
 
     [Fact]
+    public async Task SearchBatchesAsync_DefaultVectorQuery_OmitsReturnOnEveryPage()
+    {
+        var (database, recorder) = RecordingDatabaseProxy.CreatePair();
+        var index = new SearchIndex(database, CreateVectorSchema("vector-batches-default"));
+        recorder.ExecuteAsyncResponses.Enqueue(
+            VectorSearchPage(3, ("movie:1", "Heat", "0.01"), ("movie:2", "Thief", "0.02")));
+        recorder.ExecuteAsyncResponses.Enqueue(
+            VectorSearchPage(3, ("movie:3", "Arrival", "0.03")));
+
+        var batches = new List<SearchResults>();
+        await foreach (var batch in index.SearchBatchesAsync(
+            VectorQuery.FromFloat32("embedding", [1f, 0f], topK: 3),
+            batchSize: 2))
+        {
+            batches.Add(batch);
+        }
+
+        // Regression for the batch-clone sentinel: a default (unspecified) return set must stay unspecified
+        // across every paged clone. Passing the non-null empty ReturnFields into the clone would re-add the
+        // score alias and make each page emit RETURN, breaking the typed happy path for batched queries.
+        Assert.Equal(2, recorder.ExecuteAsyncCallCount);
+        Assert.All(
+            recorder.ExecuteAsyncCalls,
+            static call => Assert.DoesNotContain(
+                "RETURN",
+                call.Arguments.Select(static argument => argument?.ToString() ?? string.Empty)));
+    }
+
+    [Fact]
+    public async Task SearchBatchesAsync_DefaultVectorRangeQuery_OmitsReturnOnEveryPage()
+    {
+        var (database, recorder) = RecordingDatabaseProxy.CreatePair();
+        var index = new SearchIndex(database, CreateVectorSchema("vector-range-batches-default"));
+        recorder.ExecuteAsyncResponses.Enqueue(
+            VectorSearchPage(3, ("movie:1", "Heat", "0.01"), ("movie:2", "Thief", "0.02")));
+        recorder.ExecuteAsyncResponses.Enqueue(
+            VectorSearchPage(3, ("movie:3", "Arrival", "0.03")));
+
+        var batches = new List<SearchResults>();
+        await foreach (var batch in index.SearchBatchesAsync(
+            VectorRangeQuery.FromFloat32("embedding", [1f, 0f], 0.3),
+            batchSize: 2))
+        {
+            batches.Add(batch);
+        }
+
+        // Same clone-sentinel regression, exercised through the vector range pager.
+        Assert.Equal(2, recorder.ExecuteAsyncCallCount);
+        Assert.All(
+            recorder.ExecuteAsyncCalls,
+            static call => Assert.DoesNotContain(
+                "RETURN",
+                call.Arguments.Select(static argument => argument?.ToString() ?? string.Empty)));
+    }
+
+    [Fact]
     public async Task AggregateAsync_ExecutesFtAggregateWithAggregationArguments()
     {
         var (database, recorder) = RecordingDatabaseProxy.CreatePair();
@@ -1330,6 +1386,79 @@ public sealed class SearchIndexAsyncTests
         Assert.Equal(0.095d, document.CombinedDistance, 10);
     }
 
+    [Fact]
+    public async Task MultiVectorSearchAsync_DefaultProjection_CopiesAllStoredFieldsAndHidesInternalScores()
+    {
+        var (database, recorder) = RecordingDatabaseProxy.CreatePair();
+        var index = new SearchIndex(database, CreateMultiVectorSchema("multi-vector-default"));
+        // Projected fields unspecified → sub-queries omit RETURN, so the server returns every stored field
+        // (title, category) alongside the internal per-vector score alias.
+        recorder.ExecuteAsyncResponses.Enqueue(MultiVectorProductResponse("product:1", "__mv_score_0", "0.05"));
+        recorder.ExecuteAsyncResponses.Enqueue(MultiVectorProductResponse("product:1", "__mv_score_1", "0.20"));
+
+        var results = await index.SearchAsync(
+            new MultiVectorQuery(
+                [
+                    MultiVectorInput.FromFloat32("text_embedding", [1f, 0f], weight: 0.7),
+                    MultiVectorInput.FromFloat32("image_embedding", [0f, 1f], weight: 0.3)
+                ],
+                topK: 3,
+                scoreAlias: "combined_distance"));
+
+        var document = Assert.Single(results.Documents);
+        Assert.Equal("product:1", document.Id);
+        // Every stored field from the sub-results is copied into the combined document.
+        Assert.Equal("Runner", document.Values["title"]);
+        Assert.Equal("footwear", document.Values["category"]);
+        // The fused score is projected under the query's score alias (0.7*0.05 + 0.3*0.20 = 0.095).
+        Assert.Equal(0.095, (double)document.Values["combined_distance"], precision: 6);
+        // The internal per-vector score aliases must never leak into combined documents.
+        Assert.DoesNotContain("__mv_score_0", document.Values.Keys);
+        Assert.DoesNotContain("__mv_score_1", document.Values.Keys);
+        // Default projection → each fan-out sub-query omits RETURN.
+        Assert.All(
+            recorder.ExecuteAsyncCalls,
+            static call => Assert.DoesNotContain(
+                "RETURN",
+                call.Arguments.Select(static argument => argument?.ToString() ?? string.Empty)));
+    }
+
+    [Fact]
+    public async Task MultiVectorSearchAsync_ExplicitProjection_CopiesOnlyProjectedFieldsAndScore()
+    {
+        var (database, recorder) = RecordingDatabaseProxy.CreatePair();
+        var index = new SearchIndex(database, CreateMultiVectorSchema("multi-vector-explicit"));
+        // The sub-results carry an extra stored field ("category") the caller did not project; it must be
+        // ignored so the explicit-projection behavior is unchanged.
+        recorder.ExecuteAsyncResponses.Enqueue(MultiVectorProductResponse("product:1", "__mv_score_0", "0.05"));
+        recorder.ExecuteAsyncResponses.Enqueue(MultiVectorProductResponse("product:1", "__mv_score_1", "0.20"));
+
+        var results = await index.SearchAsync(
+            new MultiVectorQuery(
+                [
+                    MultiVectorInput.FromFloat32("text_embedding", [1f, 0f], weight: 0.7),
+                    MultiVectorInput.FromFloat32("image_embedding", [0f, 1f], weight: 0.3)
+                ],
+                topK: 3,
+                returnFields: ["title"],
+                scoreAlias: "combined_distance"));
+
+        var document = Assert.Single(results.Documents);
+        Assert.Equal("Runner", document.Values["title"]);
+        Assert.Equal(0.095, (double)document.Values["combined_distance"], precision: 6);
+        // Only the projected field plus the combined score are copied; unprojected fields and internal
+        // per-vector score aliases stay out of the combined document.
+        Assert.DoesNotContain("category", document.Values.Keys);
+        Assert.DoesNotContain("__mv_score_0", document.Values.Keys);
+        Assert.DoesNotContain("__mv_score_1", document.Values.Keys);
+        // Explicit projection → each fan-out sub-query narrows the projection with RETURN.
+        Assert.All(
+            recorder.ExecuteAsyncCalls,
+            static call => Assert.Contains(
+                "RETURN",
+                call.Arguments.Select(static argument => argument?.ToString() ?? string.Empty)));
+    }
+
     private static SearchSchema CreateHashSchema(string token) =>
         new(
             new IndexDefinition($"hash-{token}", $"movie:{token}:", StorageType.Hash),
@@ -1383,6 +1512,40 @@ public sealed class SearchIndexAsyncTests
                         VectorDataType.Float32,
                         VectorDistanceMetric.Cosine,
                         2))
+            ]);
+
+    private static RedisResult VectorSearchPage(long totalCount, params (string Id, string Title, string Distance)[] documents)
+    {
+        var elements = new List<RedisResult> { RedisResult.Create(totalCount) };
+        foreach (var (id, title, distance) in documents)
+        {
+            elements.Add(RedisResult.Create((RedisValue)id));
+            elements.Add(RedisResult.Create(
+                [
+                    RedisResult.Create((RedisValue)"title"),
+                    RedisResult.Create((RedisValue)title),
+                    RedisResult.Create((RedisValue)"vector_distance"),
+                    RedisResult.Create((RedisValue)distance)
+                ]));
+        }
+
+        return RedisResult.Create(elements.ToArray());
+    }
+
+    private static RedisResult MultiVectorProductResponse(string id, string scoreAlias, string score) =>
+        RedisResult.Create(
+            [
+                RedisResult.Create(1),
+                RedisResult.Create((RedisValue)id),
+                RedisResult.Create(
+                    [
+                        RedisResult.Create((RedisValue)"title"),
+                        RedisResult.Create((RedisValue)"Runner"),
+                        RedisResult.Create((RedisValue)"category"),
+                        RedisResult.Create((RedisValue)"footwear"),
+                        RedisResult.Create((RedisValue)scoreAlias),
+                        RedisResult.Create((RedisValue)score)
+                    ])
             ]);
 
     private static RedisResult CreateExistingIndexInfoResult() =>

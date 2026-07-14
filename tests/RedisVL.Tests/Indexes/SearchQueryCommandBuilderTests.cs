@@ -375,6 +375,76 @@ public sealed class SearchQueryCommandBuilderTests
         ]);
 
     [Fact]
+    public void DefaultHybridQueryOmitsReturnSoAllFieldsComeBack()
+    {
+        var schema = VectorSchema();
+        var query = HybridQuery.FromFloat32(Filter.Text("title").Match("heat"), "embedding", [1f, 0f], 2);
+
+        var tokens = SearchQueryCommandBuilder.BuildHybridSearchArguments(schema, query)
+            .Select(static argument => argument.ToString())
+            .ToArray();
+
+        // No RETURN → the server returns every stored field plus the yielded score, so the typed
+        // happy path can map a POCO instead of throwing on a missing required field.
+        Assert.Empty(query.ReturnFields);
+        Assert.DoesNotContain("RETURN", tokens);
+        // SORTBY on the score alias (yielded by the KNN `AS` clause) is still emitted so results stay ordered.
+        Assert.Contains("SORTBY", tokens);
+    }
+
+    [Fact]
+    public void ExplicitHybridQueryReturnFieldsStillEmitReturn()
+    {
+        var schema = VectorSchema();
+        var query = HybridQuery.FromFloat32(
+            Filter.Text("title").Match("heat"),
+            "embedding",
+            [1f, 0f],
+            2,
+            returnFields: ["title"],
+            scoreAlias: "distance");
+
+        var tokens = SearchQueryCommandBuilder.BuildHybridSearchArguments(schema, query)
+            .Select(static argument => argument.ToString())
+            .ToArray();
+
+        Assert.Equal(["title", "distance"], query.ReturnFields);
+        Assert.Contains("RETURN", tokens);
+    }
+
+    [Fact]
+    public void DefaultVectorRangeQueryOmitsReturnSoAllFieldsComeBack()
+    {
+        var schema = VectorSchema();
+        var query = VectorRangeQuery.FromFloat32("embedding", [1f, 0f], 0.3);
+
+        var tokens = SearchQueryCommandBuilder.BuildVectorRangeArguments(schema, query)
+            .Select(static argument => argument.ToString())
+            .ToArray();
+
+        // No RETURN → the server returns every stored field plus the yielded distance, so the typed
+        // happy path can map a POCO instead of throwing on a missing required field.
+        Assert.Empty(query.ReturnFields);
+        Assert.DoesNotContain("RETURN", tokens);
+        // SORTBY on the distance alias (yielded by VECTOR_RANGE `$YIELD_DISTANCE_AS`) is still emitted.
+        Assert.Contains("SORTBY", tokens);
+    }
+
+    [Fact]
+    public void ExplicitVectorRangeQueryReturnFieldsStillEmitReturn()
+    {
+        var schema = VectorSchema();
+        var query = VectorRangeQuery.FromFloat32("embedding", [1f, 0f], 0.3, returnFields: ["title"], scoreAlias: "distance");
+
+        var tokens = SearchQueryCommandBuilder.BuildVectorRangeArguments(schema, query)
+            .Select(static argument => argument.ToString())
+            .ToArray();
+
+        Assert.Equal(["title", "distance"], query.ReturnFields);
+        Assert.Contains("RETURN", tokens);
+    }
+
+    [Fact]
     public void BuildsMultiVectorSearchArgumentsWithStableAliases()
     {
         var schema = new SearchSchema(
@@ -437,6 +507,39 @@ public sealed class SearchQueryCommandBuilderTests
                 "DIALECT", "2"
             ],
             arguments[1].Select(RenderArgument).ToArray());
+    }
+
+    [Fact]
+    public void DefaultMultiVectorQueryFanOutOmitsReturnButKeepsScoreAliases()
+    {
+        var schema = new SearchSchema(
+            new IndexDefinition("products-idx", "product:", StorageType.Hash),
+            [
+                new TextFieldDefinition("title"),
+                new VectorFieldDefinition(
+                    "text_embedding",
+                    new VectorFieldAttributes(VectorAlgorithm.Flat, VectorDataType.Float32, VectorDistanceMetric.Cosine, 2)),
+                new VectorFieldDefinition(
+                    "image_embedding",
+                    new VectorFieldAttributes(VectorAlgorithm.Flat, VectorDataType.Float32, VectorDistanceMetric.Cosine, 2))
+            ]);
+        var query = new MultiVectorQuery(
+            [
+                MultiVectorInput.FromFloat32("text_embedding", [1f, 0f], weight: 0.7),
+                MultiVectorInput.FromFloat32("image_embedding", [0f, 1f], weight: 0.3)
+            ],
+            topK: 3);
+
+        var arguments = SearchQueryCommandBuilder.BuildMultiVectorSearchArguments(schema, query);
+
+        Assert.Equal(2, arguments.Count);
+        // Unspecified projected fields → each fan-out sub-query omits RETURN so all stored fields come back,
+        // but the internal per-vector score alias is still yielded via the KNN `AS` clause for combining.
+        Assert.All(
+            arguments,
+            static subCommand => Assert.DoesNotContain("RETURN", subCommand.Select(RenderArgument)));
+        Assert.Contains("(*)=>[KNN 3 @text_embedding $vector AS __mv_score_0]", arguments[0].Select(RenderArgument));
+        Assert.Contains("(*)=>[KNN 3 @image_embedding $vector AS __mv_score_1]", arguments[1].Select(RenderArgument));
     }
 
     [Fact]

@@ -59,7 +59,13 @@ public sealed class HybridQuery
         TopK = topK;
         Filter = filter;
         ScoreAlias = FilterExpression.NormalizeFieldName(scoreAlias);
-        ReturnFields = QueryReturnFieldHelper.NormalizeReturnFields(returnFields, ScoreAlias);
+
+        // When the caller does not specify return fields, leave the set empty so the builder omits RETURN
+        // entirely and the server returns every stored field (plus the yielded score alias produced by the
+        // KNN `AS` clause, which SORTBY still targets). Emitting `RETURN 1 <scoreAlias>` here would make the
+        // typed happy path throw, because the mapper treats every non-nullable property as required.
+        HasExplicitReturnFields = returnFields is not null;
+        ReturnFields = returnFields is null ? [] : QueryReturnFieldHelper.NormalizeReturnFields(returnFields, ScoreAlias);
         RuntimeOptions = runtimeOptions;
         Pagination = pagination ?? new QueryPagination(limit: topK);
         Offset = Pagination.Offset;
@@ -95,6 +101,13 @@ public sealed class HybridQuery
 
     /// <summary>The fields returned for each matching document.</summary>
     public IReadOnlyList<string> ReturnFields { get; }
+
+    /// <summary>
+    /// Whether the caller explicitly supplied return fields. When <see langword="false"/> the return set was
+    /// left unspecified and <see cref="ReturnFields"/> is empty, signalling the builder to omit RETURN so the
+    /// server returns every stored field. Preserved through cloning so batched queries keep the same behavior.
+    /// </summary>
+    internal bool HasExplicitReturnFields { get; }
 
     /// <summary>Optional query-time index tuning parameters, or <see langword="null"/> to use index defaults.</summary>
     public VectorKnnRuntimeOptions? RuntimeOptions { get; }
