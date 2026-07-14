@@ -202,25 +202,6 @@ internal sealed class GeoFilterExpression(
         };
 }
 
-internal sealed class GeoBoxFilterExpression(
-    string fieldName,
-    double minLongitude,
-    double minLatitude,
-    double maxLongitude,
-    double maxLatitude) : FilterExpression
-{
-    private readonly string _fieldName = NormalizeFieldName(fieldName);
-    private readonly double _minLongitude = minLongitude;
-    private readonly double _minLatitude = minLatitude;
-    private readonly double _maxLongitude = maxLongitude;
-    private readonly double _maxLatitude = maxLatitude;
-
-    internal override string Render(bool grouped)
-    {
-        return $"@{_fieldName}:[{FormatNumber(_minLongitude)} {FormatNumber(_minLatitude)} {FormatNumber(_maxLongitude)} {FormatNumber(_maxLatitude)}]";
-    }
-}
-
 internal enum LogicalOperator
 {
     And,

@@ -9,7 +9,7 @@ Use `FilterQuery` when the match criteria come from fielded filters:
 * tag equality and set membership (`Filter.Tag(field).Eq/In`) and wildcard patterns (`Filter.Tag(field).Like("tech*")`)
 * numeric ranges
 * text expressions built with the filter DSL: `Match`, `Phrase`, `Prefix`, `Fuzzy`, and `Wildcard`
-* geo radius (`WithinRadius`) and bounding-box (`WithinBox`) predicates
+* geo radius (`WithinRadius`) predicates
 * timestamp ranges over epoch-seconds fields (`Filter.Timestamp(field).After/Before/Between/Eq`)
 * boolean combinations through `Filter.And(...)`, `Filter.Or(...)`, and `!`
 
@@ -29,8 +29,8 @@ Filter.Text("title").Fuzzy("redis", 2);           // @title:%%redis%%
 // Wildcard text match (DIALECT 2 w'...' syntax)
 Filter.Text("title").Wildcard("f?o*bar");         // @title:w'f?o*bar'
 
-// Geo bounding box (min/max longitude, min/max latitude)
-Filter.Geo("location").WithinBox(-74.05, 40.6, -73.85, 40.9);
+// Geo radius (center longitude/latitude, radius, unit)
+Filter.Geo("location").WithinRadius(-74.05, 40.7, 10, GeoUnit.Kilometers);
 
 // Timestamp ranges over an epoch-seconds numeric field
 Filter.Timestamp("created").After(DateTimeOffset.UtcNow.AddDays(-7));
