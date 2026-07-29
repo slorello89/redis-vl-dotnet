@@ -97,5 +97,5 @@ Java is the more mature, broader **platform** (0.13.1 vs 0.0.4): it leads on AI-
 
 ## Sources
 
-- `redis-vl-dotnet` local source tree at `/Users/steve.lorello/projects/redis/redis-vl-dotnet/src`, version 0.0.4.
+- `redis-vl-dotnet` local source tree at `src`, version 0.0.4.
 - `redis/redis-vl-java` @ `main` (v0.13.1), inventoried from the public source tree on 2026-06-08.

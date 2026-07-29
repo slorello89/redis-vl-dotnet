@@ -73,6 +73,6 @@ Most items from the original `prd.json` delivery order are now complete. The rem
 ## Source Inputs
 
 - Local implementation and tests in this repository
-- [docs/feature-analysis.md](/Users/steve.lorello/projects/redis/redis-vl-dotnet/docs/feature-analysis.md)
+- Local feature-analysis notes
 - `redis-vl-java` public repository and `FEATURE_PARITY_REPORT.md`
 - Local sibling `../redis-vl-python` repository
